@@ -5,11 +5,7 @@
 #include <string.h>
 #include <stdatomic.h>
 
-#include "annotation/intention.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -114,7 +110,7 @@ static void console_clamp_copy(char *dst, size_t cap, const char *src) {
 
 // CONSTRUCTORS (PUBLIC & PRIVATE)
 /** Creates a console configured to use the default shell. */
-Console *Console_0(void) {
+Console *Console_0() {
     return Console_1("/bin/sh");
 }
 

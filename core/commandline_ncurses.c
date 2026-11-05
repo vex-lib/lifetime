@@ -1,11 +1,10 @@
-#include "kernel/commandline.h"
+#include "commandline.h"
 
 #include <string.h>
 
 #include <curses.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -177,7 +176,7 @@ static bool ncPoll(void *ctx, int timeoutMs, CommandLineEvent *out) {
     return true;
 }
 
-CommandLineIo CommandLine_defaultIo(void) {
+CommandLineIo CommandLine_defaultIo() {
     CommandLineIo io;
     memset(&io, 0, sizeof(io));
     io.ctx = nullptr;

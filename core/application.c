@@ -6,15 +6,13 @@
 #include <stdatomic.h>
 #include <time.h>
 
-#include "annotation/intention.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "input/key.h"
-#include "input/mouse.h"
-#include "input/touch.h"
-#include "system/system.h"
+#include "lifetime/lifetime.h"
+
+#include "annotation/annotation.h"
+#include "../../vexspoke/input/key.h"
+#include "../../vexspoke/input/mouse.h"
+#include "../../vexspoke/input/touch.h"
+#include "../../vexspoke/system/system.h"
 
 ;;DEFINITION
 /**
@@ -61,7 +59,8 @@
  *   Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
  *   uint32_t window_count;                 // used slots in windows[]
  *   _Atomic bool running;                  // runtime active flag (Kernel writes, graphvex reads)
- *   HotModule *hot;                        // dynamic module watcher (opt-in via setHot)
+ *   void *hot;                           // reload watcher, opaque (setHot)
+ *   AppHotPollFn hotPoll;                // reload poll seam (setHotPoll)
  *   _Atomic uint32_t fps;                  // live telemetry: FPS (graphvex writes)
  *   _Atomic uint32_t frametimeUs;          // live telemetry: frametime in microseconds
  *   AppHotReloadFn hotReloadFn;            // hot-reload notification callback (nullable)
@@ -182,7 +181,9 @@ static bool appAllWindowsClosed(const Application *self) {
     return true;
 }
 
-/** Services window/input work on the owner thread, then parks for one short slice. */
+/** Services window/input work on the owner thread, then parks for one short slice.
+ * Closes each pass by resetting the host transient arena: scratch borrowed
+ * during this pass dies here, never across frames or swaps. */
 static void appParkSlice(Application *self) {
     for (uint32_t i = 0; i < APP_PARK_SLICES; i++) {
         if (!atomic_load_explicit(&(*self).running, memory_order_relaxed))
@@ -192,6 +193,8 @@ static void appParkSlice(Application *self) {
         Key_dispatchEvents(); Mouse_dispatchEvents(); Touch_dispatchEvents();
         s_current = previous;
         Application_poll(self);
+        if ((*self).hostLifetime)
+            Lifetime_resetTransient((Lifetime*) (*self).hostLifetime);
         struct timespec slice = { APP_PARK_SLICE_NS / 1000000000ULL,
                                   APP_PARK_SLICE_NS % 1000000000ULL };
         nanosleep(&slice, nullptr);
@@ -200,7 +203,7 @@ static void appParkSlice(Application *self) {
 
 // CONSTRUCTORS (PUBLIC & PRIVATE)
 /** Allocates an application manifest with the default name. */
-Application *Application_0(void) {
+Application *Application_0() {
     Application_init();
     Application *self = (Application*) calloc(1, sizeof(Application));
     if (!self) return nullptr;
@@ -252,7 +255,9 @@ static void *appStartWorker(void *userdata) {
 }
 
 /** Returns the application currently being serviced on this thread, if any. */
-Application *Application_current(void) { return s_current; }
+Application *Application_current() {
+    return s_current;
+}
 
 /** Marks the application active, shows its windows, and starts its worker callbacks. */
 bool Application_begin(Application *self) {
@@ -314,7 +319,7 @@ bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *us
 }
 
 /** Removes the matching poll callback and userdata pair. */
-bool Application_removePollEvent(Application *self, ApplicationEventFn fn, void *userdata) {
+bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const void *userdata) {
     if (!self) return false;
     if (atomic_load(&(*self).active) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
     for (uint32_t i = 0; i < APP_MAX_EVENTS; i++)
@@ -461,33 +466,36 @@ void Application_onHotReload(Application *self, AppHotReloadFn fn, void *userdat
     (*self).hotReloadUserdata = userdata;
 }
 
-#include <dlfcn.h>
-
-/** Polls the associated HotModule and reports successful loaded sections. */
+/** Polls the associated reload watcher via the hotcwap-provided seam. */
 void Application_pollHot(Application *self) {
-    if (!self || !(*self).hot)
-        return;
-    typedef int (*HotPollFn)(HotModule *, uint32_t *);
-    static HotPollFn pollFn = nullptr;
-    static bool resolved = false;
-    if (!resolved) {
-        pollFn = (HotPollFn) dlsym(RTLD_DEFAULT, "Hot_poll");
-        resolved = true;
-    }
-    if (!pollFn)
+    if (!self || !(*self).hot || !(*self).hotPoll)
         return;
     uint32_t loaded = 0;
-    int r = pollFn((*self).hot, &loaded);
+    int r = (*self).hotPoll((*self).hot, &loaded);
     if (r == 0 && loaded > 0 && (*self).hotReloadFn)
         (*self).hotReloadFn(self, loaded, (*self).hotReloadUserdata);
 }
 
 // SETTERS (PUBLIC & PRIVATE)
 ;;SETTER
-/** Associates a borrowed HotModule used by Application_pollHot. */
-void Application_setHot(Application *self, HotModule *hot) {
+/** Associates a borrowed reload watcher (opaque; hotcwap owns the type). */
+void Application_setHot(Application *self, void *hot) {
     if (!self) return;
     (*self).hot = hot;
+}
+
+;;SETTER
+/** Installs the reload poll seam (hotcwap provides; R0 never names HotModule). */
+void Application_setHotPoll(Application *self, AppHotPollFn poll) {
+    if (!self) return;
+    (*self).hotPoll = poll;
+}
+
+;;SETTER
+/** Binds the owning Kernel Lifetime so the host pump can reset scratch per pass. */
+void Application_setHostLifetime(Application *self, void *lifetime) {
+    if (!self) return;
+    (*self).hostLifetime = lifetime;
 }
 
 ;;SETTER
@@ -536,8 +544,8 @@ uint32_t Application_getFrametimeUs(const Application *self) {
 }
 
 ;;GETTER
-/** Returns the associated borrowed hot module, or nullptr for null self. */
-HotModule *Application_getHot(const Application *self) {
+/** Returns the associated borrowed reload watcher (opaque), or nullptr for null self. */
+void *Application_getHot(const Application *self) {
     return self ? (*self).hot : nullptr;
 }
 

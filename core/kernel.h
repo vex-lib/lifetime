@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#include "spoke/lifetime.h"
+#include "lifetime/lifetime.h"
 #include "application.h"
 #include "console.h"
 #include "process.h"

@@ -1,13 +1,11 @@
-#include "kernel/commandline.h"
+#include "commandline.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/intention.h"
-#include "exception/throw.h"
+#include "annotation/annotation.h"
+#include "../../vexspoke/exception/throw.h"
 
 ;;DEFINITION
 /**
@@ -115,7 +113,7 @@ static bool cmdAllocGrid(CommandLine *self, size_t width, size_t height) {
     return true;
 }
 
-CommandLine *CommandLine_0(void) {
+CommandLine *CommandLine_0() {
     return CommandLine_1("vex");
 }
 

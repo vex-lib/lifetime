@@ -1,11 +1,8 @@
-#include "kernel/process.h"
+#include "process.h"
 
 #include <stdlib.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**

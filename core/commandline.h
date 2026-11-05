@@ -1,8 +1,6 @@
 #ifndef HOT_KERNEL_COMMANDLINE_H
 #define HOT_KERNEL_COMMANDLINE_H
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdatomic.h>
 
@@ -120,7 +118,7 @@ struct CommandLine {
 // --- Overloaded constructors (the Window chooser idiom) ---
 //   CommandLine()          -> default title "vex"
 //   CommandLine("title")   -> named
-CommandLine *CommandLine_0(void);
+CommandLine *CommandLine_0();
 CommandLine *CommandLine_1(const char *title);
 
 #define COMMANDLINE_CHOOSER(_0, _1, NAME, ...) NAME
@@ -204,6 +202,6 @@ bool CommandLine_toStringStruct(const CommandLine *self, char *dest, size_t cap,
 
 // The default ncurses backend (commandline_ncurses.c). Returned by value; owns
 // no state until opened. Exposed so an application can pre-set mouse policy.
-CommandLineIo CommandLine_defaultIo(void);
+CommandLineIo CommandLine_defaultIo();
 
 #endif

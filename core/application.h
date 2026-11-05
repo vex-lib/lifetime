@@ -7,8 +7,7 @@
 #include <stdatomic.h>
 #include <pthread.h>
 
-typedef struct HotModule HotModule;
-#include "window/window.h"
+#include "../window/window.h"
 
 // kernel/application.h — Executable-level manifest, window registry & hot-module slot.
 //
@@ -41,18 +40,21 @@ typedef struct Application Application;
 
 typedef void (*AppHotReloadFn)(Application *self, uint32_t loaded, void *userdata);
 typedef void (*ApplicationEventFn)(Application *self, void *userdata);
+typedef int (*AppHotPollFn)(void *hot, uint32_t *loaded);
 #define APP_MAX_EVENTS 16
 
 struct Application {
     char name[APP_MAX_NAME];               // app name (default "vex")
     char author[APP_MAX_NAME];             // author / studio (default "")
-    char version[APP_MAX_VERSION];         // version string, e.g. "1.2.3"
+    char version[APP_MAX_VERSION];         // version string, e.g. "1.0.0"
     char iconPath[APP_MAX_ICON_PATH];      // icon path reference (default "")
     Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
     uint32_t window_count;                 // used slots in windows[]
     bool hadWindows;                      // removing last window completes lifetime
     _Atomic bool running;                  // runtime active flag (Kernel writes, graphvex reads)
-    HotModule *hot;                        // dynamic module watcher (opt-in via Application_setHot)
+    void *hot;                             // reload watcher (opaque; hotcwap fills via setHotPoll)
+    AppHotPollFn hotPoll;                  // reload poll seam (nullable; hotcwap provides)
+    void *hostLifetime;                    // owning Kernel Lifetime (opaque; set at start)
     _Atomic uint32_t fps;                  // live telemetry: FPS (graphvex writes)
     _Atomic uint32_t frametimeUs;          // live telemetry: frametime in microseconds (graphvex writes)
     AppHotReloadFn hotReloadFn;            // hot-reload notification callback (nullable)
@@ -117,7 +119,7 @@ bool Application_isRunning(const Application *self);
 // Register before starting. Start callbacks run in registration order on a worker.
 bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *userdata);
 bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *userdata);
-bool Application_removePollEvent(Application *self, ApplicationEventFn fn, void *userdata);
+bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const void *userdata);
 // Synchronous owner-thread work; false if closing. Never call while holding UI locks.
 bool Application_invoke(Application *self, ApplicationEventFn fn, void *userdata);
 // Current application on its native owner thread (NULL outside lifecycle).
@@ -137,11 +139,11 @@ bool Application_isFinished(const Application *self);
 void Application_run(Application *self);
 
 // --- Hot-reload drive (generation-driven, _main thread only) ---
-// Poll this app's HotModule (bind via Application_setHot): Hot_poll reloads
-// bin/current/<library> when the manifest generation stamp moves, then the
-// hotReloadFn notification fires for every executed swap. No-op when hot is
-// NULL/unset. Called by the Kernel reactor and the parked loop at a ~250ms
-// cadence.
+// Poll this app's reload watcher (bind via Application_setHot + setHotPoll):
+// the seam polls the watcher, then the hotReloadFn notification fires for
+// every executed swap. No-op when hot or hotPoll is NULL/unset. R0 never
+// names the watcher type — hotcwap adapts. Called by the Kernel reactor
+// and the parked loop at a ~250ms cadence.
 void Application_pollHot(Application *self);
 
 // --- Lifecycle callbacks ---
@@ -150,10 +152,12 @@ void Application_onHotReload(Application *self, AppHotReloadFn fn, void *userdat
 // --- Telemetry ---
 uint32_t   Application_getFps(const Application *self);
 uint32_t   Application_getFrametimeUs(const Application *self);
-HotModule *Application_getHot(const Application *self);
-// Opt-in: assign a pre-initialized HotModule to enable hot-reload for this
-// application. NULL disables.
-void        Application_setHot(Application *self, HotModule *hot);
+void      *Application_getHot(const Application *self);
+// Opt-in: assign a pre-initialized reload watcher (opaque; hotcwap owns the
+// type) plus its poll seam. NULL disables.
+void        Application_setHot(Application *self, void *hot);
+void        Application_setHotPoll(Application *self, AppHotPollFn poll);
+void        Application_setHostLifetime(Application *self, void *lifetime);
 
 // --- Identity: symmetric setters / getters (the Symmetric Getter/Setter Completeness Law) ---
 void        Application_setName(Application *self, const char *name);

@@ -1,4 +1,4 @@
-#include "kernel/kernel.h"
+#include "kernel.h"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -6,15 +6,11 @@
 #include <string.h>
 #include <time.h>
 
-#include "annotation/intention.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "input/key.h"
-#include "input/mouse.h"
-#include "window/window.h"
-#include "spoke/bespoke.h"
+#include "annotation/annotation.h"
+#include "lifetime/lifetime.h"
+#include "../../vexspoke/input/key.h"
+#include "../../vexspoke/input/mouse.h"
+#include "../../vexspoke/spoke/bespoke.h"
 
 ;;DEFINITION
 /**
@@ -403,7 +399,7 @@ static void *kernelRunWorkerMain(void *arg) {
 
 // --- REGISTRY INTERNALS + DEFERRED MAILBOX -----------------------------------
 // The three Kernel_add* entry points split into (a) the Terminal-Run guard
-// and (b) apply-internal peers that touch ONLY the registry arrays. The
+// and (b.sh) apply-internal peers that touch ONLY the registry arrays. The
 // guard lives at the public seam; the apply-internal peers are the sole
 // writers of the arrays. During a live run only the arming thread mutates
 // the registries (via drain), keeping iteration single-threaded per the
@@ -607,9 +603,10 @@ static bool kernelAllDone(const Kernel *self) {
 // path adds Application_run on top.
 /** Begins an application and shows its registered windows without blocking. */
 static void kernelStartApplication(Kernel *self, Application *a) {
-    (void) self;
     if (!a)
         return;
+    if (self)
+        Application_setHostLifetime(a, &(*self).lifetime);
     (void) Application_begin(a);
     uint32_t winCount = Application_getWindowCount(a);
     for (uint32_t i = 0; i < winCount; i++) {
@@ -705,6 +702,10 @@ int Kernel_runAll(Kernel *self) {
         for (uint32_t i = 0; i < (*self).applicationCount; i++)
             Application_poll((*self).applications[i]);
         bridgeBespokeCheck();
+        // Host-owned scratch dies at this frame boundary: module borrowers
+        // are excluded (their pass ran above), so no transient pointer
+        // survives into the next pass or across a swap.
+        Lifetime_resetTransient(&(*self).lifetime);
 
         char buf[4096];
         for (uint32_t i = 0; i < (*self).consoleCount; i++) {
@@ -814,6 +815,11 @@ int Kernel_runCommandLine(Kernel *self, CommandLine *c) {
 // layout). Completion predicate + per-pass servicing: the loop keeps running
 // until every window closes, and each ask doubles as the generation-driven
 // hot-reload poll (cheap generation compare at frame cadence).
+// File-local Lifetime for the GfxLoop-seat continue callback: the seat hands
+// only the Application to graphvex, so the Kernel arms this alongside the run
+// and clears it after. Single run at a time (Terminal-Run Contract).
+static Lifetime *s_kernelLifetime = nullptr;
+
 /** Services application reload/events and reports whether it remains unfinished. */
 static bool kernelGfxAppContinues(void *context) {
     Application *a = (Application*) context;
@@ -822,6 +828,10 @@ static bool kernelGfxAppContinues(void *context) {
     Application_pollHot(a);
     Application_poll(a);
     bridgeBespokeCheck();
+    // GfxLoop-seat pass closes here: scratch borrowed during this frame dies
+    // before the next frame, never across frames or swaps.
+    if (s_kernelLifetime)
+        Lifetime_resetTransient(s_kernelLifetime);
     return !Application_isFinished(a);
 }
 
@@ -852,7 +862,9 @@ int Kernel_runApplication(Kernel *self, Application *a) {
     // HERE (R1), the frame loop + Thread-0 event pump stay THERE (R3).
     // Otherwise, fall back to hotcwap's parked loop.
     if ((*self).gfxAppRun != nullptr) {
+        s_kernelLifetime = &(*self).lifetime;
         int result = (*self).gfxAppRun(a, kernelGfxAppContinues, kernelGfxPump);
+        s_kernelLifetime = nullptr;
         Application_finish(a);
         return result;
     }
