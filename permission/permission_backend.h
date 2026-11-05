@@ -1,7 +1,7 @@
 #ifndef PERMISSION_PERMISSION_BACKEND_H
 #define PERMISSION_PERMISSION_BACKEND_H
 
-#include "permission/permission.h"
+#include "permission.h"
 
 // permission/permission_backend.h — INTERNAL backend seam (not public API).
 //

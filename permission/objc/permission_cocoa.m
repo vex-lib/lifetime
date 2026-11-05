@@ -17,8 +17,8 @@
 // This backend never relaunches or exits the process: it reports what the OS
 // says and nothing more (the relaunch is the user's to make).
 
-#include "permission/permission.h"
-#include "permission/permission_backend.h"
+#include "../permission.h"
+#include "../permission_backend.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -37,8 +37,7 @@
 #import <CoreLocation/CoreLocation.h>
 #import <UserNotifications/UserNotifications.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -77,9 +76,8 @@
  *   - permissionBackendOpenSettings(kind)
  * ============================================================================
  */
-
 // Status reads that are only defined for an identified app.
-static bool hostHasBundle(void) {
+static bool hostHasBundle() {
     return [[NSBundle mainBundle] bundleIdentifier] != nil;
 }
 
@@ -123,7 +121,7 @@ static PermissionStatus mapEK(EKAuthorizationStatus status) {
 /** Maps a Photos authorization value to the portable permission status. */
 static PermissionStatus mapPH(PHAuthorizationStatus status) {
     switch (status) {
-        case PHAuthorizationStatusAuthorized:    return PERMISSION_GRANTED;
+        case PHAuthorizationStatusAuthorized:
         case PHAuthorizationStatusLimited:       return PERMISSION_GRANTED;
         case PHAuthorizationStatusDenied:        return PERMISSION_DENIED;
         case PHAuthorizationStatusRestricted:    return PERMISSION_RESTRICTED;
@@ -141,7 +139,7 @@ static PermissionStatus mapCL(CLAuthorizationStatus status) {
         case kCLAuthorizationStatusAuthorizedAlways: return PERMISSION_GRANTED;
         case kCLAuthorizationStatusDenied:          return PERMISSION_DENIED;
         case kCLAuthorizationStatusRestricted:      return PERMISSION_RESTRICTED;
-        case kCLAuthorizationStatusNotDetermined:   return PERMISSION_NOT_DETERMINED;
+        case kCLAuthorizationStatusNotDetermined:
         default:                                    return PERMISSION_NOT_DETERMINED;
     }
 }
@@ -153,35 +151,35 @@ static EKEventStore    *g_eventStore = nil;
 static CLLocationManager *g_locationManager = nil;
 
 // --- Status per kind --------------------------------------------------------
-static PermissionStatus statusCamera(void) {
+static PermissionStatus statusCamera() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     return mapAV([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo]);
 }
 
 /** Reads the current microphone authorization status. */
-static PermissionStatus statusMicrophone(void) {
+static PermissionStatus statusMicrophone() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     return mapAV([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]);
 }
 
 /** Reads the current Contacts authorization status. */
-static PermissionStatus statusContacts(void) {
+static PermissionStatus statusContacts() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     return mapCN([CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts]);
 }
 
 /** Reads the current Calendar authorization status. */
-static PermissionStatus statusCalendar(void) {
+static PermissionStatus statusCalendar() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     return mapEK([EKEventStore authorizationStatusForEntityType:EKEntityTypeEvent]);
 }
 
 /** Reads the current Photos authorization status. */
-static PermissionStatus statusPhotos(void) {
+static PermissionStatus statusPhotos() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     if (@available(macOS 11.0, *))
@@ -190,7 +188,7 @@ static PermissionStatus statusPhotos(void) {
 }
 
 /** Reads the current Location authorization status. */
-static PermissionStatus statusLocation(void) {
+static PermissionStatus statusLocation() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
     if (g_locationManager == nil)
@@ -199,7 +197,7 @@ static PermissionStatus statusLocation(void) {
 }
 
 // --- Requests (fire-and-forget; the answer arrives later) -------------------
-static bool requestCamera(void) {
+static bool requestCamera() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
@@ -208,7 +206,7 @@ static bool requestCamera(void) {
 }
 
 /** Requests microphone access using AVFoundation's authorization API. */
-static bool requestMicrophone(void) {
+static bool requestMicrophone() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
@@ -217,7 +215,7 @@ static bool requestMicrophone(void) {
 }
 
 /** Requests Contacts access using the Contacts framework. */
-static bool requestContacts(void) {
+static bool requestContacts() {
     if (!hostHasBundle())
         return false;
     if (g_contactStore == nil)
@@ -231,7 +229,7 @@ static bool requestContacts(void) {
 }
 
 /** Requests Calendar access using EventKit. */
-static bool requestCalendar(void) {
+static bool requestCalendar() {
     if (!hostHasBundle())
         return false;
     if (g_eventStore == nil)
@@ -255,7 +253,7 @@ static bool requestCalendar(void) {
 }
 
 /** Requests Photos access using Photos framework authorization. */
-static bool requestPhotos(void) {
+static bool requestPhotos() {
     if (!hostHasBundle())
         return false;
     if (@available(macOS 11.0, *)) {
@@ -268,7 +266,7 @@ static bool requestPhotos(void) {
 }
 
 /** Requests Location authorization from the shared Core Location manager. */
-static bool requestLocation(void) {
+static bool requestLocation() {
     if (!hostHasBundle())
         return false;
     if (g_locationManager == nil)
@@ -278,7 +276,7 @@ static bool requestLocation(void) {
 }
 
 /** Requests notification authorization through UserNotifications. */
-static bool requestNotifications(void) {
+static bool requestNotifications() {
     if (!hostHasBundle())
         return false;
     UNAuthorizationOptions options =
@@ -352,7 +350,7 @@ bool permissionBackendOpenSettings(PermissionKind kind) {
     const char *pane = nullptr;
     switch (kind) {
         case PERMISSION_SCREEN_CAPTURE: pane = "Privacy_ScreenCapture"; break;
-        case PERMISSION_KEY_LISTEN:     pane = "Privacy_ListenEvent"; break;
+        case PERMISSION_KEY_LISTEN:
         case PERMISSION_POST_EVENT:     pane = "Privacy_ListenEvent"; break;
         case PERMISSION_ACCESSIBILITY:  pane = "Privacy_Accessibility"; break;
         case PERMISSION_CAMERA:         pane = "Privacy_Camera"; break;
