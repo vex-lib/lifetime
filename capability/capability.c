@@ -1,11 +1,10 @@
-#include "capability/capability.h"
-#include "platform/platform.h"
+#include "../capability/capability.h"
 
-#include <stddef.h>
+#include <stdlib.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
+// following the directory going forward:
+// worktree > organization > repository > <directory tree> > file
+#include "annotation/annotation.h"
 
 #if defined(VEX_PLATFORM_APPLE)
 #include <sys/sysctl.h>
@@ -61,7 +60,6 @@
  *   - Capability_kindName(kind)
  * ============================================================================
  */
-
 static uint64_t s_bits = 0;      // one bit per CapabilityKind
 static bool s_probed = false;    // the one-time probe has run
 static int s_osMajor = -1;       // running macOS major (0 = unknown)
@@ -78,42 +76,42 @@ static bool sysctlFlag(const char *name) {
 #endif
 
 // The running macOS major version, or 0 when unknown.
-static int probeOsMajor(void) {
-#if defined(VEX_PLATFORM_APPLE)
-    char buf[32];
-    size_t size = sizeof buf;
-    if (sysctlbyname("kern.osproductversion", buf, &size, nullptr, 0) != 0)
+static int probeOsMajor() {
+    #if defined(VEX_PLATFORM_APPLE)
+        char buf[32];
+        size_t size = sizeof buf;
+        if (sysctlbyname("kern.osproductversion", buf, &size, nullptr, 0) != 0)
+            return 0;
+        buf[sizeof buf - 1] = '\0';
+        int major = 0;
+        for (const char *p = buf; *p >= '0' && *p <= '9'; p++)
+            major = major * 10 + (*p - '0');
+        return major;
+    #else
         return 0;
-    buf[sizeof buf - 1] = '\0';
-    int major = 0;
-    for (const char *p = buf; *p >= '0' && *p <= '9'; p++)
-        major = major * 10 + (*p - '0');
-    return major;
-#else
-    return 0;
-#endif
+    #endif
 }
 
 // The one-time cold probe. Idempotent; guarded by s_probed.
-static void probeOnce(void) {
+static void probeOnce() {
     if (s_probed)
         return;
     s_probed = true;
     s_bits = 0;
     s_osMajor = probeOsMajor();
-#if defined(VEX_PLATFORM_APPLE)
-    if (sysctlFlag("hw.optional.arm.FEAT_DotProd")) s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_DOTPROD);
-    if (sysctlFlag("hw.optional.arm.FEAT_AES"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_AES);
-    if (sysctlFlag("hw.optional.arm.FEAT_SHA256"))  s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA256);
-    if (sysctlFlag("hw.optional.arm.FEAT_SHA512"))  s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA512);
-    if (sysctlFlag("hw.optional.arm.FEAT_SHA3"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA3);
-    if (sysctlFlag("hw.optional.arm.FEAT_LSE"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_LSE);
-    if (sysctlFlag("hw.optional.arm.FEAT_FP16"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_FP16);
-    if (sysctlFlag("hw.optional.arm.FEAT_BF16"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_BF16);
-    if (sysctlFlag("hw.optional.arm.FEAT_I8MM"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_I8MM);
-    if (sysctlFlag("hw.optional.arm.FEAT_SVE"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SVE);
-    if (sysctlFlag("hw.optional.arm.FEAT_SME"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SME);
-#endif
+    #if defined(VEX_PLATFORM_APPLE)
+        if (sysctlFlag("hw.optional.arm.FEAT_DotProd")) s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_DOTPROD);
+        if (sysctlFlag("hw.optional.arm.FEAT_AES"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_AES);
+        if (sysctlFlag("hw.optional.arm.FEAT_SHA256"))  s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA256);
+        if (sysctlFlag("hw.optional.arm.FEAT_SHA512"))  s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA512);
+        if (sysctlFlag("hw.optional.arm.FEAT_SHA3"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SHA3);
+        if (sysctlFlag("hw.optional.arm.FEAT_LSE"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_LSE);
+        if (sysctlFlag("hw.optional.arm.FEAT_FP16"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_FP16);
+        if (sysctlFlag("hw.optional.arm.FEAT_BF16"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_BF16);
+        if (sysctlFlag("hw.optional.arm.FEAT_I8MM"))    s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_I8MM);
+        if (sysctlFlag("hw.optional.arm.FEAT_SVE"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SVE);
+        if (sysctlFlag("hw.optional.arm.FEAT_SME"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SME);
+    #endif
 }
 
 // CORE FUNCTIONS (PUBLIC & PRIVATE)
@@ -126,12 +124,12 @@ bool Capability_has(CapabilityKind kind) {
 }
 
 /** Performs the idempotent cold host capability probe. */
-void Capability_probe(void) {
+void Capability_probe() {
     probeOnce();
 }
 
 /** Returns the cached operating-system major version, or zero when unknown. */
-int Capability_osMajor(void) {
+int Capability_osMajor() {
     probeOnce();
     return s_osMajor;
 }
