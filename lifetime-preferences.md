@@ -16,6 +16,7 @@ Universal laws are inherited from the compressed constitution (`../../metadata/g
 | **One-Seam Canvas Window Architecture Law** | R0 Kernel Host | Mandatory for `lifetime` |
 | **Continuous Real-Time Live Resize & Presentation Law (Abolishing "Freeze-Exact")** | R0 Kernel Host | Mandatory for `lifetime` |
 | **Present-On-Demand Law (composite ≠ render)** | R0 Kernel Host | Mandatory for `lifetime` |
+| **R0 Freeze Law (always in, never reloaded)** | R0 Kernel Host | Mandatory for `lifetime` |
 
 ## 2. Exclusive Repo-Local Laws (FULL PROSE RESTATEMENT)
 
@@ -68,9 +69,31 @@ freezes windows/animations and tears. Render continuously during every drag:
 
 Windows present when the scene is dirty, not on a timer or fixed poll:
 
+### R0 Freeze Law (always in, never reloaded)
+
+R0 is `lifetime` + `relational-engine`: statically linked, never `dlopen`ed,
+never hot-swapped. Arena addresses stay put across every dylib generation, so
+modules borrow the same bytes in turn. R0 changes only by versioned cold
+release (launcher stages, then `exec`s) with ABI check — no in-process R0
+swap, ever. `Kernel → Lifetime → {arenas, clock, relational}`; Kernel owns
+start/stop + registries + teardown order, never tick/draw.
+
+`Application` holds reload watchers opaque (`void *hot` + `AppHotPollFn`
+seam): R0 never names a hotcwap type. Hotcwap adapts to R0, never the
+reverse.
+
 ## 3. Current State (Living Documentation Law)
 
-- `src/platform/platform.h` — the single spelling of the platform: six exact target macros
+- `lifetime/clock.h/.c` — the R0 ground-truth clock: `Clock_nowNanos()`
+  (CLOCK_MONOTONIC_RAW, never backwards) + `Clock_nowMillis()` (unix wall)
+  + `Clock_nowSeconds()` (single conversion for module frames). No
+  pause/scale. `test/clock/clock_test.c` proves monotonic + range.
+- Host owns `Transient_reset`: `appParkSlice` (parked loop) resets per pass
+  via the app's bound `hostLifetime`; `Kernel_runAll` reactor resets per
+  pass; `kernelGfxAppContinues` (GfxLoop seat) resets per frame. Scratch
+  borrowed during a pass dies at its boundary — never across frames/swaps.
+  A module stashing a transient pointer in its save blob fails restore.
+- `lifetime/platform.h` — the single spelling of the platform: six exact target macros
   (`VEX_PLATFORM_APPLE_SILICON`, `_APPLE_X86_64`, `_LINUX_ARM64`, `_LINUX_X86_64`,
   `_WINDOWS_ARM64`, `_WINDOWS_X86_64`) with coarse axes (`VEX_PLATFORM_APPLE/_WINDOWS/_LINUX`,
   `VEX_ARCH_ARM/_X86`, `VEX_ARCH_ARM64/_X86_64`) derived from them; 32-bit x86/arm

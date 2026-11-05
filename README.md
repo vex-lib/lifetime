@@ -8,10 +8,10 @@ system permissions, hardware capability detection, and memory substrate attestat
 ## Structure
 
 - `window/`: Native OS window (`NSWindow`, events, traffic lights, Win32/Wayland/Linux backends).
-- `kernel/`: OS Application entry, Process management, Console, CommandLine TTY.
+- `core/`: OS Application entry, Process management, Console, CommandLine TTY.
+- `lifetime/`: Lifetime memory substrate + R0 ground-truth Clock (nanos/millis).
 - `permission/`: OS permissions backend & Cocoa permissions.
 - `capability/`: Hardware and system capability probing.
-- `spoke/`: Lifetime memory substrate (`Lifetime` arena attestation).
 
 ## Architecture & Preferences
 
