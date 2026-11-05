@@ -73,7 +73,7 @@
 #define VEX_PLATFORM_NAME "windows"
 #endif
 
-// ── derived architecture ─────────────────────────────────────────────────────
+// ── derived architecture ────────────────────────────────────────────────────
 // Family answers "arm or x86"; width answers "how wide". Both are derived, so a
 // file never has to re-derive them from the exact target.
 #if defined(VEX_PLATFORM_APPLE_SILICON) || defined(VEX_PLATFORM_LINUX_ARM64) || \

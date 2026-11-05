@@ -1,13 +1,9 @@
-#include "spoke/lifetime.h"
+#include "lifetime.h"
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdbool.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
