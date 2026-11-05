@@ -2,10 +2,7 @@
 
 #include <stddef.h>
 
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**

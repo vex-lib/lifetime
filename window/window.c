@@ -1,4 +1,4 @@
-#include "platform/platform.h"
+#include "lifetime/platform.h"
 
 #if defined(VEX_PLATFORM_WINDOWS)
 // window/window_win32.c — the lean Win32 backend for the Window API (draft).
@@ -62,13 +62,7 @@
 #include "input/mouse.h"
 #include "input/touch.h"
 #include "buffer/buffer.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "annotation/intention.h"
-#include "annotation/draft.h"
-#include "annotation/platform_exclusive.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**
@@ -2273,13 +2267,6 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 #include "input/mouse.h"
 #include "input/touch.h"
 #include "buffer/buffer.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "annotation/intention.h"
-#include "annotation/draft.h"
-#include "annotation/platform_exclusive.h"
 
 ;;DEFINITION
 /**
@@ -4532,14 +4519,6 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 
 #include "window/window.h"
 #include "window/traffic_light.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "annotation/draft.h"
-#include "annotation/incomplete.h"
-#include "annotation/intention.h"
-#include "annotation/platform_exclusive.h"
 
 ;;DEFINITION
 /**

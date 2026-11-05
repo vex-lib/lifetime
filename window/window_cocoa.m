@@ -38,11 +38,7 @@
 #include "input/key.h"
 #include "input/mouse.h"
 #include "input/touch.h"
-#include "annotation/definition.h"
-#include "annotation/overview.h"
-#include "annotation/getter.h"
-#include "annotation/setter.h"
-#include "annotation/intention.h"
+#include "annotation/annotation.h"
 
 ;;DEFINITION
 /**

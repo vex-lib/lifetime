@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "application": {
+    "id": "org.vexgraph.lifetime.window",
+    "name": "window",
+    "displayName": "lifetime window",
+    "version": "0.1.0",
+    "type": "lib",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Native OS window: C core plus the Cocoa body",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "",
+    "sources": [
+      "window.c",
+      "window_event.c",
+      "window_cocoa.m",
+      "traffic_light_cocoa.m"
+    ],
+    "includes": [
+      "..",
+      "../..",
+      "."
+    ],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra"
+    ],
+    "link": "static"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}
