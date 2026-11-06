@@ -1,6 +1,6 @@
 #include "permission.h"
 #include "permission_backend.h"
-#include "../lifetime/platform.h"
+#include "util/platform.h"
 
 #include "util/annotation.h"
 
