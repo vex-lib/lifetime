@@ -8,7 +8,7 @@
 
 #include "lifetime/lifetime.h"
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "../../vexspoke/input/key.h"
 #include "../../vexspoke/input/mouse.h"
 #include "../../vexspoke/input/touch.h"

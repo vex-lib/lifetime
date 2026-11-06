@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "lifetime/platform.h"
+#include "util/platform.h"
 
 // Exactly one exact target. Duplicated deliberately: the test must fail if the
 // header's own guard is removed, not trust the guard it is testing.

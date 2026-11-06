@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 #include "../../vexspoke/event/keyhandler.h"
 #include "../../vexspoke/event/mousehandler.h"

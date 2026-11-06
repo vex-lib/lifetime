@@ -17,7 +17,7 @@
 
 #include "core/application.h"
 #include "window/window.h"
-#include "test_support.h"
+#include "util/test_support.h"
 
 static int g_failures = 0;
 

@@ -6,7 +6,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "lifetime/lifetime.h"
 #include "../../vexspoke/input/key.h"
 #include "../../vexspoke/input/mouse.h"

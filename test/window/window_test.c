@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 #include "engine/loop.h"
 #include "input/key.h"
 #include "input/mouse.h"

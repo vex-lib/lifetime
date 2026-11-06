@@ -4,7 +4,7 @@
 
 // following the directory going forward:
 // worktree > organization > repository > <directory tree> > file
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 #if defined(VEX_PLATFORM_APPLE)
 #include <sys/sysctl.h>

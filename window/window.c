@@ -1,4 +1,4 @@
-#include "lifetime/platform.h"
+#include "util/platform.h"
 
 #if defined(VEX_PLATFORM_WINDOWS)
 // window/window_win32.c — the lean Win32 backend for the Window API (draft).
@@ -62,7 +62,7 @@
 #include "input/mouse.h"
 #include "input/touch.h"
 #include "buffer/buffer.h"
-#include "annotation/annotation.h"
+#include "util/annotation.h"
 
 ;;DEFINITION
 /**

@@ -13,7 +13,7 @@
 
 #include "core/commandline.h"
 #include "core/kernel.h"
-#include "test_support.h"
+#include "util/test_support.h"
 
 typedef struct Fake {
     int opens, closes, presents, mouse, polls;

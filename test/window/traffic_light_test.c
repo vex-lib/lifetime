@@ -13,7 +13,7 @@
 #include <stdio.h>
 
 #include "window/traffic_light.h"
-#include "test_support.h"
+#include "util/test_support.h"
 #include "window/window.h"
 
 static int g_failures = 0;

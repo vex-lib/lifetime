@@ -7,7 +7,7 @@
 // prompting paths are IRL actions and are never thrown at a headless suite (the
 // lab/IRL split, applied to permissions).
 
-#include "lifetime/platform.h"
+#include "util/platform.h"
 #include <stdio.h>
 #include <string.h>
 
