@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 2,
   "application": {
     "id": "org.vexgraph.lifetime.window",
     "name": "window",
