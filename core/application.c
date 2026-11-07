@@ -58,7 +58,7 @@
  *   char iconPath[APP_MAX_ICON_PATH];      // icon path reference (default "")
  *   Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
  *   uint32_t window_count;                 // used slots in windows[]
- *   _Atomic bool running;                  // runtime active flag (Kernel writes, graphvex reads)
+ *   atomic_uint phase;                     // AppPhase: the single lifecycle word
  *   void *hot;                           // reload watcher, opaque (setHot)
  *   AppHotPollFn hotPoll;                // reload poll seam (setHotPoll)
  *   _Atomic uint32_t fps;                  // live telemetry: FPS (graphvex writes)
@@ -116,6 +116,9 @@
  *   - (none)
  *
  * Public Getters: (.h)
+ *   - Application_getPhase(self)               : The one lifecycle word
+ *   - Application_isActive(self)               : STARTING/RUNNING/CLOSING
+ *   - Application_getPhaseName(phase)          : Stable symbolic name
  *   - Application_getFps(self)
  *   - Application_getFrametimeUs(self)
  *   - Application_getHot(self)
@@ -138,6 +141,66 @@
 // Plain bool, not _Atomic: construction is single-threaded cold-path (the Cold-Strict, Hot-Minimal Validation Law).
 static bool s_bootstrapped = false;
 static _Thread_local Application *s_current;
+
+// --- PHASE MACHINE -----------------------------------------------------------
+// The ONLY place lifecycle transitions are written. Every guard and getter
+// reads the same word, so no second flag can disagree with it.
+//
+//   appPhaseBegin : IDLE|STOPPED -> STARTING   (refused from admitted phases)
+//   appPhaseAdvance: STARTING    -> RUNNING    (startup worker finished)
+//   appPhaseClose : admitted     -> CLOSING    (idempotent, no-op when idle)
+//   appPhaseStop  : CLOSING      -> STOPPED    (owner, after the join)
+//
+// workerDone and hadWindows are one-way latches, not phases: they are set at
+// most once per launch and never combined into a lifecycle decision.
+
+static AppPhase appPhase(const Application *self) {
+    return (AppPhase) atomic_load_explicit(&(*self).phase, memory_order_acquire);
+}
+
+static bool appPhaseRunning(AppPhase phase) {
+    return phase == APP_PHASE_STARTING || phase == APP_PHASE_RUNNING;
+}
+
+static bool appPhaseActive(AppPhase phase) {
+    return appPhaseRunning(phase) || phase == APP_PHASE_CLOSING;
+}
+
+/** IDLE or STOPPED -> STARTING. Refused from every admitted phase. */
+static bool appPhaseBegin(Application *self) {
+    uint32_t expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    for (;;) {
+        if (expected != APP_PHASE_IDLE && expected != APP_PHASE_STOPPED)
+            return false;
+        if (atomic_compare_exchange_weak_explicit(&(*self).phase, &expected,
+                APP_PHASE_STARTING, memory_order_acq_rel, memory_order_relaxed))
+            return true;
+    }
+}
+
+/** STARTING -> RUNNING, by the startup worker (or by begin when it is empty). */
+static void appPhaseAdvance(Application *self) {
+    uint32_t expected = APP_PHASE_STARTING;
+    atomic_compare_exchange_strong_explicit(&(*self).phase, &expected,
+        APP_PHASE_RUNNING, memory_order_acq_rel, memory_order_relaxed);
+}
+
+/** Any admitted phase -> CLOSING. Idempotent; a no-op in IDLE/STOPPED. */
+static void appPhaseClose(Application *self) {
+    uint32_t expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    for (;;) {
+        if (!appPhaseActive((AppPhase) expected))
+            return;
+        if (atomic_compare_exchange_weak_explicit(&(*self).phase, &expected,
+                APP_PHASE_CLOSING, memory_order_acq_rel, memory_order_relaxed))
+            return;
+    }
+}
+
+/** CLOSING -> STOPPED, by the owner after the worker join. */
+static void appPhaseStop(Application *self) {
+    atomic_store_explicit(&(*self).phase, APP_PHASE_STOPPED, memory_order_release);
+}
 
 ;;INTENTION("Application_start owns lifetime, not scene timing: startup callbacks "
             "run on a supervised worker; native operations are serviced on the "
@@ -186,7 +249,7 @@ static bool appAllWindowsClosed(const Application *self) {
  * during this pass dies here, never across frames or swaps. */
 static void appParkSlice(Application *self) {
     for (uint32_t i = 0; i < APP_PARK_SLICES; i++) {
-        if (!atomic_load_explicit(&(*self).running, memory_order_relaxed))
+        if (!appPhaseRunning(appPhase(self)))
             return;
         Window_pollEvents(); // the Window pumps its own queue (its job)
         Application *previous = s_current; s_current = self;
@@ -238,8 +301,8 @@ Application *Application_3(const char *name, const char *author, const char *ver
 void Application_free(Application *self) {
     if (!self) return;
     // Caller must return from start/run (worker quiescence) before freeing.
-    if (atomic_load(&(*self).active)) return;
-    atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
+    if (appPhaseActive(appPhase(self)))
+        return;
     pthread_cond_destroy(&(*self).invokeCondition);
     pthread_mutex_destroy(&(*self).invokeMutex);
     free(self);
@@ -251,6 +314,7 @@ static void *appStartWorker(void *userdata) {
     for (uint32_t i = 0; i < (*self).startCount && Application_isRunning(self); i++)
         (*self).startFns[i](self, (*self).startUsers[i]);
     atomic_store_explicit(&(*self).workerDone, true, memory_order_release);
+    appPhaseAdvance(self); // STARTING -> RUNNING; a pending close keeps CLOSING
     return nullptr;
 }
 
@@ -262,22 +326,22 @@ Application *Application_current() {
 /** Marks the application active, shows its windows, and starts its worker callbacks. */
 bool Application_begin(Application *self) {
     if (!self) return false;
-    bool expected = false;
-    if (!atomic_compare_exchange_strong(&(*self).active, &expected, true)) return false;
+    if (!appPhaseBegin(self)) return false;
     (*self).ownerThread = pthread_self();
-    atomic_store(&(*self).closeRequested, false);
-    atomic_store(&(*self).workerDone, (*self).startCount == 0);
-    atomic_store(&(*self).running, true);
+    bool hasWorker = (*self).startCount != 0;
+    atomic_store(&(*self).workerDone, !hasWorker);
     for (uint32_t i = 0; i < (*self).window_count; i++)
         if (!Window_shouldClose((*self).windows[i])) Window_show((*self).windows[i]);
-    if ((*self).startCount) {
+    if (hasWorker) {
         if (pthread_create(&(*self).startThread, nullptr, appStartWorker, self) != 0) {
             atomic_store(&(*self).workerDone, true);
-            Application_close(self);
+            appPhaseClose(self);
             Application_finish(self);
             return false;
         }
         (*self).workerLaunched = true;
+    } else {
+        appPhaseAdvance(self);
     }
     return true;
 }
@@ -290,8 +354,7 @@ void Application_start(Application *self) {
 /** Requests closure and wakes callers waiting for owner-thread invocation. */
 void Application_close(Application *self) {
     if (!self) return;
-    atomic_store(&(*self).closeRequested, true);
-    atomic_store(&(*self).running, false);
+    appPhaseClose(self);
     pthread_mutex_lock(&(*self).invokeMutex);
     pthread_cond_broadcast(&(*self).invokeCondition);
     pthread_mutex_unlock(&(*self).invokeMutex);
@@ -299,7 +362,7 @@ void Application_close(Application *self) {
 
 /** Registers a startup callback before the application becomes active. */
 bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *userdata) {
-    if (!self || !fn || atomic_load(&(*self).active) || (*self).startCount == APP_MAX_EVENTS) return false;
+    if (!self || !fn || appPhaseActive(appPhase(self)) || (*self).startCount == APP_MAX_EVENTS) return false;
     uint32_t i = (*self).startCount++;
     (*self).startFns[i] = fn; (*self).startUsers[i] = userdata;
     return true;
@@ -308,7 +371,7 @@ bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *u
 /** Registers an owner-thread poll callback, accepting an identical registration once. */
 bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *userdata) {
     if (!self || !fn) return false;
-    if (atomic_load(&(*self).active) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
     uint32_t empty = APP_MAX_EVENTS;
     for (uint32_t i = 0; i < APP_MAX_EVENTS; i++) {
         if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) return true;
@@ -321,7 +384,7 @@ bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *us
 /** Removes the matching poll callback and userdata pair. */
 bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const void *userdata) {
     if (!self) return false;
-    if (atomic_load(&(*self).active) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
     for (uint32_t i = 0; i < APP_MAX_EVENTS; i++)
         if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) {
             (*self).pollFns[i] = nullptr; (*self).pollUsers[i] = nullptr; return true;
@@ -337,12 +400,13 @@ bool Application_invoke(Application *self, ApplicationEventFn fn, void *userdata
         fn(self, userdata); s_current = previous; return true;
     }
     pthread_mutex_lock(&(*self).invokeMutex);
-    while ((*self).invokeFn && Application_isRunning(self))
+    while ((*self).invokePhase != APP_INVOKE_IDLE && Application_isRunning(self))
         pthread_cond_wait(&(*self).invokeCondition, &(*self).invokeMutex);
     if (!Application_isRunning(self)) { pthread_mutex_unlock(&(*self).invokeMutex); return false; }
     (*self).invokeFn = fn; (*self).invokeUser = userdata;
+    (*self).invokePhase = APP_INVOKE_PENDING;
     // Once admitted, wait for completion even if the callback requests close.
-    while ((*self).invokeFn)
+    while ((*self).invokePhase != APP_INVOKE_IDLE)
         pthread_cond_wait(&(*self).invokeCondition, &(*self).invokeMutex);
     pthread_mutex_unlock(&(*self).invokeMutex);
     return true;
@@ -350,18 +414,18 @@ bool Application_invoke(Application *self, ApplicationEventFn fn, void *userdata
 
 /** Executes queued owner work and registered poll callbacks on the owner thread. */
 void Application_poll(Application *self) {
-    if (!self || !atomic_load(&(*self).active) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
+    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
     Application *previous = s_current; s_current = self;
     pthread_mutex_lock(&(*self).invokeMutex);
-    ApplicationEventFn fn = (*self).invokeExecuting ? nullptr : (*self).invokeFn;
+    ApplicationEventFn fn = (*self).invokePhase == APP_INVOKE_PENDING ? (*self).invokeFn : nullptr;
     void *userdata = (*self).invokeUser;
-    if (fn) (*self).invokeExecuting = true;
+    if (fn) (*self).invokePhase = APP_INVOKE_EXECUTING;
     pthread_mutex_unlock(&(*self).invokeMutex);
     if (fn) {
         fn(self, userdata);
         pthread_mutex_lock(&(*self).invokeMutex);
         (*self).invokeFn = nullptr;
-        (*self).invokeExecuting = false;
+        (*self).invokePhase = APP_INVOKE_IDLE;
         pthread_cond_broadcast(&(*self).invokeCondition);
         pthread_mutex_unlock(&(*self).invokeMutex);
     }
@@ -373,7 +437,7 @@ void Application_poll(Application *self) {
 
 /** Closes registered windows, drains admitted owner work, joins startup work, and deactivates. */
 void Application_finish(Application *self) {
-    if (!self || !atomic_load(&(*self).active) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
+    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
     Application_close(self);
     for (uint32_t i = 0; i < (*self).window_count; i++)
         Window_close((*self).windows[i]);
@@ -384,7 +448,7 @@ void Application_finish(Application *self) {
         struct timespec slice = {0, 1000000}; nanosleep(&slice, nullptr);
     }
     if ((*self).workerLaunched) { pthread_join((*self).startThread, nullptr); (*self).workerLaunched = false; }
-    atomic_store(&(*self).active, false);
+    appPhaseStop(self);
 }
 
 /** Requests application closure through Application_close. */
@@ -393,16 +457,41 @@ void Application_stop(Application *self) {
     Application_close(self);
 }
 
-/** Reads the atomic running flag; null applications are not running. */
+/** Reads the lifecycle word; an application is running in STARTING or RUNNING. */
 bool Application_isRunning(const Application *self) {
-    return self ? atomic_load_explicit(&(*self).running, memory_order_relaxed) : false;
+    return self ? appPhaseRunning(appPhase(self)) : false;
+}
+
+;;GETTER
+/** True in the admitted phases (STARTING, RUNNING, CLOSING); false when freeable. */
+bool Application_isActive(const Application *self) {
+    return self ? appPhaseActive(appPhase(self)) : false;
+}
+
+;;GETTER
+/** The one lifecycle word; a null application reads IDLE. */
+AppPhase Application_getPhase(const Application *self) {
+    return self ? appPhase(self) : APP_PHASE_IDLE;
+}
+
+;;GETTER
+/** Stable symbolic name for a phase (cold path; never null). */
+const char *Application_getPhaseName(AppPhase phase) {
+    switch (phase) {
+        case APP_PHASE_IDLE:     return "APP_PHASE_IDLE";
+        case APP_PHASE_STARTING: return "APP_PHASE_STARTING";
+        case APP_PHASE_RUNNING:  return "APP_PHASE_RUNNING";
+        case APP_PHASE_CLOSING:  return "APP_PHASE_CLOSING";
+        case APP_PHASE_STOPPED:  return "APP_PHASE_STOPPED";
+        default:                 return "APP_PHASE_UNKNOWN";
+    }
 }
 
 /** Reports completion when stopped or when all applicable registered windows close. */
 bool Application_isFinished(const Application *self) {
     if(self == nullptr)
         return true;
-    if(!atomic_load_explicit(&(*self).running, memory_order_relaxed))
+    if(!appPhaseRunning(appPhase(self)))
         return true;
     if(appAllWindowsClosed(self))
         return true;
@@ -419,11 +508,11 @@ bool Application_isFinished(const Application *self) {
 /** Parks and services the application until stopped or all registered windows close. */
 void Application_run(Application *self) {
     if (!self) return;
-    if (!atomic_load(&(*self).active) && !Application_begin(self)) return;
+    if (!appPhaseActive(appPhase(self)) && !Application_begin(self)) return;
     if (!pthread_equal(pthread_self(), (*self).ownerThread)) return;
-    while (atomic_load_explicit(&(*self).running, memory_order_relaxed)) {
+    while (appPhaseRunning(appPhase(self))) {
         if (appAllWindowsClosed(self)) {
-            atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
+            appPhaseClose(self);
             break;
         }
         appParkSlice(self);
@@ -435,8 +524,8 @@ void Application_run(Application *self) {
 /** Adds a borrowed window unless duplicated, full, or disallowed by active ownership. */
 bool Application_addWindow(Application *self, Window *win) {
     if (!self || !win) return false;
-    if (atomic_load(&(*self).active) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
-    if (atomic_load(&(*self).active) && !Application_isRunning(self)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhase(self) == APP_PHASE_CLOSING) return false;
     for (uint32_t i = 0; i < (*self).window_count; i++)
         if ((*self).windows[i] == win) return false;
     if ((*self).window_count >= APP_MAX_WINDOWS) return false;
@@ -448,7 +537,7 @@ bool Application_addWindow(Application *self, Window *win) {
 /** Removes a registered borrowed window without destroying it. */
 bool Application_removeWindow(Application *self, Window *win) {
     if (!self || !win) return false;
-    if (atomic_load(&(*self).active) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
     for (uint32_t i = 0; i < (*self).window_count; i++) {
         if ((*self).windows[i] == win) {
             (*self).windows[i] = (*self).windows[--(*self).window_count];

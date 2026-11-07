@@ -24,7 +24,7 @@
 //
 // Application_run is the KEEP-ALIVE PARKED LOOP (hotcwap's own, no graphvex):
 // it BLOCKS until every registered window is closed, then ends the app by
-// flipping running=false. It parks in 5ms slices, letting the Window
+// moving the phase to CLOSING. It parks in 5ms slices, letting the Window
 // pump its own events in between — so an empty window lives on its own and
 // Kernel_run(kernel, app) returns only once the user closed all windows.
 //
@@ -43,6 +43,40 @@ typedef void (*ApplicationEventFn)(Application *self, void *userdata);
 typedef int (*AppHotPollFn)(void *hot, uint32_t *loaded);
 #define APP_MAX_EVENTS 16
 
+// One lifecycle, one word. The legal transitions are listed here and enforced
+// in application.c — never inferred from a boolean combination at the call site.
+//
+//      IDLE ──begin──▶ STARTING ──worker done──▶ RUNNING
+//        ▲                │                        │
+//        │                └────close/finish────┐   │
+//        │                                     ▼   ▼
+//        │                                   CLOSING
+//        │                                     │ finish (join + release)
+//        └──────────── (re-begin) ────────── STOPPED
+//
+// IDLE and STOPPED are the two freeable phases. STARTING, RUNNING and CLOSING
+// are "admitted" (what the old `active` flag meant). STARTING and RUNNING are
+// "running" (what the old `running` flag meant). CLOSING means close requested
+// while the owner is still draining and has not joined the startup worker.
+typedef enum AppPhase {
+    APP_PHASE_IDLE = 0,   // constructed; nothing admitted yet
+    APP_PHASE_STARTING,   // admitted; startup worker still executing callbacks
+    APP_PHASE_RUNNING,    // admitted; startup worker finished (or none present)
+    APP_PHASE_CLOSING,    // close requested; draining, worker not yet joined
+    APP_PHASE_STOPPED,    // finished; worker joined, owner released
+    APP_PHASE_COUNT
+} AppPhase;
+
+// The owner-work mailbox is a three-state slot, not a bool beside a pointer:
+// IDLE (nothing queued) -> PENDING (queued, waiting for the owner) -> EXECUTING
+// (owner is running the callback) -> IDLE. Guarded by invokeMutex.
+typedef enum AppInvokePhase {
+    APP_INVOKE_IDLE = 0,
+    APP_INVOKE_PENDING,
+    APP_INVOKE_EXECUTING,
+    APP_INVOKE_COUNT
+} AppInvokePhase;
+
 struct Application {
     char name[APP_MAX_NAME];               // app name (default "vex")
     char author[APP_MAX_NAME];             // author / studio (default "")
@@ -50,8 +84,8 @@ struct Application {
     char iconPath[APP_MAX_ICON_PATH];      // icon path reference (default "")
     Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
     uint32_t window_count;                 // used slots in windows[]
-    bool hadWindows;                      // removing last window completes lifetime
-    _Atomic bool running;                  // runtime active flag (Kernel writes, graphvex reads)
+    bool hadWindows;                      // one-way latch: a window was ever registered
+    atomic_uint phase;                     // AppPhase: the single lifecycle word
     void *hot;                             // reload watcher (opaque; hotcwap fills via setHotPoll)
     AppHotPollFn hotPoll;                  // reload poll seam (nullable; hotcwap provides)
     void *hostLifetime;                    // owning Kernel Lifetime (opaque; set at start)
@@ -65,13 +99,13 @@ struct Application {
     ApplicationEventFn pollFns[APP_MAX_EVENTS]; // owner-thread service bridges
     void *pollUsers[APP_MAX_EVENTS];
     pthread_t ownerThread, startThread;
-    _Atomic bool active, closeRequested, workerDone;
-    bool workerLaunched;
+    _Atomic bool workerDone;               // one-way latch: startup callbacks finished
+    bool workerLaunched;                   // startThread exists and needs a join
     pthread_mutex_t invokeMutex;
     pthread_cond_t invokeCondition;
-    ApplicationEventFn invokeFn; // one synchronous worker -> owner mailbox
+    ApplicationEventFn invokeFn;           // one synchronous worker -> owner mailbox
     void *invokeUser;
-    bool invokeExecuting;
+    AppInvokePhase invokePhase;            // under invokeMutex
 };
 
 // --- Subsystem bootstrap & shutdown ---
@@ -116,6 +150,13 @@ void Application_finish(Application *self);
 void Application_close(Application *self);
 void Application_stop(Application *self);
 bool Application_isRunning(const Application *self);
+// One lifecycle word, readable from any thread (snapshot semantics).
+AppPhase Application_getPhase(const Application *self);
+// True in STARTING, RUNNING and CLOSING — the admitted phases where owner-thread
+// work is legal. False in IDLE and STOPPED (the freeable phases).
+bool Application_isActive(const Application *self);
+// Stable symbolic name for a phase (cold path; never null).
+const char *Application_getPhaseName(AppPhase phase);
 // Register before starting. Start callbacks run in registration order on a worker.
 bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *userdata);
 bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *userdata);
@@ -126,10 +167,10 @@ bool Application_invoke(Application *self, ApplicationEventFn fn, void *userdata
 Application *Application_current(void);
 
 // --- Completion predicate (drives the Kernel completion reactor) ---
-// True when the app can never end itself: running flipped false (external
-// stop), or EVERY registered window reports shouldClose (including removal of
-// the last previously registered window). An app that has never had windows
-// lives until an explicit close/stop request.
+// True when the app can never end itself: the phase has left STARTING/RUNNING
+// (external stop), or EVERY registered window reports shouldClose (including
+// removal of the last previously registered window). An app that has never had
+// windows lives until an explicit close/stop request.
 bool Application_isFinished(const Application *self);
 
 // --- Keep-alive parked loop (hotcwap's own) ---

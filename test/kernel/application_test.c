@@ -14,6 +14,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdatomic.h>
+#include <time.h>
 
 #include "core/application.h"
 #include "window/window.h"
@@ -32,6 +34,69 @@ static int g_failures = 0;
 /** Records the application reload callback's load result for later assertions. */
 static void onHotReloadStub(Application *self, uint32_t loaded, void *userdata) {
     (void) self; (void) loaded; (void) userdata;
+}
+
+// A start callback that blocks until the test opens the gate, so STARTING is
+// observable deterministically instead of racing the worker.
+typedef struct StartGate {
+    pthread_mutex_t lock;
+    pthread_cond_t ready;
+    bool open;
+    atomic_int entered;
+    atomic_int calls;
+} StartGate;
+
+static void gatedStart(Application *self, void *userdata) {
+    (void) self;
+    StartGate *gate = userdata;
+    atomic_fetch_add_explicit(&(*gate).entered, 1, memory_order_release);
+    pthread_mutex_lock(&(*gate).lock);
+    while (!(*gate).open)
+        pthread_cond_wait(&(*gate).ready, &(*gate).lock);
+    pthread_mutex_unlock(&(*gate).lock);
+    atomic_fetch_add_explicit(&(*gate).calls, 1, memory_order_release);
+}
+
+static void gateOpen(StartGate *gate) {
+    pthread_mutex_lock(&(*gate).lock);
+    (*gate).open = true;
+    pthread_cond_broadcast(&(*gate).ready);
+    pthread_mutex_unlock(&(*gate).lock);
+}
+
+static long elapsedMs(const struct timespec *from, const struct timespec *to) {
+    return (to->tv_sec - from->tv_sec) * 1000L
+         + (to->tv_nsec - from->tv_nsec) / 1000000L;
+}
+
+/** Bounded wait (never an unbounded spin) for a phase; false on timeout. */
+static bool waitPhase(Application *app, AppPhase want, long timeoutMs) {
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    for (;;) {
+        if (Application_getPhase(app) == want)
+            return true;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if (elapsedMs(&start, &now) > timeoutMs)
+            return false;
+        struct timespec nap = {0, 1000000};
+        nanosleep(&nap, nullptr);
+    }
+}
+
+/** Bounded wait for a counter to reach `want`; false on timeout. */
+static bool waitCounter(atomic_int *counter, int want, long timeoutMs) {
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    for (;;) {
+        if (atomic_load_explicit(counter, memory_order_acquire) >= want)
+            return true;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if (elapsedMs(&start, &now) > timeoutMs)
+            return false;
+        struct timespec nap = {0, 1000000};
+        nanosleep(&nap, nullptr);
+    }
 }
 
 int main(void) {
@@ -75,6 +140,91 @@ int main(void) {
     CHECK(!Application_isFinished(a));
     Application_stop(a);
     Application_finish(a);
+
+    // --- The single lifecycle word: every legal transition, plus refusals ---
+    Application *p = Application();
+    CHECK(Application_getPhase(p) == APP_PHASE_IDLE);
+    CHECK(!Application_isActive(p));
+    CHECK(!Application_isRunning(p));
+    CHECK(Application_isFinished(p));
+    for (int i = 0; i < (int) APP_PHASE_COUNT; i++)
+        CHECK(Application_getPhaseName((AppPhase) i)[0] != '\0');
+    CHECK(strcmp(Application_getPhaseName(APP_PHASE_CLOSING), "APP_PHASE_CLOSING") == 0);
+    CHECK(Application_getPhaseName((AppPhase) 999)[0] != '\0');
+
+    // No start callbacks: begin lands directly in RUNNING.
+    CHECK(Application_begin(p));
+    CHECK(Application_getPhase(p) == APP_PHASE_RUNNING);
+    CHECK(Application_isActive(p));
+    CHECK(Application_isRunning(p));
+    CHECK(!Application_begin(p));                       // already admitted
+    CHECK(Application_getPhase(p) == APP_PHASE_RUNNING);
+    CHECK(!Application_addStartEvent(p, gatedStart, nullptr));
+
+    // CLOSING is admitted but no longer running; new windows are refused.
+    Application_close(p);
+    CHECK(Application_getPhase(p) == APP_PHASE_CLOSING);
+    CHECK(Application_isActive(p));
+    CHECK(!Application_isRunning(p));
+    CHECK(Application_isFinished(p));
+    CHECK(!Application_addWindow(p, (Window*) (uintptr_t) 0x77));
+    CHECK(Application_getPhase(p) == APP_PHASE_CLOSING);
+
+    Application_finish(p);
+    CHECK(Application_getPhase(p) == APP_PHASE_STOPPED);
+    CHECK(!Application_isActive(p));
+    CHECK(Application_isFinished(p));
+
+    // STOPPED is freeable and re-beginnable.
+    CHECK(Application_begin(p));
+    CHECK(Application_getPhase(p) == APP_PHASE_RUNNING);
+    Application_finish(p);                              // finish without close
+    CHECK(Application_getPhase(p) == APP_PHASE_STOPPED);
+    Application_free(p);
+
+    // Worker-driven STARTING -> RUNNING.
+    StartGate gate = {0};
+    pthread_mutex_init(&gate.lock, nullptr);
+    pthread_cond_init(&gate.ready, nullptr);
+    Application *w = Application();
+    CHECK(Application_addStartEvent(w, gatedStart, &gate));
+    CHECK(Application_begin(w));
+    CHECK(Application_getPhase(w) == APP_PHASE_STARTING);
+    CHECK(Application_isActive(w));
+    CHECK(Application_isRunning(w));
+    CHECK(!Application_isFinished(w));
+    gateOpen(&gate);
+    CHECK(waitPhase(w, APP_PHASE_RUNNING, 2000));
+    CHECK(atomic_load_explicit(&gate.calls, memory_order_acquire) == 1);
+    Application_finish(w);
+    CHECK(Application_getPhase(w) == APP_PHASE_STOPPED);
+    Application_free(w);
+    pthread_cond_destroy(&gate.ready);
+    pthread_mutex_destroy(&gate.lock);
+
+    // A close that lands while the worker is inside a start callback must
+    // survive the worker's advance: the CAS refuses to overwrite CLOSING.
+    StartGate gate2 = {0};
+    pthread_mutex_init(&gate2.lock, nullptr);
+    pthread_cond_init(&gate2.ready, nullptr);
+    Application *c = Application();
+    CHECK(Application_addStartEvent(c, gatedStart, &gate2));
+    CHECK(Application_begin(c));
+    CHECK(Application_getPhase(c) == APP_PHASE_STARTING);
+    CHECK(waitCounter(&gate2.entered, 1, 2000));   // worker is inside the callback
+    CHECK(Application_getPhase(c) == APP_PHASE_STARTING);
+    Application_close(c);
+    CHECK(Application_getPhase(c) == APP_PHASE_CLOSING);
+    gateOpen(&gate2);
+    CHECK(waitCounter(&gate2.calls, 1, 2000));
+    struct timespec settle = {0, 20000000};   // let the worker attempt its advance
+    nanosleep(&settle, nullptr);
+    CHECK(Application_getPhase(c) == APP_PHASE_CLOSING);
+    Application_finish(c);
+    CHECK(Application_getPhase(c) == APP_PHASE_STOPPED);
+    Application_free(c);
+    pthread_cond_destroy(&gate2.ready);
+    pthread_mutex_destroy(&gate2.lock);
 
     // Window registry with opaque sentinel handles (never dereferenced here).
     Window *w1 = (Window*) (uintptr_t) 0x1;
