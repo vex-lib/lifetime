@@ -180,16 +180,36 @@ int main(void) {
     CHECK(!CommandLine_isCancelled(named), "not cancelled");
 
     // run: one stopping input ends the loop with exit code 0.
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_IDLE, "idle before run");
+    // A stop requested while IDLE is discarded, never pre-cancelling the run.
+    CommandLine_stop(named);
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_IDLE, "idle stop discarded");
+    int pollsAtRunStart = fake.polls;
     app.stopOnInput = true;
     fake.pending = true;
     fake.next = (CommandLineEvent) { .kind = COMMANDLINE_EVENT_KEY, .key = 3 };
     int rc = CommandLine_run(named);
     CHECK(rc == 0 && CommandLine_isCancelled(named), "run exits on app stop");
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_CANCELLED, "cancelled phase after stop");
+    CHECK(!CommandLine_isRunning(named), "not running after exit");
+    CHECK(fake.polls > pollsAtRunStart, "run serviced the loop after the discarded stop");
+
+    // CANCELLED is terminal for the session: a second run refuses instead of
+    // silently returning 0 for a loop that never executes.
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_CANCELLED, "cancelled persists");
+    CHECK(CommandLine_run(named) == 1, "run refused while cancelled");
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_CANCELLED, "refusal preserves cancelled");
 
     // detach + close restore the device.
     CHECK(CommandLine_detachApp(named) && !CommandLine_hasApp(named), "detachApp");
     CommandLine_close(named);
     CHECK(fake.closes == 1 && !CommandLine_isOpen(named), "device restored");
+
+    // The documented exit: a new device session resets the loop word to IDLE.
+    CHECK(CommandLine_open(named), "reopen after cancel");
+    CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_IDLE, "reopen resets the loop word");
+    CommandLine_close(named);
+    CHECK(fake.closes == 2, "session closed again");
 
     // Kernel registration: the fourth kind.
     Kernel *k = Kernel();

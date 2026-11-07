@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "util/annotation.h"
-#include "../../vexspoke/exception/throw.h"
+#include "util/throw.h"
 
 ;;DEFINITION
 /**
@@ -47,14 +47,12 @@
  *   CommandLineIo io       injected device backend
  *   bool explicitIo        false => default (ncurses) backend
  *   CommandLineApp app     borrowed swappable application seam
- *   bool hasApp            app seam attached
  *   char *cells            owned device framebuffer (width*height)
  *   size_t capacity        admitted grid byte capacity
  *   size_t width, height   cell geometry
  *   uint64_t generation    successful app publications
  *   size_t refusalCount    epoch grid-capacity refusals
- *   _Atomic bool running   run loop active
- *   _Atomic bool cancel    stop request
+ *   atomic_uint run        CommandLineRunPhase: IDLE/RUNNING/CANCELLED
  *   bool opened            device acquired
  *   bool active            callback exclusion guard
  *
@@ -176,6 +174,10 @@ bool CommandLine_open(CommandLine *self) {
         return false;
     }
     (*self).opened = true;
+    // A device session owns one loop history: opening (never legal while a loop
+    // is live) starts the word fresh, so a cancelled session is revived only by
+    // an explicit close/reopen, never silently mid-session.
+    atomic_store_explicit(&(*self).run, COMMANDLINE_RUN_IDLE, memory_order_release);
     return true;
 }
 
@@ -223,7 +225,7 @@ bool CommandLine_revalidate(CommandLine *self) {
     }
     // A resize repaints in one step: redraw the app, then present once.
     CommandLineApp app = (*self).app;
-    if ((*self).hasApp && app.draw != nullptr) {
+    if (app.draw != nullptr) {
         (*self).active = true;
         bool ok = app.draw(app.ctx, self);
         (*self).active = false;
@@ -249,28 +251,33 @@ bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app) {
         return false;
     }
     (*self).app = *app;
-    (*self).hasApp = true;
     ++(*self).generation;
     return true;
 }
 
 bool CommandLine_hasApp(const CommandLine *self) {
-    return self && (*self).hasApp;
+    return self && (*self).app.draw != nullptr;
 }
 
 bool CommandLine_detachApp(CommandLine *self) {
-    if (self == nullptr || !(*self).hasApp)
+    if (self == nullptr || (*self).app.draw == nullptr)
         return false;
     CommandLineApp app = (*self).app;
     if (app.detach != nullptr)
         app.detach(app.ctx);
     memset(&(*self).app, 0, sizeof((*self).app));
-    (*self).hasApp = false;
     return true;
 }
 
+/** Requests cancel; only a live loop consumes it (IDLE stops are discarded). */
+static void cmdRequestCancel(CommandLine *self) {
+    uint32_t expected = COMMANDLINE_RUN_RUNNING;
+    atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+        COMMANDLINE_RUN_CANCELLED, memory_order_acq_rel, memory_order_relaxed);
+}
+
 bool CommandLine_tick(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || !(*self).hasApp) {
+    if (self == nullptr || !(*self).opened || (*self).app.draw == nullptr) {
         THROW("CommandLine tick: not open or no app");
         return false;
     }
@@ -284,7 +291,7 @@ bool CommandLine_tick(CommandLine *self) {
             bool ok = app.input(app.ctx, self, &ev);
             (*self).active = false;
             if (!ok) {
-                atomic_store(&(*self).cancel, true);
+                cmdRequestCancel(self);
                 return false;
             }
         }
@@ -298,14 +305,22 @@ bool CommandLine_tick(CommandLine *self) {
 }
 
 int CommandLine_run(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || !(*self).hasApp) {
+    if (self == nullptr || !(*self).opened || (*self).app.draw == nullptr) {
         THROW("CommandLine run: not open or no app");
         return 1;
     }
-    atomic_store(&(*self).running, true);
+    uint32_t expected = COMMANDLINE_RUN_IDLE;
+    if (!atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+            COMMANDLINE_RUN_RUNNING, memory_order_acq_rel, memory_order_relaxed)) {
+        if (expected == COMMANDLINE_RUN_CANCELLED)
+            THROW("CommandLine run: session was cancelled; reopen the device for a new loop");
+        else
+            THROW("CommandLine run: loop already active");
+        return 1;
+    }
     int rc = 0;
     CommandLineApp app = (*self).app;
-    while (!atomic_load(&(*self).cancel)) {
+    while (atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_RUNNING) {
         CommandLineEvent ev;
         if (CommandLine_poll(self, 50, &ev)) {
             if (ev.kind == COMMANDLINE_EVENT_RESIZE) {
@@ -317,7 +332,7 @@ int CommandLine_run(CommandLine *self) {
                 bool ok = app.input(app.ctx, self, &ev);
                 (*self).active = false;
                 if (!ok) {
-                    atomic_store(&(*self).cancel, true);
+                    cmdRequestCancel(self);
                     break;
                 }
             }
@@ -330,13 +345,17 @@ int CommandLine_run(CommandLine *self) {
             break;
         }
     }
-    atomic_store(&(*self).running, false);
+    // A stop leaves CANCELLED visible; a failure exit returns to IDLE so the
+    // same device can be run again.
+    expected = COMMANDLINE_RUN_RUNNING;
+    atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+        COMMANDLINE_RUN_IDLE, memory_order_acq_rel, memory_order_relaxed);
     return rc;
 }
 
 void CommandLine_stop(CommandLine *self) {
     if (self != nullptr)
-        atomic_store(&(*self).cancel, true);
+        cmdRequestCancel(self);
 }
 
 void CommandLine_requestCancel(CommandLine *self) {
@@ -344,7 +363,13 @@ void CommandLine_requestCancel(CommandLine *self) {
 }
 
 bool CommandLine_isRunning(const CommandLine *self) {
-    return self && atomic_load(&(*self).running);
+    return self && atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_RUNNING;
+}
+
+CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self) {
+    if (self == nullptr)
+        return COMMANDLINE_RUN_IDLE;
+    return (CommandLineRunPhase) atomic_load_explicit(&(*self).run, memory_order_acquire);
 }
 
 size_t CommandLine_getWidth(const CommandLine *self) { return self ? (*self).width : 0; }
@@ -396,7 +421,9 @@ uint64_t CommandLine_getGeneration(const CommandLine *self) { return self ? (*se
 size_t CommandLine_exhaustionCount(const CommandLine *self) { return self ? (*self).refusalCount : 0; }
 bool CommandLine_isOpen(const CommandLine *self) { return self && (*self).opened; }
 bool CommandLine_isActive(const CommandLine *self) { return self && (*self).active; }
-bool CommandLine_isCancelled(const CommandLine *self) { return self && atomic_load(&(*self).cancel); }
+bool CommandLine_isCancelled(const CommandLine *self) {
+    return self && atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_CANCELLED;
+}
 
 bool CommandLine_toString(const CommandLine *self, char *dest, size_t cap, bool *outTruncated) {
     if (outTruncated != nullptr)
@@ -407,10 +434,11 @@ bool CommandLine_toString(const CommandLine *self, char *dest, size_t cap, bool 
         THROW("CommandLine projection: missing destination");
         return false;
     }
-    int n = self ? snprintf(dest, cap, "CommandLine{title=\"%s\",%zux%zu,capacity=%zu,generation=%llu,refusalCount=%zu,opened=%d,active=%d,hasApp=%d}",
+    int n = self ? snprintf(dest, cap, "CommandLine{title=\"%s\",%zux%zu,capacity=%zu,generation=%llu,refusalCount=%zu,run=%u,opened=%d,active=%d,hasApp=%d}",
         (*self).title, (*self).width, (*self).height, (*self).capacity,
         (unsigned long long) (*self).generation, (*self).refusalCount,
-        (*self).opened, (*self).active, (*self).hasApp)
+        (unsigned) atomic_load_explicit(&(*self).run, memory_order_acquire),
+        (*self).opened, (*self).active, (*self).app.draw != nullptr)
         : snprintf(dest, cap, "nullptr");
     bool cut = n < 0 || (size_t) n >= cap;
     if (outTruncated != nullptr)

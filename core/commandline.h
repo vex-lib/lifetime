@@ -62,6 +62,18 @@ typedef enum CommandLineEventKind {
     COMMANDLINE_EVENT_RESIZE
 } CommandLineEventKind;
 
+// One loop lifecycle, one word. `stop` moves RUNNING to CANCELLED; the loop
+// returns to IDLE when it winds down WITHOUT a stop request. A stop requested
+// while IDLE is discarded, so a fresh run() is never pre-cancelled by a stale
+// request — the flag pair that used to allow exactly that is gone. CANCELLED is
+// terminal for the device session: only CommandLine_open starts a new one.
+typedef enum CommandLineRunPhase {
+    COMMANDLINE_RUN_IDLE = 0,   // no loop active
+    COMMANDLINE_RUN_RUNNING,    // loop servicing events
+    COMMANDLINE_RUN_CANCELLED,  // stop requested; loop observed and exited
+    COMMANDLINE_RUN_COUNT
+} CommandLineRunPhase;
+
 // One normalized device event delivered on the owner thread. `key` holds a
 // CommandLineKey for special keys or the literal character code for text/control.
 typedef struct CommandLineEvent {
@@ -102,17 +114,15 @@ struct CommandLine {
     CommandLineIo io;                   // injected device backend
     bool explicitIo;                    // false => default (ncurses) backend
     CommandLineApp app;                 // borrowed swappable application seam
-    bool hasApp;                        // app seam attached
     char *cells;                        // owned device framebuffer (width*height)
     size_t capacity;                    // admitted grid byte capacity
     size_t width;                       // columns
     size_t height;                      // rows
     uint64_t generation;                // successful app publications
     size_t refusalCount;                // epoch grid-capacity refusals
-    _Atomic bool running;               // run loop active
-    _Atomic bool cancel;                // stop request
+    atomic_uint run;                    // CommandLineRunPhase
     bool opened;                        // device acquired
-    bool active;                        // callback exclusion guard
+    bool active;                        // callback exclusion guard (owner thread)
 };
 
 // --- Overloaded constructors (the Window chooser idiom) ---
@@ -170,6 +180,8 @@ int CommandLine_run(CommandLine *self);
 void CommandLine_stop(CommandLine *self);
 void CommandLine_requestCancel(CommandLine *self);
 bool CommandLine_isRunning(const CommandLine *self);
+// One loop word, readable from any thread (snapshot semantics).
+CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self);
 
 // --- Geometry / grid ---
 size_t CommandLine_getWidth(const CommandLine *self);
