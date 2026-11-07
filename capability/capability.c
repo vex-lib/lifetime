@@ -5,6 +5,7 @@
 // following the directory going forward:
 // worktree > organization > repository > <directory tree> > file
 #include "util/annotation.h"
+#include "util/platform.h"
 
 #if defined(VEX_PLATFORM_APPLE)
 #include <sys/sysctl.h>
@@ -19,8 +20,9 @@
  * has a host/CPU feature that is newer than the platform floor, so a feature
  * never raises the floor (the Capability Gating Law). The host is read ONCE:
  * the first query fills a 64-bit bitset and an OS-major word, and every later
- * query branches on that cache. A host with no backend answers false for every
- * kind — a capability is never assumed. Device/GPU capabilities are NOT here;
+ * query branches on that cache. The image constructor below performs that read
+ * before `main`, so the first query is already a cache hit. A host with no
+ * backend answers false for every kind — a capability is never assumed. Device/GPU capabilities are NOT here;
  * they belong to the R3 driver (graphvex).
  *
  * On Apple Silicon the CPU bits come from the documented hw.optional.arm.FEAT_*
@@ -112,6 +114,15 @@ static void probeOnce() {
         if (sysctlFlag("hw.optional.arm.FEAT_SVE"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SVE);
         if (sysctlFlag("hw.optional.arm.FEAT_SME"))     s_bits |= ((uint64_t) 1 << CAPABILITY_CPU_SME);
     #endif
+}
+
+// The one pre-main hook. The linker records this pointer in the image's
+// initializer list; the runtime walks that list before the entry point, so the
+// host facts are already cached by the time `main` runs. No caller, no order
+// dependency on other units, and no I/O — sysctl only.
+// INTENTIONAL(vex): the only constructor in the tree.
+__attribute__((constructor)) static void capabilityBoot(void) {
+    probeOnce();
 }
 
 // CORE FUNCTIONS (PUBLIC & PRIVATE)
