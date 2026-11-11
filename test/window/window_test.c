@@ -75,13 +75,13 @@ static win_ctx_t *g_winCtx = nullptr;
 
 // --- Input listeners: echo everything the pipeline produces. ---
 
-static void on_key_down(void *self, int keyEvent, uint64_t nanos) {
+static void on_key_down(void *self, int keyEvent, u64 nanos) {
     (void) self; (void) nanos;
     printf("key DOWN  %-12s code=%d\n", Key_name(Key_code(keyEvent)), Key_code(keyEvent));
 }
 
 /** Prints key-up events and stops the tour when Escape is released. */
-static void on_key_up(void *self, int keyEvent, uint64_t nanos) {
+static void on_key_up(void *self, int keyEvent, u64 nanos) {
     (void) self; (void) nanos;
     printf("key UP    %-12s hold=%.1fms taps=%d\n", Key_name(Key_code(keyEvent)),
            Key_lastHoldDurationNanos(Key_code(keyEvent)) / 1e6,
@@ -91,7 +91,7 @@ static void on_key_up(void *self, int keyEvent, uint64_t nanos) {
 }
 
 /** Reports mouse-button presses with the current pointer position. */
-static void on_mouse_down(void *self, int mouseEvent, uint64_t nanos) {
+static void on_mouse_down(void *self, int mouseEvent, u64 nanos) {
     (void) self; (void) nanos;
     printf("mouse DOWN %s taps=%d at (%.0f, %.0f)\n",
            Mouse_name(Mouse_button(mouseEvent)), Mouse_taps(Mouse_button(mouseEvent)),
@@ -99,7 +99,7 @@ static void on_mouse_down(void *self, int mouseEvent, uint64_t nanos) {
 }
 
 /** Reports scroll deltas received by the window input listener. */
-static void on_scroll(void *self, double dx, double dy) {
+static void on_scroll(void *self, d64 dx, d64 dy) {
     (void) self;
     printf("scroll (%.2f, %.2f)\n", dx, dy);
 }
@@ -107,7 +107,7 @@ static void on_scroll(void *self, double dx, double dy) {
 static int g_moves = 0;
 
 /** Reports pointer movement and counts events for the bounded demo. */
-static void on_move(void *self, double x, double y) {
+static void on_move(void *self, d64 x, d64 y) {
     (void) self;
     if (++g_moves % 60 == 0) // throttle: one line per ~60 moves
         printf("move (%.0f, %.0f)\n", x, y);
@@ -150,14 +150,14 @@ static void runChromeContract(Window *w) {
         return;
 
     // Present policy: mirrors are atomic; a change bumps renderGeneration.
-    uint64_t gen0 = Window_renderGeneration(w);
+    u64 gen0 = Window_renderGeneration(w);
     CHECK(Window_getPresentMode(w) == WINDOW_PRESENT_FIFO);
     Window_setPresentMode(w, WINDOW_PRESENT_IMMEDIATE);
     CHECK(Window_getPresentMode(w) == WINDOW_PRESENT_IMMEDIATE);
     CHECK(Window_renderGeneration(w) > gen0);
 
     // Transparency mirror + generation bump.
-    uint64_t gen1 = Window_renderGeneration(w);
+    u64 gen1 = Window_renderGeneration(w);
     CHECK(!Window_isTransparent(w));
     Window_setTransparent(w, true);
     CHECK(Window_isTransparent(w));
@@ -245,7 +245,7 @@ static void runChromeContract(Window *w) {
     CHECK(Window_getLifecycle(w) != nullptr);
     CHECK(Window_width(w) > 0 && Window_height(w) > 0);
 
-    float scale = Window_getScale(w);
+    f32 scale = Window_getScale(w);
     CHECK(scale >= 1.0f);
 
     // Native Pixel Law: Window_setSize operates in native physical display pixels.

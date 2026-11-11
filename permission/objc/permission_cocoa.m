@@ -366,7 +366,7 @@ bool permissionBackendOpenSettings(PermissionKind kind) {
     char url[192];
     int n = snprintf(url, sizeof url,
                      "x-apple.systempreferences:com.apple.preference.security?%s", pane);
-    if (n <= 0 || (size_t) n >= sizeof url)
+    if (n <= 0 || (bytes) n >= sizeof url)
         return false;
     CFURLRef cfUrl = CFURLCreateWithBytes(nullptr, (const UInt8*) url, (CFIndex) n,
                                           kCFStringEncodingUTF8, nullptr);

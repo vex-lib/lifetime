@@ -33,9 +33,9 @@ typedef struct Console Console;
 typedef struct ConsoleIo {
     void *ctx;                                              // borrowed: R2 ProcessSpawn job
     bool (*spawn)(void *ctx, const char *shell, const char *workDir);
-    bool (*feed)(void *ctx, const char *Bytes, size_t len); // write to stdin pipe
-    bool (*reap)(void *ctx, char *out, size_t outCap,
-                 size_t *outLen);                           // non-blocking ≤100ms
+    bool (*feed)(void *ctx, const char *Bytes, bytes len); // write to stdin pipe
+    bool (*reap)(void *ctx, char *out, bytes outCap,
+                 bytes *outLen);                           // non-blocking ≤100ms
     void (*cancel)(void *ctx);                              // SIGTERM; never blocks
     bool (*joined)(const void *ctx);                        // true once child is reaped
 } ConsoleIo;
@@ -75,12 +75,12 @@ bool Console_run(Console *self);
 
 // Write a line into the session's stdin pipe.  False if not running or feed
 // not implemented.
-bool Console_writeInput(Console *self, const char *line, size_t len);
+bool Console_writeInput(Console *self, const char *line, bytes len);
 
 // Non-blocking output drain (≤100ms slice contract, the Bounded Wait Law).  Writes up to
 // outCap Bytes into out, sets *outLen to actual Bytes written.  Returns false
 // only on null self.  Reads 0 Bytes is a valid (non-error) empty poll.
-bool Console_poll(Console *self, char *out, size_t outCap, size_t *outLen);
+bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen);
 
 // Request graceful termination (SIGTERM via io.cancel).  Does not wait;
 // the supervising thread calls Console_poll + joined() to observe completion

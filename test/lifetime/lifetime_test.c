@@ -29,10 +29,10 @@
 
 // 32-byte header stamped by the allocator for negative pointer recovery
 typedef struct MemoryHeader {
-    uint64_t typeId;
-    uint64_t hash;
-    uint64_t length;
-    uint64_t pointer;
+    u64 typeId;
+    u64 hash;
+    u64 length;
+    u64 pointer;
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
 

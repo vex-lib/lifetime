@@ -38,9 +38,9 @@
 
 typedef struct Application Application;
 
-typedef void (*AppHotReloadFn)(Application *self, uint32_t loaded, void *userdata);
+typedef void (*AppHotReloadFn)(Application *self, u32 loaded, void *userdata);
 typedef void (*ApplicationEventFn)(Application *self, void *userdata);
-typedef int (*AppHotPollFn)(void *hot, uint32_t *loaded);
+typedef int (*AppHotPollFn)(void *hot, u32 *loaded);
 #define APP_MAX_EVENTS 16
 
 // One lifecycle, one word. The legal transitions are listed here and enforced
@@ -83,19 +83,19 @@ struct Application {
     char version[APP_MAX_VERSION];         // version string, e.g. "1.0.0"
     char iconPath[APP_MAX_ICON_PATH];      // icon path reference (default "")
     Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
-    uint32_t window_count;                 // used slots in windows[]
+    u32 window_count;                 // used slots in windows[]
     bool hadWindows;                      // one-way latch: a window was ever registered
     atomic_uint phase;                     // AppPhase: the single lifecycle word
     void *hot;                             // reload watcher (opaque; hotcwap fills via setHotPoll)
     AppHotPollFn hotPoll;                  // reload poll seam (nullable; hotcwap provides)
     void *hostLifetime;                    // owning Kernel Lifetime (opaque; set at start)
-    _Atomic uint32_t fps;                  // live telemetry: FPS (graphvex writes)
-    _Atomic uint32_t frametimeUs;          // live telemetry: frametime in microseconds (graphvex writes)
+    _Atomic u32 fps;                  // live telemetry: FPS (graphvex writes)
+    _Atomic u32 frametimeUs;          // live telemetry: frametime in microseconds (graphvex writes)
     AppHotReloadFn hotReloadFn;            // hot-reload notification callback (nullable)
     void *hotReloadUserdata;               // userdata for hotReloadFn
     ApplicationEventFn startFns[APP_MAX_EVENTS];
     void *startUsers[APP_MAX_EVENTS];
-    uint32_t startCount;
+    u32 startCount;
     ApplicationEventFn pollFns[APP_MAX_EVENTS]; // owner-thread service bridges
     void *pollUsers[APP_MAX_EVENTS];
     pthread_t ownerThread, startThread;
@@ -191,8 +191,8 @@ void Application_pollHot(Application *self);
 void Application_onHotReload(Application *self, AppHotReloadFn fn, void *userdata);
 
 // --- Telemetry ---
-uint32_t   Application_getFps(const Application *self);
-uint32_t   Application_getFrametimeUs(const Application *self);
+u32   Application_getFps(const Application *self);
+u32   Application_getFrametimeUs(const Application *self);
 void      *Application_getHot(const Application *self);
 // Opt-in: assign a pre-initialized reload watcher (opaque; hotcwap owns the
 // type) plus its poll seam. NULL disables.
@@ -216,10 +216,10 @@ bool      Application_addWindow(Application *self, Window *win);
 // Unregister a window (swap-remove, order not preserved). False if absent.
 bool      Application_removeWindow(Application *self, Window *win);
 // Window at index, or NULL when out of range.
-Window   *Application_getWindow(const Application *self, uint32_t index);
+Window   *Application_getWindow(const Application *self, u32 index);
 // Number of registered windows.
-uint32_t  Application_getWindowCount(const Application *self);
+u32  Application_getWindowCount(const Application *self);
 // Copy registry into out[] (up to cap), returns entries written.
-uint32_t  Application_getWindows(const Application *self, Window **out, uint32_t cap);
+u32  Application_getWindows(const Application *self, Window **out, u32 cap);
 
 #endif

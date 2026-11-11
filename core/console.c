@@ -98,7 +98,7 @@
 // All io.fn-pointers are nullable — NULL degrades gracefully per the Cold-Strict, Hot-Minimal Validation Law.")
 
 /** Copies a string into a bounded buffer and always terminates nonempty output. */
-static void console_clamp_copy(char *dst, size_t cap, const char *src) {
+static void console_clamp_copy(char *dst, bytes cap, const char *src) {
     if (!dst || cap == 0)
         return;
     if (!src) {
@@ -147,7 +147,7 @@ bool Console_run(Console *self) {
 }
 
 /** Sends a byte span to the active session through its feed callback. */
-bool Console_writeInput(Console *self, const char *line, size_t len) {
+bool Console_writeInput(Console *self, const char *line, bytes len) {
     if (!self)
         return false;
     if (!(*self).running)
@@ -159,7 +159,7 @@ bool Console_writeInput(Console *self, const char *line, size_t len) {
 }
 
 /** Drains one output slice and clears running state when the seam reports joined. */
-bool Console_poll(Console *self, char *out, size_t outCap, size_t *outLen) {
+bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
     if (!self)
         return false;
     if (outLen)
@@ -175,7 +175,7 @@ bool Console_poll(Console *self, char *out, size_t outCap, size_t *outLen) {
             out[0] = '\0';
         return true;
     }
-    size_t n = 0;
+    bytes n = 0;
     bool ok = (*io).reap((*io).ctx, out, outCap, &n);
     if (outLen)
         *outLen = n;

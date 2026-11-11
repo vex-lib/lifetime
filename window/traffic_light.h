@@ -27,12 +27,12 @@ void TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button
 bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton button);
 
 // --- Header Position (content-relative) ---
-void TrafficLight_setHeaderPosition(TrafficLight *self, float x, float y);
-void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float *outY);
+void TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y);
+void TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY);
 
 // --- State & Layout ---
 void TrafficLight_resetBase(TrafficLight *self);
 void TrafficLight_refresh(TrafficLight *self);
-void TrafficLight_setFloating(TrafficLight *self, bool floating);
+void TrafficLight_setFloating(TrafficLight *self, bool f32ing);
 
 #endif // WINDOW_TRAFFIC_LIGHT_H

@@ -17,7 +17,7 @@
 
 typedef struct Fake {
     int opens, closes, presents, mouse, polls;
-    size_t w, h;
+    bytes w, h;
     bool pending;
     CommandLineEvent next;
 } Fake;
@@ -29,12 +29,12 @@ typedef struct FakeApp {
 
 static bool fOpen(void *ctx) { (*((Fake*) ctx)).opens++; return true; }
 static void fClose(void *ctx) { (*((Fake*) ctx)).closes++; }
-static bool fSize(void *ctx, size_t *w, size_t *h) {
+static bool fSize(void *ctx, bytes *w, bytes *h) {
     Fake *f = (Fake*) ctx;
     *w = (*f).w; *h = (*f).h;
     return (*f).w > 0 && (*f).h > 0;
 }
-static bool fPresent(void *ctx, const char *cells, size_t w, size_t h) {
+static bool fPresent(void *ctx, const char *cells, bytes w, bytes h) {
     Fake *f = (Fake*) ctx;
     (void) cells; (void) w; (void) h;
     (*f).presents++;

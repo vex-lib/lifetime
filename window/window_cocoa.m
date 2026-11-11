@@ -80,24 +80,24 @@
  *   NSWindow *nsWindow;           // AppKit window (we own it; releasedWhenClosed NO)
  *   WindowDelegate *delegate;     // per-window close/resize/focus delegate
  *   WindowEvent lifecycle;        // OS lifecycle registry (window/window_event.h)
- *   uint32_t id;                  // engine window id (1..N, 0 = FOCUS_BROADCAST)
+ *   u32 id;                  // engine window id (1..N, 0 = FOCUS_BROADCAST)
  *   _Atomic bool shouldClose;     // true once close requested (Thread 0 writes, loop reads)
- *   _Atomic uint64_t sizeGeneration; // resize-reflection counter (thread 0 bumps)
+ *   _Atomic u64 sizeGeneration; // resize-reflection counter (thread 0 bumps)
  *   _Atomic int cachedWidth;      // content width in physical pixels at last thread-0 event (any thread reads)
  *   _Atomic int cachedHeight;     // content height in physical pixels at last thread-0 event
- *   double cachedScale;           // active backing scale factor
- *   double cachedX;               // top-left screen X at last thread-0 event
- *   double cachedY;               // top-left screen Y at last thread-0 event
- *   double cachedContentX;        // CONTENT top-left X (below title bar)
- *   double cachedContentY;        // CONTENT top-left Y (below title bar)
+ *   d64 cachedScale;           // active backing scale factor
+ *   d64 cachedX;               // top-left screen X at last thread-0 event
+ *   d64 cachedY;               // top-left screen Y at last thread-0 event
+ *   d64 cachedContentX;        // CONTENT top-left X (below title bar)
+ *   d64 cachedContentY;        // CONTENT top-left Y (below title bar)
  *   _Atomic bool liveResizing;    // thread 0 during NSViewLiveResize; renderer consumes
  *   _Atomic bool miniaturizing;   // thread 0 during genie minimize; suppress merge
  *   _Atomic int presentMode;      // present pacing (FIFO/IMMEDIATE), pure state
  *   _Atomic bool transparent;     // composite transparency request, pure state
- *   _Atomic uint64_t renderGeneration; // policy-reflection counter (rebuild ticket)
+ *   _Atomic u64 renderGeneration; // policy-reflection counter (rebuild ticket)
  *   _Atomic bool enabled;         // false mutes ALL OS input for this window
  *   bool lastFocused;             // focus-flip detection during the pump
- *   _Atomic uint32_t monitorId;   // CGDirectDisplayID mirror (0 = unmapped)
+ *   _Atomic u32 monitorId;   // CGDirectDisplayID mirror (0 = unmapped)
  *   WindowCursorType cursorType;  // active OS cursor style
  *   TrafficLight *trafficLights;  // macOS traffic-light chrome controller (window/traffic_light.h)
  *   WindowResizeRenderFn resizeRenderFn;  // resize-cadence render hook
@@ -205,7 +205,7 @@
  *   - Window_setNaked(window, naked)
  *   - Window_setBorderless(window, borderless)
  *   - Window_setViewportFlushToTop(window, flush)
- *   - Window_setFloatingTrafficLights(window, floating)
+ *   - Window_setFloatingTrafficLights(window, f32ing)
  *   - Window_macOS_setTrafficLightButtonVisible(window, light, visible)
  *   - Window_macOS_setTrafficLightHeaderPosition(window, x, y)
  *   - Window_macOS_hasLiquidGlass() / Window_macOS_setLiquidGlass(window, desc)
@@ -263,11 +263,11 @@
 ;;INTENTION("GPU-era composite surface (attachPanes/resizePanes/compositePanes/compositeBoards/orderLayers/metalLayer/setGravityTopLeft/workerPresentBegin/workerPresentEnd/present) is retained as inert stubs so the still-unmigrated darling compositor keeps linking; zero Vulkan/Metal code lives in this file. They retire together with their window.h declarations once darling migrates onto the WindowEvent bridge (the Window Decoupling Law).")
 ;;INTENTION("presentMode/transparent/renderGeneration are pure atomic policy state (swapchain-rebuild tickets for a future render path), not GPU calls; no render logic exists here.")
 
-// Multi-tap window for double-click style counting (legacy parity: 250ms).
-static const uint64_t kTapThresholdNanos = 250000000ULL;
+// Multi-tap window for d64-click style counting (legacy parity: 250ms).
+static const u64 kTapThresholdNanos = 250000000ULL;
 
 // Carbon virtual keycode -> KEY_* code. -1 = unmapped. Same table the legacy
-// macOSWindow built (physical F1-F12, not Fn-doubled media keys).
+// macOSWindow built (physical F1-F12, not Fn-f64d media keys).
 static int macKeyMap[128] = {
     [0] = KEY_A,                   [1] = KEY_S,
     [2] = KEY_D,                   [3] = KEY_F,
@@ -327,28 +327,28 @@ struct Window {
     NSWindow *nsWindow;
     WindowDelegate *delegate;
     WindowEvent lifecycle;
-    uint32_t id;
+    u32 id;
     _Atomic bool shouldClose;
-    _Atomic uint64_t sizeGeneration;
+    _Atomic u64 sizeGeneration;
     _Atomic int cachedWidth;
     _Atomic int cachedHeight;
-    double cachedScale;
-    double cachedX;
-    double cachedY;
-    double cachedContentX;
-    double cachedContentY;
+    d64 cachedScale;
+    d64 cachedX;
+    d64 cachedY;
+    d64 cachedContentX;
+    d64 cachedContentY;
     _Atomic bool liveResizing;
     _Atomic bool miniaturizing;
 
     // Pure-state reflection words (no GPU calls in this file).
     _Atomic int presentMode;
     _Atomic bool transparent;
-    _Atomic uint64_t renderGeneration;
+    _Atomic u64 renderGeneration;
 
     _Atomic bool enabled;
     _Atomic bool keyEnabled; // false = canBecomeKeyWindow refuses (held by a modal dialog)
     bool lastFocused;
-    _Atomic uint32_t monitorId;
+    _Atomic u32 monitorId;
     WindowCursorType cursorType;
 
     // Traffic-light chrome lives in the segregated TrafficLight class (window/
@@ -381,15 +381,15 @@ typedef struct WindowSlot {
 } WindowSlot;
 
 static WindowSlot *s_refs = nullptr;
-static uint32_t s_refCap = 0;
+static u32 s_refCap = 0;
 
 // Grow the NSWindow-to-handle registry geometrically and initialize new slots.
 static bool windowRefsGrow(void) {
-    uint32_t nextCap = (s_refCap == 0) ? 8u : s_refCap * 2u;
-    WindowSlot *grown = (WindowSlot*) realloc(s_refs, (size_t) nextCap * sizeof(WindowSlot));
+    u32 nextCap = (s_refCap == 0) ? 8u : s_refCap * 2u;
+    WindowSlot *grown = (WindowSlot*) realloc(s_refs, (bytes) nextCap * sizeof(WindowSlot));
     if (grown == nullptr)
         return false;
-    for (uint32_t i = s_refCap; i < nextCap; i++) {
+    for (u32 i = s_refCap; i < nextCap; i++) {
         grown[i].window = nil;
         grown[i].handle = nullptr;
     }
@@ -399,10 +399,10 @@ static bool windowRefsGrow(void) {
 }
 
 // Resolve an id for a newly created window, or 0 when the table cannot grow.
-static uint32_t windowIdAcquire(NSWindow *window, Window *handle) {
+static u32 windowIdAcquire(NSWindow *window, Window *handle) {
     if (s_refCap == 0 && !windowRefsGrow())
         return FOCUS_BROADCAST;
-    for (uint32_t i = 1; i < s_refCap; i++) {
+    for (u32 i = 1; i < s_refCap; i++) {
         if (s_refs[i].window == nil) {
             s_refs[i].window = window;
             s_refs[i].handle = handle;
@@ -411,7 +411,7 @@ static uint32_t windowIdAcquire(NSWindow *window, Window *handle) {
     }
     if (!windowRefsGrow())
         return FOCUS_BROADCAST;
-    for (uint32_t i = 1; i < s_refCap; i++) {
+    for (u32 i = 1; i < s_refCap; i++) {
         if (s_refs[i].window == nil) {
             s_refs[i].window = window;
             s_refs[i].handle = handle;
@@ -422,7 +422,7 @@ static uint32_t windowIdAcquire(NSWindow *window, Window *handle) {
 }
 
 // Clear the registry slot after native delegates and input routes are detached.
-static void windowIdRelease(uint32_t id) {
+static void windowIdRelease(u32 id) {
     if (id != FOCUS_BROADCAST && id < s_refCap) {
         s_refs[id].window = nil;
         s_refs[id].handle = nullptr;
@@ -430,10 +430,10 @@ static void windowIdRelease(uint32_t id) {
 }
 
 // Reverse lookup: which engine id does this OS window carry? 0 if unknown.
-static uint32_t windowIdOf(NSWindow *window) {
+static u32 windowIdOf(NSWindow *window) {
     if (window == nil)
         return FOCUS_BROADCAST;
-    for (uint32_t i = 1; i < s_refCap; i++)
+    for (u32 i = 1; i < s_refCap; i++)
         if (s_refs[i].window == window)
             return i;
     return FOCUS_BROADCAST;
@@ -442,7 +442,7 @@ static uint32_t windowIdOf(NSWindow *window) {
 static Window *windowHandleOf(NSWindow *window) {
     if (window == nil)
         return nullptr;
-    for (uint32_t i = 1; i < s_refCap; i++)
+    for (u32 i = 1; i < s_refCap; i++)
         if (s_refs[i].window == window)
             return s_refs[i].handle;
     return nullptr;
@@ -480,7 +480,7 @@ static CGFloat windowBackingScale(const Window *window);
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
         fprintf(stderr, "sf: %.0fx%.0f\n", newSize.width, newSize.height);
     if (w) {
-        uint64_t previousSizeGeneration = Window_sizeGeneration(w);
+        u64 previousSizeGeneration = Window_sizeGeneration(w);
         windowRefreshSize(w);
         // Repaint the WHOLE frame on EVERY geometry step, no exceptions. The
         // public resize event speaks rounded logical points, so a drag step
@@ -684,7 +684,7 @@ static CGFloat windowBackingScale(const Window *window);
     }
 }
 
-// Zoom-to-fill (green button / double-click titlebar): publish the lifecycle
+// Zoom-to-fill (green button / d64-click titlebar): publish the lifecycle
 // event before AppKit performs the standard-frame change.
 /** Publish the zoom-fill lifecycle event before AppKit applies the target frame. */
 - (BOOL)windowShouldZoom:(NSWindow*) sender toFrame:(NSRect)newFrame {
@@ -733,7 +733,7 @@ static void windowRefreshSize(Window *window) {
         NSView *cv = [nsw contentView];
         NSRect content = cv != nil ? [cv bounds] : [nsw contentRectForFrameRect:[nsw frame]];
         CGFloat scale = windowBackingScale(window);
-        (*window).cachedScale = (double) scale;
+        (*window).cachedScale = (d64) scale;
 
         int cw, ch;
         if (cv != nil) {
@@ -779,17 +779,17 @@ static void windowRefreshOrigin(Window *window) {
         NSRect frame = [nsw frame];
         NSRect content = [nsw contentRectForFrameRect:frame];
         CGFloat screenHeight = [[NSScreen mainScreen] frame].size.height;
-        double tx = (double) frame.origin.x;
-        double ty = (double) (screenHeight - frame.origin.y - frame.size.height);
+        d64 tx = (d64) frame.origin.x;
+        d64 ty = (d64) (screenHeight - frame.origin.y - frame.size.height);
         NSView *cv = [nsw contentView];
         if (cv != nil) {
             NSRect cvRectInWindow = [cv frame];
             NSRect cvRectInScreen = [nsw convertRectToScreen:cvRectInWindow];
-            (*window).cachedContentX = (double) cvRectInScreen.origin.x;
-            (*window).cachedContentY = (double) (screenHeight - cvRectInScreen.origin.y - cvRectInScreen.size.height);
+            (*window).cachedContentX = (d64) cvRectInScreen.origin.x;
+            (*window).cachedContentY = (d64) (screenHeight - cvRectInScreen.origin.y - cvRectInScreen.size.height);
         } else {
-            (*window).cachedContentX = (double) content.origin.x;
-            (*window).cachedContentY = (double) (screenHeight - content.origin.y - content.size.height);
+            (*window).cachedContentX = (d64) content.origin.x;
+            (*window).cachedContentY = (d64) (screenHeight - content.origin.y - content.size.height);
         }
         if (tx != (*window).cachedX || ty != (*window).cachedY) {
             (*window).cachedX = tx;
@@ -815,7 +815,7 @@ static void windowRefreshFocus(Window *window, NSWindow *keyWindow) {
 }
 
 // Mirror the OS display assignment into the atomic word; 0 means unmapped.
-static uint32_t resolveMonitorId(Window *window) {
+static u32 resolveMonitorId(Window *window) {
     if (window == nullptr)
         return 0;
     @autoreleasepool {
@@ -823,7 +823,7 @@ static uint32_t resolveMonitorId(Window *window) {
         if (screen == nil)
             return 0;
         NSNumber *displayId = [[screen deviceDescription] objectForKey:@"NSScreenNumber"];
-        return displayId ? (uint32_t) [displayId unsignedIntValue] : 0;
+        return displayId ? (u32) [displayId unsignedIntValue] : 0;
     }
 }
 
@@ -831,7 +831,7 @@ static uint32_t resolveMonitorId(Window *window) {
 static void windowRefreshMonitor(Window *window) {
     if (window == nullptr)
         return;
-    uint32_t next = resolveMonitorId(window);
+    u32 next = resolveMonitorId(window);
     atomic_store_explicit(&(*window).monitorId, next, memory_order_relaxed);
 }
 
@@ -844,7 +844,7 @@ static void recenterIfLocked(void) {
 
 // Content-area coordinates (top-left origin) for a mouse event in physical pixels (Native Pixel Law).
 // Events that miss every window fall back to raw screen-space values.
-static void mouseLocation(NSEvent *event, double *outX, double *outY) {
+static void mouseLocation(NSEvent *event, d64 *outX, d64 *outY) {
     NSPoint p = [event locationInWindow];
     NSWindow *eventWindow = [event window];
     CGFloat scale = 1.0;
@@ -855,15 +855,15 @@ static void mouseLocation(NSEvent *event, double *outX, double *outY) {
         NSView *cv = [eventWindow contentView];
         if (cv != nil) {
             NSPoint pt = [cv convertPoint:p fromView:nil];
-            *outX = (double) pt.x * (double) scale;
-            *outY = (double) pt.y * (double) scale;
+            *outX = (d64) pt.x * (d64) scale;
+            *outY = (d64) pt.y * (d64) scale;
             return;
         }
         NSRect content = [eventWindow contentRectForFrameRect:[eventWindow frame]];
         p.y = content.size.height - p.y;
     }
-    *outX = (double) p.x * (double) scale;
-    *outY = (double) p.y * (double) scale;
+    *outX = (d64) p.x * (d64) scale;
+    *outY = (d64) p.y * (d64) scale;
 }
 
 // Map an NSTouch phase onto the Touch_* action codes.
@@ -880,7 +880,7 @@ static int touchAction(NSTouchPhase phase) {
 // Feed one gesture/touch carrier event into input.Touch: resolve each active
 // touch into its slot (identity hash % TOUCH_MAX), normalize position into
 // content coords, and estimate pressure from the resting flag.
-static void dispatchTouches(NSEvent *event, uint32_t wid) {
+static void dispatchTouches(NSEvent *event, u32 wid) {
     NSWindow *eventWindow = [event window];
     if (eventWindow == nil)
         return;
@@ -893,15 +893,15 @@ static void dispatchTouches(NSEvent *event, uint32_t wid) {
         return;
 
     NSRect frame = [contentView frame];
-    double winW = frame.size.width;
-    double winH = frame.size.height;
+    d64 winW = frame.size.width;
+    d64 winH = frame.size.height;
 
     for (NSTouch *touch in touches) {
         NSUInteger slot = [[touch identity] hash] % TOUCH_MAX;
         NSPoint norm = [touch normalizedPosition];
-        double posX = norm.x * winW;
-        double posY = (1.0 - norm.y) * winH;
-        double pressure = [touch isResting] ? 0.2 : 0.8;
+        d64 posX = norm.x * winW;
+        d64 posY = (1.0 - norm.y) * winH;
+        d64 pressure = [touch isResting] ? 0.2 : 0.8;
         Touch_pushTouchEvent(wid, (int) slot, touchAction([touch phase]),
                              posX, posY, pressure, kTapThresholdNanos);
     }
@@ -913,7 +913,7 @@ static void dispatchTouches(NSEvent *event, uint32_t wid) {
 // the input pipeline.
 static void routeEvent(NSEvent *event) {
     NSEventType type = [event type];
-    uint32_t wid = windowIdOf([event window]);
+    u32 wid = windowIdOf([event window]);
 
     // Disabled windows receive nothing: events never enter the device rings.
     Window *target = (wid != FOCUS_BROADCAST) ? windowHandleOf([event window]) : nullptr;
@@ -987,7 +987,7 @@ static void routeEvent(NSEvent *event) {
             // A scroll can be the first event after entering the window. Feed
             // its own pointer location before the wheel delta so hit-testing
             // does not rely on an earlier MouseMoved event.
-            double x, y;
+            d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
             Mouse_pushScrollEvent(wid, [event scrollingDeltaX], [event scrollingDeltaY]);
@@ -1004,7 +1004,7 @@ static void routeEvent(NSEvent *event) {
             int button = (type == NSEventTypeLeftMouseDown) ? MOUSE_LEFT
                        : ((type == NSEventTypeRightMouseDown) ? MOUSE_RIGHT
                                                               : (int) [event buttonNumber]);
-            double x, y;
+            d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
             Mouse_pushButtonEvent(wid, button, KEY_ACTION_DOWN, kTapThresholdNanos);
@@ -1019,7 +1019,7 @@ static void routeEvent(NSEvent *event) {
             int button = (type == NSEventTypeLeftMouseUp) ? MOUSE_LEFT
                        : ((type == NSEventTypeRightMouseUp) ? MOUSE_RIGHT
                                                              : (int) [event buttonNumber]);
-            double x, y;
+            d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
             Mouse_pushButtonEvent(wid, button, KEY_ACTION_UP, kTapThresholdNanos);
@@ -1034,10 +1034,10 @@ static void routeEvent(NSEvent *event) {
                 CGFloat scale = [event window] ? [[event window] backingScaleFactor] : 1.0;
                 if (scale <= 0.0)
                     scale = 1.0;
-                Mouse_pushMoveDeltaEvent(wid, [event deltaX] * (double) scale, [event deltaY] * (double) scale);
+                Mouse_pushMoveDeltaEvent(wid, [event deltaX] * (d64) scale, [event deltaY] * (d64) scale);
                 break;
             }
-            double x, y;
+            d64 x, y;
             mouseLocation(event, &x, &y);
             if (type == NSEventTypeMouseMoved) {
                 Mouse_pushMoveEvent(wid, x, y);
@@ -1106,7 +1106,7 @@ static bool windowPollEvents(bool singleStep) {
 
         // Reflection pass: size/move/focus/monitor mirroring per live window.
         NSWindow *keyWindow = [NSApp keyWindow];
-        for (uint32_t i = 1; i < s_refCap; i++) {
+        for (u32 i = 1; i < s_refCap; i++) {
             NSWindow *w = s_refs[i].window;
             if (w == nil)
                 continue;
@@ -1143,7 +1143,7 @@ void Window_waitEvents(Window *window, int timeoutMs) {
     (void) window;   // the AppKit event pump is process-wide
     @autoreleasepool {
         NSDate *until = timeoutMs > 0
-            ? [NSDate dateWithTimeIntervalSinceNow:(double) timeoutMs / 1000.0]
+            ? [NSDate dateWithTimeIntervalSinceNow:(d64) timeoutMs / 1000.0]
             : [NSDate distantFuture];
         NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
                                             untilDate:until
@@ -1186,20 +1186,20 @@ void Window_waitEvents(Window *window, int timeoutMs) {
     return h > 0.0 ? h : 28.0;
 }
 
-// Titlebar double-click is the accessibility affordance Windows ships as the
+// Titlebar d64-click is the accessibility affordance Windows ships as the
 // maximize (square) button, and macOS ships as the green zoom. On a NAKED /
 // full-size-content window the title bar is transparent, so AppKit's own
-// double-click target is nearly unhittable — catch it explicitly. A plain
-// double-click zooms (fills the visible frame, the macOS maximize); an
-// Option-double-click enters fullscreen. Both are no-ops if already there.
+// d64-click target is nearly unhittable — catch it explicitly. A plain
+// d64-click zooms (fills the visible frame, the macOS maximize); an
+// Option-d64-click enters fullscreen. Both are no-ops if already there.
 //
 // The resize border keeps its own behavior: when the pointer is on an edge or
-// corner (the up-down / diagonal resize cursor), the double-click stays a
+// corner (the up-down / diagonal resize cursor), the d64-click stays a
 // directional resize and we do not intercept — only the title-bar interior
 // (normal cursor) maximizes.
 static const CGFloat kWindowResizeBorderPoints = 6.0;
 
-/** Route titlebar double-click gestures before ordinary AppKit event delivery. */
+/** Route titlebar d64-click gestures before ordinary AppKit event delivery. */
 - (void)sendEvent:(NSEvent*) event {
     if (event.type == NSEventTypeLeftMouseDown && event.clickCount == 2) {
         NSPoint p = [event locationInWindow];
@@ -1317,7 +1317,7 @@ static Window *windowAlloc(const WindowDesc *desc) {
         CGFloat winScale = [window backingScaleFactor];
         if (winScale <= 0.0)
             winScale = scale;
-        (*w).cachedScale = (double) winScale;
+        (*w).cachedScale = (d64) winScale;
         NSRect initialContent = [window contentRectForFrameRect:[window frame]];
         int initPxW = (int) lround(initialContent.size.width * winScale);
         int initPxH = (int) lround(initialContent.size.height * winScale);
@@ -1325,11 +1325,11 @@ static Window *windowAlloc(const WindowDesc *desc) {
         atomic_store_explicit(&(*w).cachedHeight, initPxH, memory_order_relaxed);
         NSRect initialFrame = [window frame];
         CGFloat screenH = [[NSScreen mainScreen] frame].size.height;
-        (*w).cachedX = (double) initialFrame.origin.x;
-        (*w).cachedY = (double) (screenH - initialFrame.origin.y - initialFrame.size.height);
-        (*w).cachedContentX = (double) initialFrame.origin.x
-                              + (double) (initialContent.origin.x - initialFrame.origin.x);
-        (*w).cachedContentY = (double) (screenH - initialContent.origin.y - initialContent.size.height);
+        (*w).cachedX = (d64) initialFrame.origin.x;
+        (*w).cachedY = (d64) (screenH - initialFrame.origin.y - initialFrame.size.height);
+        (*w).cachedContentX = (d64) initialFrame.origin.x
+                              + (d64) (initialContent.origin.x - initialFrame.origin.x);
+        (*w).cachedContentY = (d64) (screenH - initialContent.origin.y - initialContent.size.height);
         atomic_store_explicit(&(*w).presentMode, WINDOW_PRESENT_FIFO, memory_order_relaxed);
         atomic_store_explicit(&(*w).transparent, false, memory_order_relaxed);
         atomic_store_explicit(&(*w).renderGeneration, 0, memory_order_relaxed);
@@ -1437,7 +1437,7 @@ void Window_destroy(Window *window) {
 void Window_destroyAll(void) {
     if (s_refs == nullptr || s_refCap == 0)
         return;
-    for (uint32_t i = 1; i < s_refCap; i++) {
+    for (u32 i = 1; i < s_refCap; i++) {
         Window *handle = s_refs[i].handle;
         if (handle != nullptr) {
             Window_destroy(handle);
@@ -1495,7 +1495,7 @@ bool Window_isTransparent(const Window *window) {
 }
 
 // Read the policy generation used by downstream render-resource rebuilds.
-uint64_t Window_renderGeneration(const Window *window) {
+u64 Window_renderGeneration(const Window *window) {
     return window ? atomic_load_explicit(&(*window).renderGeneration, memory_order_acquire) : 0;
 }
 
@@ -1663,8 +1663,8 @@ void Window_setSize(Window *window, int width, int height) {
 }
 
 // Return the current AppKit backing scale factor for the window or main screen.
-float Window_getScale(const Window *window) {
-    return (float) windowBackingScale(window);
+f32 Window_getScale(const Window *window) {
+    return (f32) windowBackingScale(window);
 }
 
 // Reconcile scale, physical size, screen origin, and monitor after display changes.
@@ -1673,7 +1673,7 @@ void Window_revalidate(Window *window) {
         return;
     @autoreleasepool {
         CGFloat curScale = windowBackingScale(window);
-        double prevScale = (*window).cachedScale;
+        d64 prevScale = (*window).cachedScale;
         if (prevScale <= 0.0)
             prevScale = curScale;
 
@@ -1687,7 +1687,7 @@ void Window_revalidate(Window *window) {
             [(*window).nsWindow setContentSize:NSMakeSize(newPtW, newPtH)];
         }
 
-        (*window).cachedScale = (double) curScale;
+        (*window).cachedScale = (d64) curScale;
         windowRefreshSize(window);
         windowRefreshOrigin(window);
         windowRefreshMonitor(window);
@@ -1695,7 +1695,7 @@ void Window_revalidate(Window *window) {
 }
 
 // Set content dimensions directly in AppKit points and refresh pixel geometry.
-void Window_setSizePoints(Window *window, float width, float height) {
+void Window_setSizePoints(Window *window, f32 width, f32 height) {
     if (window == nullptr || width <= 0.0f || height <= 0.0f)
         return;
     @autoreleasepool {
@@ -1705,7 +1705,7 @@ void Window_setSizePoints(Window *window, float width, float height) {
 }
 
 // Read content dimensions in points through optional output parameters.
-void Window_getSizePoints(const Window *window, float *outWidth, float *outHeight) {
+void Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
     if (window == nullptr || (*window).nsWindow == nil) {
         if (outWidth) *outWidth = 0.0f;
         if (outHeight) *outHeight = 0.0f;
@@ -1715,22 +1715,22 @@ void Window_getSizePoints(const Window *window, float *outWidth, float *outHeigh
         NSView *cv = [(*window).nsWindow contentView];
         NSRect content = cv != nil ? [cv bounds] : [(*window).nsWindow contentRectForFrameRect:[(*window).nsWindow frame]];
         if (outWidth)
-            *outWidth = (float) content.size.width;
+            *outWidth = (f32) content.size.width;
         if (outHeight)
-            *outHeight = (float) content.size.height;
+            *outHeight = (f32) content.size.height;
     }
 }
 
 // Return the content width in points through the shared size getter.
-float Window_widthPoints(const Window *window) {
-    float w = 0.0f;
+f32 Window_widthPoints(const Window *window) {
+    f32 w = 0.0f;
     Window_getSizePoints(window, &w, nullptr);
     return w;
 }
 
 // Return the content height in points through the shared size getter.
-float Window_heightPoints(const Window *window) {
-    float h = 0.0f;
+f32 Window_heightPoints(const Window *window) {
+    f32 h = 0.0f;
     Window_getSizePoints(window, nullptr, &h);
     return h;
 }
@@ -1746,12 +1746,12 @@ int Window_viewportHeight(const Window *window) {
 }
 
 // Alias the logical content width as the viewport width in points.
-float Window_viewportWidthPoints(const Window *window) {
+f32 Window_viewportWidthPoints(const Window *window) {
     return Window_widthPoints(window);
 }
 
 // Alias the logical content height as the viewport height in points.
-float Window_viewportHeightPoints(const Window *window) {
+f32 Window_viewportHeightPoints(const Window *window) {
     return Window_heightPoints(window);
 }
 
@@ -1778,20 +1778,20 @@ int Window_windowHeight(const Window *window) {
 }
 
 // Return the outer NSWindow frame width in AppKit points.
-float Window_windowWidthPoints(const Window *window) {
+f32 Window_windowWidthPoints(const Window *window) {
     if (window == nullptr || (*window).nsWindow == nil)
         return 0.0f;
     @autoreleasepool {
-        return (float) [(*window).nsWindow frame].size.width;
+        return (f32) [(*window).nsWindow frame].size.width;
     }
 }
 
 // Return the outer NSWindow frame height in AppKit points.
-float Window_windowHeightPoints(const Window *window) {
+f32 Window_windowHeightPoints(const Window *window) {
     if (window == nullptr || (*window).nsWindow == nil)
         return 0.0f;
     @autoreleasepool {
-        return (float) [(*window).nsWindow frame].size.height;
+        return (f32) [(*window).nsWindow frame].size.height;
     }
 }
 
@@ -2084,9 +2084,9 @@ bool Window_isViewportFlushToTop(const Window *window) {
     return (*window).viewportFlushToTop;
 }
 
-// Route floating traffic-light behavior through the titlebar-flush setting.
-void Window_setFloatingTrafficLights(Window *window, bool floating) {
-    Window_setViewportFlushToTop(window, floating);
+// Route f32ing traffic-light behavior through the titlebar-flush setting.
+void Window_setFloatingTrafficLights(Window *window, bool f32ing) {
+    Window_setViewportFlushToTop(window, f32ing);
 }
 
 // Map the public WindowTrafficLight enum onto the TrafficLight class's button
@@ -2122,7 +2122,7 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
 }
 
 // Set the traffic-light cluster's header-relative position in AppKit points.
-void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y) {
+void Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -2131,9 +2131,9 @@ void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y
 }
 
 // Return the configured header-relative button-cluster position through outputs.
-void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *outX, float *outY) {
-    float x = 0.0f;
-    float y = 0.0f;
+void Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY) {
+    f32 x = 0.0f;
+    f32 y = 0.0f;
     if (window != nullptr)
         TrafficLight_getHeaderPosition((*window).trafficLights, &x, &y);
     if (outX)
@@ -2143,7 +2143,7 @@ void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *out
 }
 
 // Set the native NSWindow alpha value.
-void Window_setOpacity(Window *window, float opacity) {
+void Window_setOpacity(Window *window, f32 opacity) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -2167,7 +2167,7 @@ void Window_setTransparentBackground(Window *window, bool transparent) {
 // Frosted backdrop: a behindWindow NSVisualEffectView under the draw view, so
 // the transparent parts of a present show the blurred desktop through. radius
 // is a hint (AppKit materials are fixed); 0 removes it.
-void Window_setBackdropBlur(Window *window, float radius) {
+void Window_setBackdropBlur(Window *window, f32 radius) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -2255,7 +2255,7 @@ bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *ou
     return true;
 }
 
-// Select the AppKit floating or normal window level.
+// Select the AppKit f32ing or normal window level.
 void Window_setAlwaysOnTop(Window *window, bool onTop) {
     if (window == nullptr)
         return;
@@ -2265,7 +2265,7 @@ void Window_setAlwaysOnTop(Window *window, bool onTop) {
 }
 
 // Publish caller-owned RGBA pixels as layer contents without copying the buffer.
-void Window_presentRGBA(Window *window, const void *pixels, size_t stride, int width, int height) {
+void Window_presentRGBA(Window *window, const void *pixels, bytes stride, int width, int height) {
     if (window == nullptr || pixels == nullptr || width <= 0 || height <= 0)
         return;
     @autoreleasepool {
@@ -2277,11 +2277,11 @@ void Window_presentRGBA(Window *window, const void *pixels, size_t stride, int w
         // until the layer is done; live resize flushes the committed CA updates
         // but that submission is not a buffer-lifetime completion fence.
         CGDataProviderRef provider =
-            CGDataProviderCreateWithData(nullptr, pixels, stride * (size_t) height, nullptr);
+            CGDataProviderCreateWithData(nullptr, pixels, stride * (bytes) height, nullptr);
         if (provider == nullptr)
             return;
         CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-        CGImageRef img = CGImageCreate((size_t) width, (size_t) height, 8, 32, stride, cs,
+        CGImageRef img = CGImageCreate((bytes) width, (bytes) height, 8, 32, stride, cs,
                                        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big,
                                        provider, nullptr, false, kCGRenderingIntentDefault);
         CGColorSpaceRelease(cs);
@@ -2348,7 +2348,7 @@ void Window_presentSurface(Window *window, void *surface) {
         [CATransaction setDisableActions:YES];
         layer.contents = (__bridge id)(IOSurfaceRef) surface;
         layer.contentsGravity = kCAGravityResize;
-        double scale = (*window).cachedScale > 0.0 ? (*window).cachedScale : 1.0;
+        d64 scale = (*window).cachedScale > 0.0 ? (*window).cachedScale : 1.0;
         layer.contentsScale = scale;
         [CATransaction commit];
         // This is a CALayer/IOSurface publication, not a CAMetalLayer drawable:
@@ -2371,37 +2371,37 @@ void *Window_presentSurfaceContents(const Window *window) {
 }
 
 // Copy IOSurface pixels into the caller's RGBA destination when dimensions permit.
-bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, size_t destStride) {
+bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, bytes destStride) {
     (void) window;
     if (surface == nullptr || destRGBA == nullptr || destStride == 0)
         return false;
     IOSurfaceRef s = (IOSurfaceRef) surface;
     if (IOSurfaceLock(s, kIOSurfaceLockReadOnly, nullptr) != kIOReturnSuccess)
         return false;
-    const uint8_t *base = (const uint8_t*) IOSurfaceGetBaseAddress(s);
-    size_t srcStride = IOSurfaceGetBytesPerRow(s);
-    uint32_t w = (uint32_t) IOSurfaceGetWidth(s);
-    uint32_t h = (uint32_t) IOSurfaceGetHeight(s);
-    for (uint32_t y = 0; y < h; y++)
-        memcpy((uint8_t*) destRGBA + (size_t) y * destStride,
-               base + (size_t) y * srcStride, (size_t) w * 4u);
+    const u8 *base = (const u8*) IOSurfaceGetBaseAddress(s);
+    bytes srcStride = IOSurfaceGetBytesPerRow(s);
+    u32 w = (u32) IOSurfaceGetWidth(s);
+    u32 h = (u32) IOSurfaceGetHeight(s);
+    for (u32 y = 0; y < h; y++)
+        memcpy((u8*) destRGBA + (bytes) y * destStride,
+               base + (bytes) y * srcStride, (bytes) w * 4u);
     IOSurfaceUnlock(s, kIOSurfaceLockReadOnly, nullptr);
     return true;
 }
 
 // Write a tightly packed RGBA8 buffer to a PNG file. The screenshot/CAPTURE
 // path for tests and agents; ImageIO does the encoding.
-bool Window_writePNG(const void *pixels, size_t stride, int width, int height, const char *path) {
+bool Window_writePNG(const void *pixels, bytes stride, int width, int height, const char *path) {
     if (pixels == nullptr || width <= 0 || height <= 0 || path == nullptr)
         return false;
     bool ok = false;
     @autoreleasepool {
         CGDataProviderRef provider =
-            CGDataProviderCreateWithData(nullptr, pixels, stride * (size_t) height, nullptr);
+            CGDataProviderCreateWithData(nullptr, pixels, stride * (bytes) height, nullptr);
         if (provider == nullptr)
             return false;
         CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-        CGImageRef img = CGImageCreate((size_t) width, (size_t) height, 8, 32, stride, cs,
+        CGImageRef img = CGImageCreate((bytes) width, (bytes) height, 8, 32, stride, cs,
                                        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big,
                                        provider, nullptr, false, kCGRenderingIntentDefault);
         CGColorSpaceRelease(cs);
@@ -2732,7 +2732,7 @@ void Window_dispatchEvents(Window *window) {
 
 // --- Focus (the spotlight: one focused window per machine) -------------------
 
-uint32_t Window_id(Window *window) {
+u32 Window_id(Window *window) {
     return window ? (*window).id : FOCUS_BROADCAST;
 }
 
@@ -2777,13 +2777,13 @@ WindowEvent *Window_getLifecycle(Window *window) {
 
 // --- Monitor identity ---------------------------------------------------------
 
-uint32_t Window_getMonitorId(const Window *window) {
+u32 Window_getMonitorId(const Window *window) {
     return window ? atomic_load_explicit(&(*window).monitorId, memory_order_acquire) : 0;
 }
 
 // --- Resize reflection ---------------------------------------------------------
 
-uint64_t Window_sizeGeneration(Window *window) {
+u64 Window_sizeGeneration(Window *window) {
     if (window == nullptr)
         return 0;
     return atomic_load_explicit(&(*window).sizeGeneration, memory_order_acquire);

@@ -17,7 +17,7 @@
  * ============================================================================
  * Manages native macOS window chrome traffic-light buttons (close, minimize,
  * and zoom/fullscreen). Handles button visibility toggling, native frame
- * snapshotting, style mask full-size content view floating, and header offset
+ * snapshotting, style mask full-size content view f32ing, and header offset
  * positioning. Strictly decoupled from the core Window state per the Single
  * Class Per File Law.
  * ============================================================================
@@ -37,8 +37,8 @@
  * ----------------------------------------------------------------------------
  *   NSWindow *window;                                     // Weak AppKit window handle
  *   bool lightVisible[TRAFFIC_LIGHT_COUNT];               // Per-button visibility
- *   float lightOX;                                        // Cluster offset X in points
- *   float lightOY;                                        // Cluster offset Y in points
+ *   f32 lightOX;                                        // Cluster offset X in points
+ *   f32 lightOY;                                        // Cluster offset Y in points
  *   bool lightBaseSet;                                    // Base layout snapshotted flag
  *   NSRect lightBase[TRAFFIC_LIGHT_COUNT];                // Native frame snapshot
  *
@@ -59,15 +59,15 @@
  * State & Layout:
  *   - TrafficLight_resetBase(self)
  *   - TrafficLight_refresh(self)
- *   - TrafficLight_setFloating(self, floating)
+ *   - TrafficLight_setFloating(self, f32ing)
  * ============================================================================
  */
 
 struct TrafficLight {
     __unsafe_unretained NSWindow *window;
     bool lightVisible[TRAFFIC_LIGHT_COUNT];
-    float lightOX;
-    float lightOY;
+    f32 lightOX;
+    f32 lightOY;
     bool lightBaseSet;
     NSRect lightBase[TRAFFIC_LIGHT_COUNT];
 };
@@ -100,7 +100,7 @@ void TrafficLight_resetBase(TrafficLight *self) {
         (*self).lightBaseSet = false;
 }
 
-/** Applies the adapter's current visibility, position, and floating settings. */
+/** Applies the adapter's current visibility, position, and f32ing settings. */
 void TrafficLight_refresh(TrafficLight *self) {
     if (self == nullptr || (*self).window == nil)
         return;
@@ -148,7 +148,7 @@ bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton b
 }
 
 /** Sets the header-relative position used by the adapter. */
-void TrafficLight_setHeaderPosition(TrafficLight *self, float x, float y) {
+void TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y) {
     if (self == nullptr || (*self).window == nil)
         return;
 
@@ -165,16 +165,16 @@ void TrafficLight_setHeaderPosition(TrafficLight *self, float x, float y) {
         CGFloat h = [[nsw contentView] bounds].size.height;
         CGFloat wantX = (CGFloat) x;
         CGFloat wantY = h - (CGFloat) y - base.size.height;
-        (*self).lightOX = (float) (wantX - base.origin.x);
-        (*self).lightOY = (float) (wantY - base.origin.y);
+        (*self).lightOX = (f32) (wantX - base.origin.x);
+        (*self).lightOY = (f32) (wantY - base.origin.y);
         TrafficLight_refresh(self);
     }
 }
 
 /** Returns the configured header-relative position through optional outputs. */
-void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float *outY) {
-    float x = 0.0f;
-    float y = 0.0f;
+void TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY) {
+    f32 x = 0.0f;
+    f32 y = 0.0f;
     if (self != nullptr && (*self).window != nil) {
         @autoreleasepool {
             NSWindow *nsw = (*self).window;
@@ -184,8 +184,8 @@ void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float
                 CGFloat h = [[nsw contentView] bounds].size.height;
                 CGFloat curX = base.origin.x + (CGFloat) (*self).lightOX;
                 CGFloat curY = base.origin.y + (CGFloat) (*self).lightOY;
-                x = (float) curX;
-                y = (float) (h - curY - base.size.height);
+                x = (f32) curX;
+                y = (f32) (h - curY - base.size.height);
             }
         }
     }
@@ -195,15 +195,15 @@ void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float
         *outY = y;
 }
 
-/** Enables or disables floating behavior for the native traffic-light buttons. */
-void TrafficLight_setFloating(TrafficLight *self, bool floating) {
+/** Enables or disables f32ing behavior for the native traffic-light buttons. */
+void TrafficLight_setFloating(TrafficLight *self, bool f32ing) {
     if (self == nullptr || (*self).window == nil)
         return;
 
     @autoreleasepool {
         NSWindow *nsw = (*self).window;
         NSWindowStyleMask mask = [nsw styleMask];
-        if (floating) {
+        if (f32ing) {
             [nsw setStyleMask:(mask | NSWindowStyleMaskFullSizeContentView)];
             [nsw setTitlebarAppearsTransparent:YES];
             [nsw setTitleVisibility:NSWindowTitleHidden];

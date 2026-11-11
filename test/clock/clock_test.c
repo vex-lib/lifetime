@@ -11,21 +11,21 @@
 #include <stdio.h>
 
 int main(void) {
-    uint64_t n1 = Clock_nowNanos();
-    uint64_t n2 = Clock_nowNanos();
+    u64 n1 = Clock_nowNanos();
+    u64 n2 = Clock_nowNanos();
     assert(n2 >= n1);
 
-    uint64_t m1 = Clock_nowMillis();
+    u64 m1 = Clock_nowMillis();
     assert(m1 > 1700000000000ull);
 
-    double s = Clock_nowSeconds();
+    d64 s = Clock_nowSeconds();
     assert(s > 0.0);
-    uint64_t backToNanos = (uint64_t) (s * 1000000000.0);
-    uint64_t n3 = Clock_nowNanos();
+    u64 backToNanos = (u64) (s * 1000000000.0);
+    u64 n3 = Clock_nowNanos();
     assert(n3 >= backToNanos);
     assert(n3 - backToNanos < 1000000000ull);
 
-    uint64_t m2 = Clock_nowMillis();
+    u64 m2 = Clock_nowMillis();
     assert(m2 >= m1);
 
     printf("clock_test: PASS nanos=%llu millis=%llu seconds=%.3f\n",

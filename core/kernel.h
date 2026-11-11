@@ -128,10 +128,10 @@ struct Kernel {
     Lifetime lifetime;                     // Lifetime memory substrate (master + transient arenas)
     void *arena;                           // opaque master arena (provider-attested, never dereferenced)
     void *transientArena;                  // opaque scratch arena (reset, never freed mid-run)
-    uint64_t arenaType;                    // provider-reported id, nonzero = attested
-    uint64_t transientArenaType;           // provider-reported id, nonzero = attested
+    u64 arenaType;                    // provider-reported id, nonzero = attested
+    u64 transientArenaType;           // provider-reported id, nonzero = attested
     Application *applications[KERNEL_MAX_APPS];  // windowed apps (opaque to engines)
-    uint32_t applicationCount;                   // used slots in applications[]
+    u32 applicationCount;                   // used slots in applications[]
     // The GfxLoop runner seat (the Vertical Integration Law: R1 owns fn-tables,
     // never links R3). A caller hands the demand-driven Application loop here
     // BEFORE Kernel_runApplication; a null seat falls back to the parked
@@ -139,19 +139,19 @@ struct Kernel {
     // graphvex symbols (no weak externs, no Mach-O undefined-symbol traps).
     int (*gfxAppRun)(void *context, bool (*continueFn)(void*), bool (*pollFn)(void));
     Process     *processes[KERNEL_MAX_PROCS];    // one-shot invokables
-    uint32_t processCount;                       // used slots in processes[]
+    u32 processCount;                       // used slots in processes[]
     Console     *consoles[KERNEL_MAX_CONSOLES];  // session pumps
-    uint32_t consoleCount;                       // used slots in consoles[]
+    u32 consoleCount;                       // used slots in consoles[]
     CommandLine *commandlines[KERNEL_MAX_COMMANDLINES]; // terminal applications
-    uint32_t commandlineCount;                          // used slots in commandlines[]
+    u32 commandlineCount;                          // used slots in commandlines[]
 
     // --- Dynamic run-function and end-function registries ---
     KernelRunSlot *runSlots;                     // growable supervised run worker slots
-    uint32_t runCount;
-    uint32_t runCap;
+    u32 runCount;
+    u32 runCap;
     KernelEndSlot *endSlots;                     // growable lifecycle completion hooks
-    uint32_t endCount;
-    uint32_t endCap;
+    u32 endCount;
+    u32 endCap;
     _Atomic bool endHooksFired;                  // fire-once guard for end functions
     atomic_uint phase;                           // KernelPhase: READY/RUNNING/DRAINING
 
@@ -162,8 +162,8 @@ struct Kernel {
     // --- Deferred-add mailbox (the KERNEL-KINDS-DEFERRED slot above) ---
     pthread_mutex_t addLock;                     // guards the three fields below
     KernelDeferred *deferred;                    // growable pending-add slots (cold path)
-    size_t deferredCount;                        // queued entries
-    size_t deferredCap;                          // allocated slots
+    bytes deferredCount;                        // queued entries
+    bytes deferredCap;                          // allocated slots
 };
 
 // --- Overloaded constructors ---
@@ -180,8 +180,8 @@ struct Kernel {
 // Application_0); migration to arena-owned Kernel is tracked via
 // ;;INTENTION in kernel.c per the Conflict Triage Law.
 Kernel *Kernel_0(void);
-Kernel *Kernel_1(size_t arenaBytes);
-Kernel *Kernel_2(size_t arenaBytes, size_t transientBytes);
+Kernel *Kernel_1(bytes arenaBytes);
+Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes);
 
 #define KERNEL_CHOOSER(_0, _1, _2, NAME, ...) NAME
 
@@ -277,7 +277,7 @@ bool Kernel_addApplication(Kernel *self, Application *app);
 // Registered windows stay owned by the Application (detach-only, OS-owned).
 bool Kernel_removeApplication(Kernel *self, Application *app);
 // Application at index, or NULL when out of range.
-Application *Kernel_getApplication(const Kernel *self, uint32_t index);
+Application *Kernel_getApplication(const Kernel *self, u32 index);
 
 // --- GfxLoop runner seat (registered, never linked) ---
 // Install the demand-driven Application loop (graphvex's frame scheduler) into
@@ -286,36 +286,36 @@ void Kernel_setGfxAppRunner(Kernel *self, int (*fn)(void *context, bool (*contin
 // The installed runner, or NULL when unset.
 int (*Kernel_getGfxAppRunner(const Kernel *self))(void *context, bool (*continueFn)(void*), bool (*pollFn)(void));
 // Number of registered applications.
-uint32_t Kernel_getApplicationCount(const Kernel *self);
+u32 Kernel_getApplicationCount(const Kernel *self);
 // Copy registry into out[] (up to cap), returns entries written.
-uint32_t Kernel_getApplications(const Kernel *self, Application **out, uint32_t cap);
+u32 Kernel_getApplications(const Kernel *self, Application **out, u32 cap);
 
 // --- Process registry (one-shot invokables) ---
 bool    Kernel_addProcess(Kernel *self, Process *p);
 bool    Kernel_removeProcess(Kernel *self, Process *p);
-Process *Kernel_getProcess(const Kernel *self, uint32_t index);
-uint32_t Kernel_getProcessCount(const Kernel *self);
-uint32_t Kernel_getProcesses(const Kernel *self, Process **out, uint32_t cap);
+Process *Kernel_getProcess(const Kernel *self, u32 index);
+u32 Kernel_getProcessCount(const Kernel *self);
+u32 Kernel_getProcesses(const Kernel *self, Process **out, u32 cap);
 
 // --- Console registry (session pumps) ---
 bool    Kernel_addConsole(Kernel *self, Console *c);
 bool    Kernel_removeConsole(Kernel *self, Console *c);
-Console *Kernel_getConsole(const Kernel *self, uint32_t index);
-uint32_t Kernel_getConsoleCount(const Kernel *self);
-uint32_t Kernel_getConsoles(const Kernel *self, Console **out, uint32_t cap);
+Console *Kernel_getConsole(const Kernel *self, u32 index);
+u32 Kernel_getConsoleCount(const Kernel *self);
+u32 Kernel_getConsoles(const Kernel *self, Console **out, u32 cap);
 
 // --- CommandLine registry (terminal applications) ---
 bool         Kernel_addCommandLine(Kernel *self, CommandLine *c);
 bool         Kernel_removeCommandLine(Kernel *self, CommandLine *c);
-CommandLine *Kernel_getCommandLine(const Kernel *self, uint32_t index);
-uint32_t     Kernel_getCommandLineCount(const Kernel *self);
-uint32_t     Kernel_getCommandLines(const Kernel *self, CommandLine **out, uint32_t cap);
+CommandLine *Kernel_getCommandLine(const Kernel *self, u32 index);
+u32     Kernel_getCommandLineCount(const Kernel *self);
+u32     Kernel_getCommandLines(const Kernel *self, CommandLine **out, u32 cap);
 
 // --- Run functions (async background execution) & End functions (lifecycle completion) ---
 bool     Kernel_addRunFunction(Kernel *self, KernelRunFn fn, void *userdata);
 bool     Kernel_addEndFunction(Kernel *self, KernelEndFn fn, void *userdata);
-uint32_t Kernel_getRunFunctionCount(const Kernel *self);
-uint32_t Kernel_getEndFunctionCount(const Kernel *self);
+u32 Kernel_getRunFunctionCount(const Kernel *self);
+u32 Kernel_getEndFunctionCount(const Kernel *self);
 
 // --- Arena access (the Symmetric Getter/Setter Completeness Law symmetric getters) ---
 void *Kernel_getArena(const Kernel *self);

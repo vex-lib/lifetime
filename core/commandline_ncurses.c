@@ -71,7 +71,7 @@ static void ncClose(void *ctx) {
     g_open = false;
 }
 
-static bool ncSize(void *ctx, size_t *outW, size_t *outH) {
+static bool ncSize(void *ctx, bytes *outW, bytes *outH) {
     (void) ctx;
     if (!g_open)
         return false;
@@ -79,16 +79,16 @@ static bool ncSize(void *ctx, size_t *outW, size_t *outH) {
     getmaxyx(stdscr, rows, cols);
     if (rows <= 0 || cols <= 0)
         return false;
-    *outH = (size_t) rows;
-    *outW = (size_t) cols;
+    *outH = (bytes) rows;
+    *outW = (bytes) cols;
     return true;
 }
 
-static bool ncPresent(void *ctx, const char *cells, size_t width, size_t height) {
+static bool ncPresent(void *ctx, const char *cells, bytes width, bytes height) {
     (void) ctx;
     if (!g_open || cells == nullptr || width == 0 || height == 0)
         return false;
-    for (size_t y = 0; y < height; ++y) {
+    for (bytes y = 0; y < height; ++y) {
         if (move((int) y, 0) == ERR)
             return false;
         if (addnstr(cells + y * width, (int) width) == ERR)

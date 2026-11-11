@@ -18,7 +18,7 @@
  * DEFINITION: Kernel
  * ============================================================================
  * R1 Host Supervisor: storage and dispatch for executable components across the
- * vexgraph-ecosystem-gitrepo. Owns the master lifetime memory substrate, transient arenas, and the
+ * ecosystem. Owns the master lifetime memory substrate, transient arenas, and the
  * three per-kind registries (processes, applications, consoles). The Kernel owns
  * no execution loops, render ticks, or worker threads; Kernel_run forwards each
  * registered kind to its own run method, allowing dynamic module swapping without
@@ -54,28 +54,28 @@
  *   Lifetime lifetime;                          // Lifetime memory substrate (master + transient arenas)
  *   void *arena;                                // opaque master arena (attested, never dereferenced)
  *   void *transientArena;                       // opaque scratch arena
- *   uint64_t arenaType;                         // provider id, nonzero = attested
- *   uint64_t transientArenaType;                // provider id, nonzero = attested
+ *   u64 arenaType;                         // provider id, nonzero = attested
+ *   u64 transientArenaType;                // provider id, nonzero = attested
  *   Application *applications[KERNEL_MAX_APPS];  // windowed apps (opaque handles)
- *   uint32_t applicationCount;                    // used slots in applications[]
+ *   u32 applicationCount;                    // used slots in applications[]
  *   Process     *processes[KERNEL_MAX_PROCS];     // one-shot invokables
- *   uint32_t processCount;                       // used slots in processes[]
+ *   u32 processCount;                       // used slots in processes[]
  *   Console     *consoles[KERNEL_MAX_CONSOLES];  // session pumps
- *   uint32_t consoleCount;                       // used slots in consoles[]
+ *   u32 consoleCount;                       // used slots in consoles[]
  *   KernelRunSlot *runSlots;                     // growable supervised run worker slots
- *   uint32_t runCount;
- *   uint32_t runCap;
+ *   u32 runCount;
+ *   u32 runCap;
  *   KernelEndSlot *endSlots;                     // growable lifecycle completion hooks
- *   uint32_t endCount;
- *   uint32_t endCap;
+ *   u32 endCount;
+ *   u32 endCap;
  *   _Atomic bool endHooksFired;                  // fire-once guard for end functions
  *   atomic_uint phase;                           // KernelPhase: READY/RUNNING/DRAINING
  *   atomic_bool running;                          // terminal-run armed flag
  *   atomic_uintptr_t runThreadId;                 // arming (Thread 0) id; 0 = never armed
  *   pthread_mutex_t addLock;                      // guards the mailbox fields below
  *   KernelDeferred *deferred;                     // growable pending-add slots
- *   size_t deferredCount;                         // queued entries
- *   size_t deferredCap;                           // allocated slots
+ *   bytes deferredCount;                         // queued entries
+ *   bytes deferredCap;                           // allocated slots
  *
  * PRIVATE HELPERS (kept file-local pure-data only, each with full fields):
  * ----------------------------------------------------------------------------
@@ -191,12 +191,12 @@ Kernel *Kernel_0(void) {
 }
 
 /** Creates a kernel with a caller-selected persistent arena size. */
-Kernel *Kernel_1(size_t arenaBytes) {
+Kernel *Kernel_1(bytes arenaBytes) {
     return Kernel_2(arenaBytes, KERNEL_TRANSIENT_DEFAULT);
 }
 
 /** Allocates the supervisor and its persistent/transient lifetime arenas. */
-Kernel *Kernel_2(size_t arenaBytes, size_t transientBytes) {
+Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes) {
     Kernel *self = (Kernel*) calloc(1, sizeof(Kernel));
     if (!self)
         return nullptr;
@@ -259,7 +259,7 @@ bool Kernel_free(Kernel *self) {
     // Order Law). In READY phase no workers exist; Kernel_stop already fired
     // the hooks in that path and the fire-once guard keeps this a no-op.
     // Join any run worker threads
-    for (uint32_t i = 0; i < (*self).runCount; i++) {
+    for (u32 i = 0; i < (*self).runCount; i++) {
         KernelRunSlot *slot = &(*self).runSlots[i];
         if (atomic_load_explicit(&(*slot).threadLaunched, memory_order_relaxed)) {
             pthread_join((*slot).thread, nullptr);
@@ -289,16 +289,16 @@ bool Kernel_free(Kernel *self) {
     (*self).deferredCount = 0;
     (*self).deferredCap = 0;
 
-    for (uint32_t i = 0; i < KERNEL_MAX_APPS; i++)
+    for (u32 i = 0; i < KERNEL_MAX_APPS; i++)
         (*self).applications[i] = nullptr;
     (*self).applicationCount = 0;
-    for (uint32_t i = 0; i < KERNEL_MAX_PROCS; i++)
+    for (u32 i = 0; i < KERNEL_MAX_PROCS; i++)
         (*self).processes[i] = nullptr;
     (*self).processCount = 0;
-    for (uint32_t i = 0; i < KERNEL_MAX_CONSOLES; i++)
+    for (u32 i = 0; i < KERNEL_MAX_CONSOLES; i++)
         (*self).consoles[i] = nullptr;
     (*self).consoleCount = 0;
-    for (uint32_t i = 0; i < KERNEL_MAX_COMMANDLINES; i++)
+    for (u32 i = 0; i < KERNEL_MAX_COMMANDLINES; i++)
         (*self).commandlines[i] = nullptr;
     (*self).commandlineCount = 0;
 
@@ -327,21 +327,21 @@ void Kernel_stop(Kernel *self) {
     // ARMING THREAD then joins the workers and fires the end hooks in its
     // epilogue — never here, because hooks may release resources the workers
     // still touch (the Teardown Order Law: quiescence precedes release).
-    uint32_t expected = KERNEL_PHASE_RUNNING;
+    u32 expected = KERNEL_PHASE_RUNNING;
     if (atomic_compare_exchange_strong_explicit(&(*self).phase, &expected, KERNEL_PHASE_DRAINING,
                                                 memory_order_acq_rel, memory_order_acquire)) {
         atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
-        for (uint32_t i = 0; i < (*self).applicationCount; i++) {
+        for (u32 i = 0; i < (*self).applicationCount; i++) {
             Application *app = (*self).applications[i];
             if (app)
                 Application_stop(app);
         }
-        for (uint32_t i = 0; i < (*self).consoleCount; i++) {
+        for (u32 i = 0; i < (*self).consoleCount; i++) {
             Console *c = (*self).consoles[i];
             if (c)
                 Console_cancel(c);
         }
-        for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+        for (u32 i = 0; i < (*self).commandlineCount; i++) {
             CommandLine *cl = (*self).commandlines[i];
             if (cl)
                 CommandLine_stop(cl);
@@ -378,7 +378,7 @@ static void kernelFireEndHooks(Kernel *self) {
     bool expected = false;
     if (!atomic_compare_exchange_strong_explicit(&(*self).endHooksFired, &expected, true, memory_order_relaxed, memory_order_relaxed))
         return;
-    for (uint32_t i = 0; i < (*self).endCount; i++) {
+    for (u32 i = 0; i < (*self).endCount; i++) {
         KernelEndSlot *slot = &(*self).endSlots[i];
         if ((*slot).fn)
             (*slot).fn(self, (*slot).userdata);
@@ -425,7 +425,7 @@ static void kernelStartApplication(Kernel *self, Application *a);
 
 /** Adds an application to the single-threaded registry if unique and within capacity. */
 static bool kernelAddApplicationInternal(Kernel *self, Application *app) {
-    for (uint32_t i = 0; i < (*self).applicationCount; i++)
+    for (u32 i = 0; i < (*self).applicationCount; i++)
         if ((*self).applications[i] == app)
             return false;
     if ((*self).applicationCount >= KERNEL_MAX_APPS)
@@ -436,7 +436,7 @@ static bool kernelAddApplicationInternal(Kernel *self, Application *app) {
 
 /** Adds a process to the single-threaded registry if unique and within capacity. */
 static bool kernelAddProcessInternal(Kernel *self, Process *p) {
-    for (uint32_t i = 0; i < (*self).processCount; i++)
+    for (u32 i = 0; i < (*self).processCount; i++)
         if ((*self).processes[i] == p)
             return false;
     if ((*self).processCount >= KERNEL_MAX_PROCS)
@@ -447,7 +447,7 @@ static bool kernelAddProcessInternal(Kernel *self, Process *p) {
 
 /** Adds a console to the single-threaded registry if unique and within capacity. */
 static bool kernelAddConsoleInternal(Kernel *self, Console *c) {
-    for (uint32_t i = 0; i < (*self).consoleCount; i++)
+    for (u32 i = 0; i < (*self).consoleCount; i++)
         if ((*self).consoles[i] == c)
             return false;
     if ((*self).consoleCount >= KERNEL_MAX_CONSOLES)
@@ -458,7 +458,7 @@ static bool kernelAddConsoleInternal(Kernel *self, Console *c) {
 
 /** Adds a terminal application to the registry if unique and within capacity. */
 static bool kernelAddCommandLineInternal(Kernel *self, CommandLine *c) {
-    for (uint32_t i = 0; i < (*self).commandlineCount; i++)
+    for (u32 i = 0; i < (*self).commandlineCount; i++)
         if ((*self).commandlines[i] == c)
             return false;
     if ((*self).commandlineCount >= KERNEL_MAX_COMMANDLINES)
@@ -474,7 +474,7 @@ static bool kernelAddCommandLineInternal(Kernel *self, CommandLine *c) {
 static bool kernelPostDeferred(Kernel *self, KernelDeferredKind kind, void *ptr) {
     pthread_mutex_lock(&(*self).addLock);
     if ((*self).deferredCount == (*self).deferredCap) {
-        size_t cap = (*self).deferredCap ? (*self).deferredCap * 2 : 4;
+        bytes cap = (*self).deferredCap ? (*self).deferredCap * 2 : 4;
         KernelDeferred *nx = (KernelDeferred*) realloc((*self).deferred, cap * sizeof(KernelDeferred));
         if (!nx) {
             pthread_mutex_unlock(&(*self).addLock);
@@ -536,13 +536,13 @@ static void kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, void *ptr
 static void kernelDrainDeferred(Kernel *self) {
     pthread_mutex_lock(&(*self).addLock);
     KernelDeferred *batch = (*self).deferred;
-    size_t n = (*self).deferredCount;
+    bytes n = (*self).deferredCount;
     (*self).deferred = nullptr;
     (*self).deferredCount = 0;
     (*self).deferredCap = 0;
     pthread_mutex_unlock(&(*self).addLock);
 
-    for (size_t i = 0; i < n; i++)
+    for (bytes i = 0; i < n; i++)
         kernelApplyDeferred(self, batch[i].kind, batch[i].ptr);
 
     if (batch)
@@ -557,7 +557,7 @@ static void kernelDrainDeferred(Kernel *self) {
 static void kernelDropDeferred(Kernel *self) {
     pthread_mutex_lock(&(*self).addLock);
     KernelDeferred *batch = (*self).deferred;
-    size_t n = (*self).deferredCount;
+    bytes n = (*self).deferredCount;
     (*self).deferred = nullptr;
     (*self).deferredCount = 0;
     (*self).deferredCap = 0;
@@ -575,22 +575,22 @@ static void kernelDropDeferred(Kernel *self) {
 // completion predicate (all windows closed or externally stopped).
 /** Checks application, console, and worker completion to decide reactor exit. */
 static bool kernelAllDone(const Kernel *self) {
-    for (uint32_t i = 0; i < (*self).applicationCount; i++) {
+    for (u32 i = 0; i < (*self).applicationCount; i++) {
         Application *a = (*self).applications[i];
         if (a && !Application_isFinished(a))
             return false;
     }
-    for (uint32_t i = 0; i < (*self).consoleCount; i++) {
+    for (u32 i = 0; i < (*self).consoleCount; i++) {
         Console *c = (*self).consoles[i];
         if (c && Console_isRunning(c))
             return false;
     }
-    for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+    for (u32 i = 0; i < (*self).commandlineCount; i++) {
         CommandLine *cl = (*self).commandlines[i];
         if (cl && CommandLine_isOpen(cl) && !CommandLine_isCancelled(cl))
             return false;
     }
-    for (uint32_t i = 0; i < (*self).runCount; i++) {
+    for (u32 i = 0; i < (*self).runCount; i++) {
         const KernelRunSlot *slot = &(*self).runSlots[i];
         if (!atomic_load_explicit(&(*slot).done, memory_order_relaxed))
             return false;
@@ -608,8 +608,8 @@ static void kernelStartApplication(Kernel *self, Application *a) {
     if (self)
         Application_setHostLifetime(a, &(*self).lifetime);
     (void) Application_begin(a);
-    uint32_t winCount = Application_getWindowCount(a);
-    for (uint32_t i = 0; i < winCount; i++) {
+    u32 winCount = Application_getWindowCount(a);
+    for (u32 i = 0; i < winCount; i++) {
         Window *w = Application_getWindow(a, i);
         if (w)
             Window_show(w);
@@ -637,7 +637,7 @@ int Kernel_runAll(Kernel *self) {
     // arming (Thread 0) thread can no longer register — all Kernel_add* on it
     // are refused; other threads post into the deferred mailbox, drained on
     // the next pass below. A second concurrent runAll is refused (one warn).
-    uint32_t readyPhase = KERNEL_PHASE_READY;
+    u32 readyPhase = KERNEL_PHASE_READY;
     if (!atomic_compare_exchange_strong_explicit(&(*self).phase, &readyPhase, KERNEL_PHASE_RUNNING,
                                                  memory_order_acq_rel, memory_order_acquire)) {
         fprintf(stderr, "kernel: Kernel_run refused — a run is already live or draining\n");
@@ -649,7 +649,7 @@ int Kernel_runAll(Kernel *self) {
     int rc = KERNEL_EXIT_OK;
 
     // One-shot invokables: run to completion on the arming thread.
-    for (uint32_t i = 0; i < (*self).processCount; i++) {
+    for (u32 i = 0; i < (*self).processCount; i++) {
         Process *p = (*self).processes[i];
         if (p) {
             int r = 0;
@@ -661,7 +661,7 @@ int Kernel_runAll(Kernel *self) {
     }
 
     // Launch supervised run worker threads
-    for (uint32_t i = 0; i < (*self).runCount; i++) {
+    for (u32 i = 0; i < (*self).runCount; i++) {
         KernelRunSlot *slot = &(*self).runSlots[i];
         atomic_store_explicit(&(*slot).done, false, memory_order_relaxed);
         if (pthread_create(&(*slot).thread, nullptr, kernelRunWorkerMain, slot) == 0) {
@@ -673,18 +673,18 @@ int Kernel_runAll(Kernel *self) {
 
     // Session pumps + windowed apps: start without blocking — the reactor
     // below supervises them to completion.
-    for (uint32_t i = 0; i < (*self).consoleCount; i++) {
+    for (u32 i = 0; i < (*self).consoleCount; i++) {
         Console *c = (*self).consoles[i];
         if (c)
             (void) Console_run(c);
     }
     // Terminal applications: acquire the device, then drive it each pass below.
-    for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+    for (u32 i = 0; i < (*self).commandlineCount; i++) {
         CommandLine *cl = (*self).commandlines[i];
         if (cl && !CommandLine_isOpen(cl))
             (void) CommandLine_open(cl);
     }
-    for (uint32_t i = 0; i < (*self).applicationCount; i++)
+    for (u32 i = 0; i < (*self).applicationCount; i++)
         kernelStartApplication(self, (*self).applications[i]);
 
     bridgeBespoke();
@@ -694,12 +694,12 @@ int Kernel_runAll(Kernel *self) {
     // per pass keeps teardown responsive (the Bounded Wait Law) without a
     // busy spin.
     const struct timespec park = {0, 5000000L};
-    uint64_t pass = 0;
+    u64 pass = 0;
     while (atomic_load_explicit(&(*self).running, memory_order_relaxed) && !kernelAllDone(self)) {
         kernelDrainDeferred(self);
 
         Window_pollEvents();
-        for (uint32_t i = 0; i < (*self).applicationCount; i++)
+        for (u32 i = 0; i < (*self).applicationCount; i++)
             Application_poll((*self).applications[i]);
         bridgeBespokeCheck();
         // Host-owned scratch dies at this frame boundary: module borrowers
@@ -708,23 +708,23 @@ int Kernel_runAll(Kernel *self) {
         Lifetime_resetTransient(&(*self).lifetime);
 
         char buf[4096];
-        for (uint32_t i = 0; i < (*self).consoleCount; i++) {
+        for (u32 i = 0; i < (*self).consoleCount; i++) {
             Console *c = (*self).consoles[i];
             if (!c || !Console_isRunning(c))
                 continue;
-            size_t n = 0;
+            bytes n = 0;
             if (Console_poll(c, buf, sizeof(buf), &n) && n > 0)
                 (void) fwrite(buf, 1, n, stdout);
         }
         // Terminal applications: one non-blocking draw/resize/input pass each.
-        for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+        for (u32 i = 0; i < (*self).commandlineCount; i++) {
             CommandLine *cl = (*self).commandlines[i];
             if (cl && CommandLine_isOpen(cl) && CommandLine_hasApp(cl) && !CommandLine_isCancelled(cl))
                 (void) CommandLine_tick(cl);
         }
 
         if ((pass % 50) == 0) {
-            for (uint32_t i = 0; i < (*self).applicationCount; i++) {
+            for (u32 i = 0; i < (*self).applicationCount; i++) {
                 Application *a = (*self).applications[i];
                 if (!a)
                     continue;
@@ -746,18 +746,18 @@ int Kernel_runAll(Kernel *self) {
     // can grow a registry a joining worker still points into. The final
     // drain is a best-effort straggler sweep; admitted adds run like the
     // initial pass would. Then the phase returns to READY.
-    for (uint32_t i = 0; i < (*self).applicationCount; i++) {
+    for (u32 i = 0; i < (*self).applicationCount; i++) {
         Application *a = (*self).applications[i];
         if (a && Application_isRunning(a))
             Application_stop(a);
         Application_finish(a);
     }
-    for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+    for (u32 i = 0; i < (*self).commandlineCount; i++) {
         CommandLine *cl = (*self).commandlines[i];
         if (cl)
             CommandLine_close(cl);   // restore the terminal before any join (the Teardown Order Law)
     }
-    for (uint32_t i = 0; i < (*self).runCount; i++) {
+    for (u32 i = 0; i < (*self).runCount; i++) {
         KernelRunSlot *slot = &(*self).runSlots[i];
         if (atomic_load_explicit(&(*slot).threadLaunched, memory_order_relaxed)) {
             pthread_join((*slot).thread, nullptr);
@@ -813,7 +813,7 @@ int Kernel_runCommandLine(Kernel *self, CommandLine *c) {
 // R1's half of the GfxLoop lifecycle contract (the Vertical Integration Law:
 // the Kernel never names Vk_* and graphvex never mirrors a Kernel/Application
 // layout). Completion predicate + per-pass servicing: the loop keeps running
-// until every window closes, and each ask doubles as the generation-driven
+// until every window closes, and each ask f64s as the generation-driven
 // hot-reload poll (cheap generation compare at frame cadence).
 // File-local Lifetime for the GfxLoop-seat continue callback: the seat hands
 // only the Application to graphvex, so the Kernel arms this alongside the run
@@ -900,7 +900,7 @@ bool Kernel_addApplication(Kernel *self, Application *app) {
 bool Kernel_removeApplication(Kernel *self, Application *app) {
     if (!self || !app)
         return false;
-    for (uint32_t i = 0; i < (*self).applicationCount; i++) {
+    for (u32 i = 0; i < (*self).applicationCount; i++) {
         if ((*self).applications[i] == app) {
             (*self).applications[i] = (*self).applications[--(*self).applicationCount];
             (*self).applications[(*self).applicationCount] = nullptr;
@@ -933,7 +933,7 @@ bool Kernel_addProcess(Kernel *self, Process *p) {
 bool Kernel_removeProcess(Kernel *self, Process *p) {
     if (!self || !p)
         return false;
-    for (uint32_t i = 0; i < (*self).processCount; i++) {
+    for (u32 i = 0; i < (*self).processCount; i++) {
         if ((*self).processes[i] == p) {
             (*self).processes[i] = (*self).processes[--(*self).processCount];
             (*self).processes[(*self).processCount] = nullptr;
@@ -966,7 +966,7 @@ bool Kernel_addConsole(Kernel *self, Console *c) {
 bool Kernel_removeConsole(Kernel *self, Console *c) {
     if (!self || !c)
         return false;
-    for (uint32_t i = 0; i < (*self).consoleCount; i++) {
+    for (u32 i = 0; i < (*self).consoleCount; i++) {
         if ((*self).consoles[i] == c) {
             (*self).consoles[i] = (*self).consoles[--(*self).consoleCount];
             (*self).consoles[(*self).consoleCount] = nullptr;
@@ -999,7 +999,7 @@ bool Kernel_addCommandLine(Kernel *self, CommandLine *c) {
 bool Kernel_removeCommandLine(Kernel *self, CommandLine *c) {
     if (!self || !c)
         return false;
-    for (uint32_t i = 0; i < (*self).commandlineCount; i++) {
+    for (u32 i = 0; i < (*self).commandlineCount; i++) {
         if ((*self).commandlines[i] == c) {
             (*self).commandlines[i] = (*self).commandlines[--(*self).commandlineCount];
             (*self).commandlines[(*self).commandlineCount] = nullptr;
@@ -1019,7 +1019,7 @@ bool Kernel_addRunFunction(Kernel *self, KernelRunFn fn, void *userdata) {
         return false;
     }
     if ((*self).runCount >= (*self).runCap) {
-        uint32_t newCap = (*self).runCap ? (*self).runCap * 2 : 4;
+        u32 newCap = (*self).runCap ? (*self).runCap * 2 : 4;
         KernelRunSlot *newSlots = (KernelRunSlot*) realloc((*self).runSlots, newCap * sizeof(KernelRunSlot));
         if (!newSlots)
             return false;
@@ -1043,7 +1043,7 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, void *userdata) {
         return false;
     }
     if ((*self).endCount >= (*self).endCap) {
-        uint32_t newCap = (*self).endCap ? (*self).endCap * 2 : 4;
+        u32 newCap = (*self).endCap ? (*self).endCap * 2 : 4;
         KernelEndSlot *newSlots = (KernelEndSlot*) realloc((*self).endSlots, newCap * sizeof(KernelEndSlot));
         if (!newSlots)
             return false;
@@ -1059,7 +1059,7 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, void *userdata) {
 // GETTERS (PUBLIC & PRIVATE)
 ;;GETTER
 /** Returns the number of registered run callbacks. */
-uint32_t Kernel_getRunFunctionCount(const Kernel *self) {
+u32 Kernel_getRunFunctionCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).runCount;
@@ -1067,7 +1067,7 @@ uint32_t Kernel_getRunFunctionCount(const Kernel *self) {
 
 ;;GETTER
 /** Returns the number of registered end callbacks. */
-uint32_t Kernel_getEndFunctionCount(const Kernel *self) {
+u32 Kernel_getEndFunctionCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).endCount;
@@ -1075,7 +1075,7 @@ uint32_t Kernel_getEndFunctionCount(const Kernel *self) {
 
 ;;GETTER
 /** Returns the application handle at index, or nullptr if absent/out of range. */
-Application *Kernel_getApplication(const Kernel *self, uint32_t index) {
+Application *Kernel_getApplication(const Kernel *self, u32 index) {
     if (!self)
         return nullptr;
     if (index >= (*self).applicationCount)
@@ -1085,7 +1085,7 @@ Application *Kernel_getApplication(const Kernel *self, uint32_t index) {
 
 ;;GETTER
 /** Returns the number of registered applications. */
-uint32_t Kernel_getApplicationCount(const Kernel *self) {
+u32 Kernel_getApplicationCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).applicationCount;
@@ -1093,12 +1093,12 @@ uint32_t Kernel_getApplicationCount(const Kernel *self) {
 
 ;;GETTER
 /** Copies up to cap application handles to out and returns the number copied. */
-uint32_t Kernel_getApplications(const Kernel *self, Application **out, uint32_t cap) {
+u32 Kernel_getApplications(const Kernel *self, Application **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
-    uint32_t n = (*self).applicationCount;
+    u32 n = (*self).applicationCount;
     if (n > cap) n = cap;
-    for (uint32_t i = 0; i < n; i++)
+    for (u32 i = 0; i < n; i++)
         out[i] = (*self).applications[i];
     return n;
 }
@@ -1121,7 +1121,7 @@ int (*Kernel_getGfxAppRunner(const Kernel *self))(void *context, bool (*continue
 
 ;;GETTER
 /** Returns the process handle at index, or nullptr if absent/out of range. */
-Process *Kernel_getProcess(const Kernel *self, uint32_t index) {
+Process *Kernel_getProcess(const Kernel *self, u32 index) {
     if (!self)
         return nullptr;
     if (index >= (*self).processCount)
@@ -1131,7 +1131,7 @@ Process *Kernel_getProcess(const Kernel *self, uint32_t index) {
 
 ;;GETTER
 /** Returns the number of registered processes. */
-uint32_t Kernel_getProcessCount(const Kernel *self) {
+u32 Kernel_getProcessCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).processCount;
@@ -1139,19 +1139,19 @@ uint32_t Kernel_getProcessCount(const Kernel *self) {
 
 ;;GETTER
 /** Copies up to cap process handles to out and returns the number copied. */
-uint32_t Kernel_getProcesses(const Kernel *self, Process **out, uint32_t cap) {
+u32 Kernel_getProcesses(const Kernel *self, Process **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
-    uint32_t n = (*self).processCount;
+    u32 n = (*self).processCount;
     if (n > cap) n = cap;
-    for (uint32_t i = 0; i < n; i++)
+    for (u32 i = 0; i < n; i++)
         out[i] = (*self).processes[i];
     return n;
 }
 
 ;;GETTER
 /** Returns the console handle at index, or nullptr if absent/out of range. */
-Console *Kernel_getConsole(const Kernel *self, uint32_t index) {
+Console *Kernel_getConsole(const Kernel *self, u32 index) {
     if (!self)
         return nullptr;
     if (index >= (*self).consoleCount)
@@ -1161,7 +1161,7 @@ Console *Kernel_getConsole(const Kernel *self, uint32_t index) {
 
 ;;GETTER
 /** Returns the number of registered consoles. */
-uint32_t Kernel_getConsoleCount(const Kernel *self) {
+u32 Kernel_getConsoleCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).consoleCount;
@@ -1169,19 +1169,19 @@ uint32_t Kernel_getConsoleCount(const Kernel *self) {
 
 ;;GETTER
 /** Copies up to cap console handles to out and returns the number copied. */
-uint32_t Kernel_getConsoles(const Kernel *self, Console **out, uint32_t cap) {
+u32 Kernel_getConsoles(const Kernel *self, Console **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
-    uint32_t n = (*self).consoleCount;
+    u32 n = (*self).consoleCount;
     if (n > cap) n = cap;
-    for (uint32_t i = 0; i < n; i++)
+    for (u32 i = 0; i < n; i++)
         out[i] = (*self).consoles[i];
     return n;
 }
 
 ;;GETTER
 /** Returns the CommandLine handle at index, or nullptr if absent/out of range. */
-CommandLine *Kernel_getCommandLine(const Kernel *self, uint32_t index) {
+CommandLine *Kernel_getCommandLine(const Kernel *self, u32 index) {
     if (!self)
         return nullptr;
     if (index >= (*self).commandlineCount)
@@ -1191,7 +1191,7 @@ CommandLine *Kernel_getCommandLine(const Kernel *self, uint32_t index) {
 
 ;;GETTER
 /** Returns the number of registered terminal applications. */
-uint32_t Kernel_getCommandLineCount(const Kernel *self) {
+u32 Kernel_getCommandLineCount(const Kernel *self) {
     if (!self)
         return 0;
     return (*self).commandlineCount;
@@ -1199,12 +1199,12 @@ uint32_t Kernel_getCommandLineCount(const Kernel *self) {
 
 ;;GETTER
 /** Copies up to cap CommandLine handles to out and returns the number copied. */
-uint32_t Kernel_getCommandLines(const Kernel *self, CommandLine **out, uint32_t cap) {
+u32 Kernel_getCommandLines(const Kernel *self, CommandLine **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
-    uint32_t n = (*self).commandlineCount;
+    u32 n = (*self).commandlineCount;
     if (n > cap) n = cap;
-    for (uint32_t i = 0; i < n; i++)
+    for (u32 i = 0; i < n; i++)
         out[i] = (*self).commandlines[i];
     return n;
 }

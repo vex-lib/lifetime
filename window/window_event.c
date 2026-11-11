@@ -56,7 +56,7 @@
  *   WindowNoArgFn onPressed;                // mouse pressed on the window
  *   WindowNoArgFn onFocusGained;            // key window became THIS window
  *   WindowNoArgFn onFocusLost;              // key window left THIS window
- *   WindowNoArgFn onZoomFilled;             // double-click header zoom-to-fill
+ *   WindowNoArgFn onZoomFilled;             // d64-click header zoom-to-fill
  *   WindowNoArgFn onZoomBack;               // exited zoom-to-fill
  *   WindowOcclusionFn onOcclusionChanged;   // occlusion flipped (visible flag)
  *

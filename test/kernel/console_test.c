@@ -35,7 +35,7 @@ typedef struct {
     int cancels;
     bool joined;
     char lastFeed[64];
-    size_t lastFeedLen;
+    bytes lastFeedLen;
 } fake_io_t;
 
 /** Records a successful fake launch using the configured shell and directory. */
@@ -47,10 +47,10 @@ static bool fakeSpawn(void *ctx, const char *shell, const char *workDir) {
 }
 
 /** Records input bytes delivered to the console's injected IO seam. */
-static bool fakeFeed(void *ctx, const char *Bytes, size_t len) {
+static bool fakeFeed(void *ctx, const char *Bytes, bytes len) {
     fake_io_t *f = ctx;
     (*f).feeds++;
-    size_t n = len < sizeof((*f).lastFeed) - 1 ? len : sizeof((*f).lastFeed) - 1;
+    bytes n = len < sizeof((*f).lastFeed) - 1 ? len : sizeof((*f).lastFeed) - 1;
     memcpy((*f).lastFeed, Bytes, n);
     (*f).lastFeed[n] = '\0';
     (*f).lastFeedLen = len;
@@ -58,11 +58,11 @@ static bool fakeFeed(void *ctx, const char *Bytes, size_t len) {
 }
 
 /** Supplies deterministic child output and its bounded byte count. */
-static bool fakeReap(void *ctx, char *out, size_t outCap, size_t *outLen) {
+static bool fakeReap(void *ctx, char *out, bytes outCap, bytes *outLen) {
     fake_io_t *f = ctx;
     (*f).reaps++;
     const char *msg = "out";
-    size_t n = 3 < outCap ? 3 : outCap;
+    bytes n = 3 < outCap ? 3 : outCap;
     if (out && outCap > 0)
         memcpy(out, msg, n);
     if (outLen)
@@ -128,7 +128,7 @@ int main(void) {
 
     // Poll drains through the seam.
     char out[16];
-    size_t outLen = 999;
+    bytes outLen = 999;
     CHECK(Console_poll(c, out, sizeof out, &outLen));
     CHECK(f.reaps == 1);
     CHECK(outLen == 3);

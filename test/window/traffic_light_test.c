@@ -3,7 +3,7 @@
 // Proves the macOS traffic-light chrome controller:
 //   - create + defaults (all three lights visible); destroy (incl. null);
 //   - per-button visibility round trip and out-of-range refusal;
-//   - nil-window safety for the header/floating ops (zero, no crash);
+//   - nil-window safety for the header/f32ing ops (zero, no crash);
 //   - over a REAL window: visibility round trip, refresh, and a header
 //     re-seat that stays non-negative.
 //
@@ -48,9 +48,9 @@ int main(void) {
     TrafficLight_setButtonVisible(tl, (TrafficLightButton) 99, true); // no-op
     CHECK(1);
 
-    // Nil-window header/floating ops: safe and zero.
-    float x = -1.0f;
-    float y = -1.0f;
+    // Nil-window header/f32ing ops: safe and zero.
+    f32 x = -1.0f;
+    f32 y = -1.0f;
     TrafficLight_getHeaderPosition(tl, &x, &y);
     CHECK(x == 0.0f && y == 0.0f);
     TrafficLight_setHeaderPosition(tl, 10.0f, 20.0f); // no window -> no-op
@@ -75,10 +75,10 @@ int main(void) {
         CHECK(TrafficLight_isButtonVisible(live, TRAFFIC_LIGHT_ZOOM));
 
         TrafficLight_setHeaderPosition(live, 12.0f, 8.0f);
-        float hx = -1.0f;
-        float hy = -1.0f;
+        f32 hx = -1.0f;
+        f32 hy = -1.0f;
         TrafficLight_getHeaderPosition(live, &hx, &hy);
-        // Either the cluster re-seated (exact, modulo float) or the window's
+        // Either the cluster re-seated (exact, modulo f32) or the window's
         // standard buttons were unavailable (zero). Both are non-negative.
         CHECK(hx >= 0.0f && hy >= 0.0f);
 

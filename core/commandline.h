@@ -92,8 +92,8 @@ typedef struct CommandLineIo {
     void *ctx;                                             // borrowed backend state
     bool (*open)(void *ctx);                               // raw mode + alt screen + colors
     void (*close)(void *ctx);                              // restore the terminal
-    bool (*size)(void *ctx, size_t *outW, size_t *outH);   // current cell geometry
-    bool (*present)(void *ctx, const char *cells, size_t width, size_t height); // one flush
+    bool (*size)(void *ctx, bytes *outW, bytes *outH);   // current cell geometry
+    bool (*present)(void *ctx, const char *cells, bytes width, bytes height); // one flush
     bool (*poll)(void *ctx, int timeoutMs, CommandLineEvent *out); // bounded wait
     bool (*setMouse)(void *ctx, bool enabled);             // pointer reporting toggle
 } CommandLineIo;
@@ -115,11 +115,11 @@ struct CommandLine {
     bool explicitIo;                    // false => default (ncurses) backend
     CommandLineApp app;                 // borrowed swappable application seam
     char *cells;                        // owned device framebuffer (width*height)
-    size_t capacity;                    // admitted grid byte capacity
-    size_t width;                       // columns
-    size_t height;                      // rows
-    uint64_t generation;                // successful app publications
-    size_t refusalCount;                // epoch grid-capacity refusals
+    bytes capacity;                    // admitted grid byte capacity
+    bytes width;                       // columns
+    bytes height;                      // rows
+    u64 generation;                // successful app publications
+    bytes refusalCount;                // epoch grid-capacity refusals
     atomic_uint run;                    // CommandLineRunPhase
     bool opened;                        // device acquired
     bool active;                        // callback exclusion guard (owner thread)
@@ -184,9 +184,9 @@ bool CommandLine_isRunning(const CommandLine *self);
 CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self);
 
 // --- Geometry / grid ---
-size_t CommandLine_getWidth(const CommandLine *self);
-size_t CommandLine_getHeight(const CommandLine *self);
-size_t CommandLine_getCapacity(const CommandLine *self);
+bytes CommandLine_getWidth(const CommandLine *self);
+bytes CommandLine_getHeight(const CommandLine *self);
+bytes CommandLine_getCapacity(const CommandLine *self);
 // Borrowed contiguous width*height cell grid; live until close/revalidate.
 char *CommandLine_getCells(CommandLine *self);
 const char *CommandLine_getCellsConst(const CommandLine *self);
@@ -202,15 +202,15 @@ bool CommandLine_setMouseReporting(CommandLine *self, bool enabled);
 // --- Telemetry / identity: symmetric setters & getters ---
 void        CommandLine_setTitle(CommandLine *self, const char *title);
 const char *CommandLine_getTitle(const CommandLine *self);
-uint64_t    CommandLine_getGeneration(const CommandLine *self);
-size_t      CommandLine_exhaustionCount(const CommandLine *self);
+u64    CommandLine_getGeneration(const CommandLine *self);
+bytes      CommandLine_exhaustionCount(const CommandLine *self);
 bool        CommandLine_isOpen(const CommandLine *self);
 bool        CommandLine_isActive(const CommandLine *self);
 bool        CommandLine_isCancelled(const CommandLine *self);
 
 // --- Projections (the toString Law) ---
-bool CommandLine_toString(const CommandLine *self, char *dest, size_t cap, bool *outTruncated);
-bool CommandLine_toStringStruct(const CommandLine *self, char *dest, size_t cap, bool *outTruncated);
+bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *outTruncated);
+bool CommandLine_toStringStruct(const CommandLine *self, char *dest, bytes cap, bool *outTruncated);
 
 // The default ncurses backend (commandline_ncurses.c). Returned by value; owns
 // no state until opened. Exposed so an application can pre-set mouse policy.

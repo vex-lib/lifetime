@@ -44,8 +44,8 @@
  * ----------------------------------------------------------------------------
  *   void *persistentArena;    // master session arena (opaque void*)
  *   void *transientArena;     // per-tick scratch arena (opaque void*)
- *   uint64_t persistentType;  // LIFETIME_TYPE_ARENA (nonzero = attested)
- *   uint64_t transientType;   // LIFETIME_TYPE_ARENA (nonzero = attested)
+ *   u64 persistentType;  // LIFETIME_TYPE_ARENA (nonzero = attested)
+ *   u64 transientType;   // LIFETIME_TYPE_ARENA (nonzero = attested)
  *   void *relational;         // relational symbol root (opaque void*)
  *
  * PRIVATE HELPERS:
@@ -89,15 +89,15 @@
 
 // Dynamic link symbols provided by the underlying memory runtime (pure void* ABI).
 // hotcwap does NOT include nio/mem.h or any vexspoke header files.
-extern void *MemoryArena_create(size_t totalBytes);
+extern void *MemoryArena_create(bytes totalBytes);
 extern void MemoryArena_destroy(void *arena);
 extern void MemoryArena_freeAll(void *arena);
-extern void *MemoryArena_alloc(void *arena, uint64_t typeId, size_t numBytes);
+extern void *MemoryArena_alloc(void *arena, u64 typeId, bytes numBytes);
 extern void MemoryArena_free(void *arena, void *ptr);
 
 // CONSTRUCTORS (PUBLIC & PRIVATE)
 /** Creates persistent and transient arenas, substituting defaults for zero sizes. */
-Lifetime Lifetime_create(size_t persistentBytes, size_t transientBytes) {
+Lifetime Lifetime_create(bytes persistentBytes, bytes transientBytes) {
     Lifetime lt = {0};
     if (persistentBytes == 0)
         persistentBytes = 64 * 1024 * 1024;
@@ -131,7 +131,7 @@ Lifetime Lifetime_create(size_t persistentBytes, size_t transientBytes) {
 
 /** Wraps externally supplied arenas only when their pointers and type IDs validate. */
 Lifetime Lifetime_bind(void *persistentArena, void *transientArena,
-                       uint64_t persistentType, uint64_t transientType,
+                       u64 persistentType, u64 transientType,
                        void *relational) {
     Lifetime lt = {
         .persistentArena = persistentArena,
@@ -214,7 +214,7 @@ void Lifetime_resetTransient(Lifetime *lifetime) {
 }
 
 /** Allocates typed bytes from the persistent arena and validates the result pointer. */
-void *Lifetime_allocPersistent(Lifetime *lifetime, uint64_t typeId, size_t Bytes) {
+void *Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).persistentArena))
         return nullptr;
     void *ptr = MemoryArena_alloc((*lifetime).persistentArena, typeId, Bytes);
@@ -225,7 +225,7 @@ void *Lifetime_allocPersistent(Lifetime *lifetime, uint64_t typeId, size_t Bytes
 }
 
 /** Allocates typed bytes from the transient arena and validates the result pointer. */
-void *Lifetime_allocTransient(Lifetime *lifetime, uint64_t typeId, size_t Bytes) {
+void *Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).transientArena))
         return nullptr;
     void *ptr = MemoryArena_alloc((*lifetime).transientArena, typeId, Bytes);

@@ -51,7 +51,7 @@ typedef struct WindowEvent {
     WindowNoArgFn onPressed;                  // mouse pressed on the window surface
     WindowNoArgFn onFocusGained;            // key window became THIS window
     WindowNoArgFn onFocusLost;              // key window left THIS window
-    WindowNoArgFn onZoomFilled;             // double-click header zoom-to-fill
+    WindowNoArgFn onZoomFilled;             // d64-click header zoom-to-fill
     WindowNoArgFn onZoomBack;               // exited zoom-to-fill back to normal
     WindowOcclusionFn onOcclusionChanged;   // occlusion flipped (true = pixels visible)
 } WindowEvent;

@@ -30,9 +30,9 @@ typedef enum PermissionKind {
     PERMISSION_ACCESSIBILITY,      // read / control other apps' UI
     PERMISSION_CAMERA,
     PERMISSION_MICROPHONE,
-    PERMISSION_CONTACTS,           // Apple-vexgraph-ecosystem-gitrepo only
-    PERMISSION_CALENDAR,           // Apple-vexgraph-ecosystem-gitrepo only
-    PERMISSION_PHOTOS,             // Apple-vexgraph-ecosystem-gitrepo only
+    PERMISSION_CONTACTS,           // Apple-only
+    PERMISSION_CALENDAR,           // Apple-only
+    PERMISSION_PHOTOS,             // Apple-only
     PERMISSION_LOCATION,
     PERMISSION_NOTIFICATIONS,
     PERMISSION_AUTOMATION,         // drive apps via AppleEvents / scripting

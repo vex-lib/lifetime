@@ -47,7 +47,7 @@ ProcessResult Process_setName(Process *self, const char *name);
 // False on null/busy. Exclude new users before attempting free.
 bool Process_free(Process *self);
 bool Process_isRunning(const Process *self);
-uint32_t Process_getInvocationCount(const Process *self);
+u32 Process_getInvocationCount(const Process *self);
 
 // Individual atomic observations, NOT a coherent multi-field snapshot or
 // permission to call/unload entry. Invoke exclusively via Process_run.

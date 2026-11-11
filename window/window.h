@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "util/annotation.h"
+#include "lang/annotation.h"
 
 #include "../../vexspoke/event/keyhandler.h"
 #include "../../vexspoke/event/mousehandler.h"
@@ -144,24 +144,24 @@ void Window_hide(Window *window);
 void Window_setVisible(Window *window, bool visible);
 
 // --- Native pixel & DPI scale helpers (Native Pixel Law) ---
-float Window_getScale(const Window *window); // active backing scale factor (e.g. 2.0 on Retina, 1.0 on standard)
+f32 Window_getScale(const Window *window); // active backing scale factor (e.g. 2.0 on Retina, 1.0 on standard)
 void  Window_revalidate(Window *window);     // recompute points geometry across screen DPI transitions
-void  Window_setSizePoints(Window *window, float width, float height);
-void  Window_getSizePoints(const Window *window, float *outWidth, float *outHeight);
-float Window_widthPoints(const Window *window);
-float Window_heightPoints(const Window *window);
+void  Window_setSizePoints(Window *window, f32 width, f32 height);
+void  Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight);
+f32 Window_widthPoints(const Window *window);
+f32 Window_heightPoints(const Window *window);
 
 // --- Viewport of content vs Window frame (Anchoring Law) --------------------
 // The content viewport is the visible canvas for content that UI panels anchor against.
 // The window size is the supplementary OS container.
 int   Window_viewportWidth(const Window *window);
 int   Window_viewportHeight(const Window *window);
-float Window_viewportWidthPoints(const Window *window);
-float Window_viewportHeightPoints(const Window *window);
+f32 Window_viewportWidthPoints(const Window *window);
+f32 Window_viewportHeightPoints(const Window *window);
 int   Window_windowWidth(const Window *window);
 int   Window_windowHeight(const Window *window);
-float Window_windowWidthPoints(const Window *window);
-float Window_windowHeightPoints(const Window *window);
+f32 Window_windowWidthPoints(const Window *window);
+f32 Window_windowHeightPoints(const Window *window);
 
 // --- Content: owned by Frame, never by the Window ---------------------------
 //
@@ -211,7 +211,7 @@ bool Window_isTransparent(const Window *window);
 // R,G,B,A; native px; top-left origin, Y-down) into the window's content view.
 // `stride` is the row pitch in Bytes (>= width*4). Thread 0 only. The buffer is
 // referenced, not copied, so it must stay valid until the next present.
-void Window_presentRGBA(Window *window, const void *pixels, size_t stride, int width, int height);
+void Window_presentRGBA(Window *window, const void *pixels, bytes stride, int width, int height);
 
 // ── Zero-copy present surface (Apple; capability-gated) ─────────────────────
 // An IOSurface the window's draw view (a CALayer) displays directly. The render
@@ -231,15 +231,15 @@ void *Window_presentSurfaceContents(const Window *window);   // what the layer s
 
 // Read a present surface's pixels into a tightly packed RGBA8 buffer (the
 // screenshot/CAPTURE path on the GPU seam). `destStride` is Bytes/row. Thread 0.
-bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, size_t destStride);
+bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, bytes destStride);
 
 // Screenshot: write a tightly packed RGBA8 buffer (same layout as
 // Window_presentRGBA) to a PNG file. The CAPTURE() path for tests/agents.
 // Apple-only (ImageIO). Returns true on success.
-bool Window_writePNG(const void *pixels, size_t stride, int width, int height, const char *path);
+bool Window_writePNG(const void *pixels, bytes stride, int width, int height, const char *path);
 
 // Monotonic counter bumped by thread 0 whenever presentation policy changes.
-uint64_t Window_renderGeneration(const Window *window);
+u64 Window_renderGeneration(const Window *window);
 
 // --- Runtime state ---
 
@@ -282,12 +282,12 @@ bool Window_isBorderless(const Window *window);
 // this function is disabled (no-op).
 void Window_setViewportFlushToTop(Window *window, bool flush);
 bool Window_isViewportFlushToTop(const Window *window);
-void Window_setFloatingTrafficLights(Window *window, bool floating); // Transparent titlebar, leaves traffic lights over content (alias for Window_setViewportFlushToTop)
+void Window_setFloatingTrafficLights(Window *window, bool f32ing); // Transparent titlebar, leaves traffic lights over content (alias for Window_setViewportFlushToTop)
 
 // macOS-only traffic-light chrome (the Window_macOS_ infix IS the platform
 // lock: these symbols exist only in the Cocoa backend; a non-Apple build that
 // calls them fails to link, which is the flag). The lights live only in Titled
-// chrome; under NAKED (FullSizeContentView) they float over content at the
+// chrome; under NAKED (FullSizeContentView) they f32 over content at the
 // native top-left inset. Per-button visibility hides e.g. the yellows (keeping
 // only red) or drops all three while still NAKED; the header position re-seats
 // the cluster for a custom header — (x, y) is the desired top-left origin of
@@ -306,9 +306,9 @@ void Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLigh
 ;;PLATFORM_EXCLUSIVE("macOS")
 bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTrafficLight light);
 ;;PLATFORM_EXCLUSIVE("macOS")
-void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y);
+void Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y);
 ;;PLATFORM_EXCLUSIVE("macOS")
-void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *outX, float *outY);
+void Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY);
 
 // macOS-exclusive Liquid Glass chrome (macOS 26+). The Window_macOS_ infix IS
 // the platform lock: these symbols exist only in the Cocoa backend, and Liquid
@@ -321,8 +321,8 @@ void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *out
 typedef struct WindowLiquidGlassDesc {
     bool enabled;        // false = remove the glass (restore the plain backdrop)
     int style;           // WINDOW_LIQUID_GLASS_STYLE_*
-    float cornerRadius;  // native px
-    uint32_t tintColor;  // RGBA8; 0 = no tint
+    f32 cornerRadius;  // native px
+    u32 tintColor;  // RGBA8; 0 = no tint
 } WindowLiquidGlassDesc;
 
 ;;PLATFORM_EXCLUSIVE("macOS")
@@ -332,9 +332,9 @@ void Window_macOS_setLiquidGlass(Window *window, const WindowLiquidGlassDesc *de
 ;;PLATFORM_EXCLUSIVE("macOS")
 bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *out);
 
-void Window_setOpacity(Window *window, float opacity); // 0.0 to 1.0
+void Window_setOpacity(Window *window, f32 opacity); // 0.0 to 1.0
 void Window_setTransparentBackground(Window *window, bool transparent); // Makes the window backdrop fully clear so Vulkan can draw holes
-void Window_setBackdropBlur(Window *window, float radius); // frosted backdrop behind the draw view; 0 = none
+void Window_setBackdropBlur(Window *window, f32 radius); // frosted backdrop behind the draw view; 0 = none
 void Window_setAlwaysOnTop(Window *window, bool onTop);
 void Window_setClickThrough(Window *window, bool clickThrough);
 void Window_setShadow(Window *window, bool shadow);
@@ -454,7 +454,7 @@ void Window_dispatchEvents(Window *window);
 //
 // The OS owns focus; we mirror it. After every pump pass the key window's id
 // lands in one atomic word any thread can read.
-uint32_t Window_id(Window *window);      // 0 when window is nullptr
+u32 Window_id(Window *window);      // 0 when window is nullptr
 void Window_focus(Window *window);       // ask the OS to make this key
 bool Window_isFocused(Window *window);   // is THIS the spotlight right now?
 void Window_setKeyEnabled(Window *window, bool enabled); // false = the OS refuses this window key (modal dialogs holding their parent); render + order unaffected
@@ -468,7 +468,7 @@ bool Window_isKeyEnabled(const Window *window);          // false while held by 
 // by Window_show; 0 means unknown (never shown, or headless). When the value
 // flips — drag across displays, screen unplugged — WindowEvent's
 // onMonitorChanged fires on thread 0.
-uint32_t Window_getMonitorId(const Window *window);
+u32 Window_getMonitorId(const Window *window);
 
 // --- Resize reflection ---
 //
@@ -476,7 +476,7 @@ uint32_t Window_getMonitorId(const Window *window);
 // the content size actually changed. Renderers, layouts, and scenes compare
 // their last-seen generation against this and rebuild when it moved — one
 // frame of lag at worst, zero AppKit calls off Thread 0, no locks.
-uint64_t Window_sizeGeneration(Window *window);
+u64 Window_sizeGeneration(Window *window);
 
 // --- Resize-cadence rendering (the c -> objc -> c bridge) --------------------
 //

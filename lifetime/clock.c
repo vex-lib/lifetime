@@ -11,7 +11,7 @@
  * ============================================================================
  * The R0 ground-truth clock. Nanos from CLOCK_MONOTONIC_RAW for frame ticks
  * (raw hardware counter, unslewed by NTP, never backwards). Millis from
- * CLOCK_REALTIME for unix wall timestamps. Seconds (double) is the single
+ * CLOCK_REALTIME for unix wall timestamps. Seconds (d64) is the single
  * conversion site for module frame functions. No pause/scale — ground truth
  * only. The host holds the clock across hot swaps, so time continues.
  * Lives at R0 as a leaf host primitive.
@@ -37,22 +37,22 @@
  */
 
 
-uint64_t Clock_nowNanos(void) {
+u64 Clock_nowNanos(void) {
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
 
-    return (uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec;
+    return (u64) ts.tv_sec * 1000000000ull + (u64) ts.tv_nsec;
 }
 
-uint64_t Clock_nowMillis(void) {
+u64 Clock_nowMillis(void) {
     struct timespec ts;
 
     clock_gettime(CLOCK_REALTIME, &ts);
 
-    return (uint64_t) ts.tv_sec * 1000ull + (uint64_t) ts.tv_nsec / 1000000ull;
+    return (u64) ts.tv_sec * 1000ull + (u64) ts.tv_nsec / 1000000ull;
 }
 
-double Clock_nowSeconds(void) {
-    return (double) Clock_nowNanos() / 1000000000.0;
+d64 Clock_nowSeconds(void) {
+    return (d64) Clock_nowNanos() / 1000000000.0;
 }

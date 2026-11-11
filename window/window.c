@@ -99,20 +99,20 @@
  * ----------------------------------------------------------------------------
  *   HWND hwnd;                         // Win32 window (we own it)
  *   WindowEvent lifecycle;             // OS lifecycle registry
- *   uint32_t id;                       // engine window id (1..N, 0 = broadcast)
+ *   u32 id;                       // engine window id (1..N, 0 = broadcast)
  *   _Atomic bool shouldClose;          // true once close requested
- *   _Atomic uint64_t sizeGeneration;   // resize-reflection counter
+ *   _Atomic u64 sizeGeneration;   // resize-reflection counter
  *   _Atomic int cachedWidth;           // client width at last WM_SIZE
  *   _Atomic int cachedHeight;          // client height at last WM_SIZE
  *   _Atomic bool liveResizing;         // set during WM_ENTERSIZEMOVE..EXIT
  *   _Atomic int presentMode;           // present pacing (FIFO/IMMEDIATE), stored
  *   _Atomic bool transparent;          // composite transparency request, stored
- *   _Atomic uint64_t renderGeneration; // policy-reflection counter
+ *   _Atomic u64 renderGeneration; // policy-reflection counter
  *   _Atomic(void*) topLayer;           // content board handle
  *   _Atomic(void*) bottomLayer;        // scene board handle
  *   _Atomic bool enabled;              // false mutes ALL OS input
  *   bool lastFocused;                  // focus-flip detection
- *   _Atomic uint32_t monitorId;        // HMONITOR slot id (0 = unmapped)
+ *   _Atomic u32 monitorId;        // HMONITOR slot id (0 = unmapped)
  *   WindowCursorType cursorType;       // current cursor request
  *   bool decorated;                    // chrome mode (WS_OVERLAPPED vs WS_POPUP)
  *   bool fullscreen;                   // fullscreen state
@@ -125,7 +125,7 @@
  *   bool closableEnabled;              // SC_CLOSE system-menu gate
  *   bool minimizeEnabled;              // WS_MINIMIZEBOX gate
  *   bool clickThrough;                 // WS_EX_TRANSPARENT toggle
- *   float opacity;                     // SetLayeredWindowAttributes alpha
+ *   f32 opacity;                     // SetLayeredWindowAttributes alpha
  *   bool shadow;                       // DWM non-client-rendering policy
  *   int frameW, frameH;                // retained bitmap dimensions in px
  *   BITMAPINFO bmi;                    // retained bitmap header for StretchDIBits
@@ -139,7 +139,7 @@
  *     Window *handle;                  // C handle owning that window
  *   Win32Monitor                       — HMONITOR slot record
  *     HMONITOR handle;                 // monitor handle (may be nulled)
- *     uint32_t id;                     // stable engine id (index + 1)
+ *     u32 id;                     // stable engine id (index + 1)
  *   win32EnsureClass(), windowWndProc()
  *   windowRefreshSize, windowRefreshFocus, windowRefreshMonitor, recenterIfLocked
  *
@@ -219,7 +219,7 @@
  *   - Window_setNaked(window, naked)
  *   - Window_setBorderless(window, borderless)
  *   - Window_setViewportFlushToTop(window, flush)       : macOS-only no-op
- *   - Window_setFloatingTrafficLights(window, floating) : macOS-only no-op
+ *   - Window_setFloatingTrafficLights(window, f32ing) : macOS-only no-op
  *   - Window_macOS_setTrafficLightButtonVisible(window, light, visible)  : macOS-only stub
  *   - Window_macOS_setTrafficLightHeaderPosition(window, x, y)          : macOS-only stub
  *   - Window_setOpacity(window, opacity)          : SetLayeredWindowAttributes LWA_ALPHA
@@ -301,8 +301,8 @@
          "mirroring the macOS 'no sharing' semantics as closely as the OS "
          "allows. Set member when the guest compositor arrives.")
 
-// Multi-tap window for double-click style counting (legacy parity: 250ms).
-static const uint64_t kTapThresholdNanos = 250000000ULL;
+// Multi-tap window for d64-click style counting (legacy parity: 250ms).
+static const u64 kTapThresholdNanos = 250000000ULL;
 
 // Virtual keycode -> KEY_* code. Indexed by the raw Windows virtual-key code
 // (0..255); -1 = unmapped. Physical layout maps letters/digits/function rows
@@ -347,9 +347,9 @@ static POINT s_lockCenter = {0, 0};
 struct Window {
    HWND hwnd;
    WindowEvent lifecycle;
-   uint32_t id;
+   u32 id;
    _Atomic bool shouldClose;
-   _Atomic uint64_t sizeGeneration;
+   _Atomic u64 sizeGeneration;
    _Atomic int cachedWidth;
    _Atomic int cachedHeight;
    int cachedX;
@@ -362,7 +362,7 @@ struct Window {
    // Pure-state reflection words (no GPU calls in this file).
    _Atomic int presentMode;
    _Atomic bool transparent;
-   _Atomic uint64_t renderGeneration;
+   _Atomic u64 renderGeneration;
 
    // Board slots — opaque layer handles consumed by graphvex/darling; this
    // window stores them, never dereferences them. Panels live on the Frame.
@@ -372,7 +372,7 @@ struct Window {
    _Atomic bool enabled;
    _Atomic bool keyEnabled; // stored; OS-level key refusal is Cocoa-only for now
    bool lastFocused;
-   _Atomic uint32_t monitorId;
+   _Atomic u32 monitorId;
    WindowCursorType cursorType;
 
    // Chrome: style-mask mirror (WIN32 has no traffic lights; no lightBase).
@@ -408,21 +408,21 @@ typedef struct WindowSlot {
 } WindowSlot;
 
 static WindowSlot *s_refs = nullptr;
-static uint32_t s_refCap = 0;
+static u32 s_refCap = 0;
 
 // Foreground-claim pending: set by Window_show/Window_focus, drained by the
 // pump once the OS grants foreground (Win32 foreground-locking rules are the
 // mirror of AppKit activation — a bounded re-assert, never a spin).
 static HWND sPendingForeground = nullptr;
-static uint64_t sPendingUntilMillis = 0;
+static u64 sPendingUntilMillis = 0;
 
 // Grow the HWND-to-window registry geometrically and initialize the new slots.
 static bool windowRefsGrow(void) {
-   uint32_t nextCap = (s_refCap == 0) ? 8u : s_refCap * 2u;
-   WindowSlot *grown = (WindowSlot*) realloc(s_refs, (size_t) nextCap * sizeof(WindowSlot));
+   u32 nextCap = (s_refCap == 0) ? 8u : s_refCap * 2u;
+   WindowSlot *grown = (WindowSlot*) realloc(s_refs, (bytes) nextCap * sizeof(WindowSlot));
    if (grown == nullptr)
       return false;
-   for (uint32_t i = s_refCap; i < nextCap; i++) {
+   for (u32 i = s_refCap; i < nextCap; i++) {
       grown[i].hwnd = nullptr;
       grown[i].handle = nullptr;
    }
@@ -432,10 +432,10 @@ static bool windowRefsGrow(void) {
 }
 
 // Resolve an id for a newly created window, or 0 when the table cannot grow.
-static uint32_t windowIdAcquire(HWND hwnd, Window *handle) {
+static u32 windowIdAcquire(HWND hwnd, Window *handle) {
    if (s_refCap == 0 && !windowRefsGrow())
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < s_refCap; i++) {
+   for (u32 i = 1; i < s_refCap; i++) {
       if (s_refs[i].hwnd == nullptr) {
          s_refs[i].hwnd = hwnd;
          s_refs[i].handle = handle;
@@ -444,7 +444,7 @@ static uint32_t windowIdAcquire(HWND hwnd, Window *handle) {
    }
    if (!windowRefsGrow())
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < s_refCap; i++) {
+   for (u32 i = 1; i < s_refCap; i++) {
       if (s_refs[i].hwnd == nullptr) {
          s_refs[i].hwnd = hwnd;
          s_refs[i].handle = handle;
@@ -455,7 +455,7 @@ static uint32_t windowIdAcquire(HWND hwnd, Window *handle) {
 }
 
 // Clear a registry slot after its native window and C handle are detached.
-static void windowIdRelease(uint32_t id) {
+static void windowIdRelease(u32 id) {
    if (id != FOCUS_BROADCAST && id < s_refCap) {
       s_refs[id].hwnd = nullptr;
       s_refs[id].handle = nullptr;
@@ -463,10 +463,10 @@ static void windowIdRelease(uint32_t id) {
 }
 
 // Reverse lookup: which engine id does this OS window carry? 0 if unknown.
-static uint32_t windowIdOf(HWND hwnd) {
+static u32 windowIdOf(HWND hwnd) {
    if (hwnd == nullptr)
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < s_refCap; i++)
+   for (u32 i = 1; i < s_refCap; i++)
       if (s_refs[i].hwnd == hwnd)
          return i;
    return FOCUS_BROADCAST;
@@ -475,7 +475,7 @@ static uint32_t windowIdOf(HWND hwnd) {
 static Window *windowHandleOf(HWND hwnd) {
    if (hwnd == nullptr)
       return nullptr;
-   for (uint32_t i = 1; i < s_refCap; i++)
+   for (u32 i = 1; i < s_refCap; i++)
       if (s_refs[i].hwnd == hwnd)
          return s_refs[i].handle;
    return nullptr;
@@ -549,18 +549,18 @@ static void windowRefreshFocus(Window *window, HWND fgWindow) {
 // Mirror the display assignment into the atomic word; 0 means unmapped. The id
 // is the EnumDisplayMonitors traversal index + 1 (stable per session, unlike
 // the HMONITOR pointer which recesses between enumerations).
-static uint32_t resolveMonitorId(HWND hwnd) {
+static u32 resolveMonitorId(HWND hwnd) {
    if (hwnd == nullptr)
       return 0;
    HMONITOR mine = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
    if (mine == nullptr)
       return 0;
-   uint32_t idx = 0;
+   u32 idx = 0;
    // Count preceding monitors until EnumDisplayMonitors reaches the target.
    BOOL CALLBACK countCb(HMONITOR m, HDC dc, LPRECT r, LPARAM lp) {
       (void) dc;
       (void) r;
-      uint32_t *out = (uint32_t*) lp;
+      u32 *out = (u32*) lp;
       if (m == mine)
          return FALSE;
       (*out)++;
@@ -587,9 +587,9 @@ static void recenterIfLocked(void) {
 // Client-area coordinates (top-left origin) from an lParam — Win32 messages
 // already carry client px, so no flip is needed (parity with the flipped
 // Cocoa content view).
-static void mousePoint(LPARAM lp, double *outX, double *outY) {
-   *outX = (double) GET_X_LPARAM(lp);
-   *outY = (double) GET_Y_LPARAM(lp);
+static void mousePoint(LPARAM lp, d64 *outX, d64 *outY) {
+   *outX = (d64) GET_X_LPARAM(lp);
+   *outY = (d64) GET_Y_LPARAM(lp);
 }
 
 // Map a Win32 mouse message to the MOUSE_* button constant.
@@ -615,7 +615,7 @@ static bool winButtonDown(UINT msg) {
 static void mirrorModifiers(Window *window, WPARAM state, UINT msg) {
    if (window == nullptr)
       return;
-   uint32_t wid = (*window).id;
+   u32 wid = (*window).id;
    bool ctrl = (state & MK_CONTROL) != 0;
    if (ctrl != (Key_isDown(KEY_LEFT_CONTROL) || Key_isDown(KEY_RIGHT_CONTROL)))
       Key_pushEvent(wid, KEY_LEFT_CONTROL, ctrl ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
@@ -641,8 +641,8 @@ static void routeTouch(Window *window, WPARAM wp, LPARAM lp) {
       return;
    RECT client = {0};
    GetClientRect((*window).hwnd, &client);
-   double winW = (double) (client.right - client.left);
-   double winH = (double) (client.bottom - client.top);
+   d64 winW = (d64) (client.right - client.left);
+   d64 winH = (d64) (client.bottom - client.top);
    for (UINT i = 0; i < count; i++) {
       if ((in[i].dwFlags & TOUCHEVENTF_DOWN) == 0
          && (in[i].dwFlags & TOUCHEVENTF_UP) == 0
@@ -654,8 +654,8 @@ static void routeTouch(Window *window, WPARAM wp, LPARAM lp) {
       else if ((in[i].dwFlags & TOUCHEVENTF_UP) != 0)
          action = TOUCH_UP;
       int slot = (int) (in[i].dwID % TOUCH_MAX);
-      double x = (double) in[i].x / 100.0;
-      double y = (double) in[i].y / 100.0;
+      d64 x = (d64) in[i].x / 100.0;
+      d64 y = (d64) in[i].y / 100.0;
       Touch_pushTouchEvent((*window).id, slot, action, x, y, 0.8, kTapThresholdNanos);
    }
    CloseTouchInputHandle((HTOUCHINPUT) lp);
@@ -763,18 +763,18 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
       case WM_MOUSEMOVE: {
          if (!window)
             break;
-         uint32_t wid = (*window).id;
+         u32 wid = (*window).id;
          if (atomic_load_explicit(&(*window).enabled, memory_order_relaxed))
             break;
          if (s_cursorLocked) {
             POINT now = {0};
             GetCursorPos(&now);
             Mouse_pushMoveDeltaEvent(wid,
-               (double) (now.x - s_lockCenter.x),
-               (double) (now.y - s_lockCenter.y));
+               (d64) (now.x - s_lockCenter.x),
+               (d64) (now.y - s_lockCenter.y));
             break;
          }
-         double x, y;
+         d64 x, y;
          mousePoint(lp, &x, &y);
          Mouse_pushMoveEvent(wid, x, y);
          break;
@@ -790,8 +790,8 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
       case WM_XBUTTONUP: {
          if (!window)
             break;
-         uint32_t wid = (*window).id;
-         double x, y;
+         u32 wid = (*window).id;
+         d64 x, y;
          mousePoint(lp, &x, &y);
          Mouse_pushMoveEvent(wid, x, y);
          bool down = winButtonDown(msg);
@@ -805,7 +805,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_MOUSEWHEEL: {
          if (window) {
-            double delta = (double) GET_WHEEL_DELTA_WPARAM(wp) / (double) WHEEL_DELTA;
+            d64 delta = (d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA;
             Mouse_pushScrollEvent((*window).id, 0.0, delta);
          }
          return 0;
@@ -813,7 +813,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_MOUSEHWHEEL: {
          if (window) {
-            double delta = (double) GET_WHEEL_DELTA_WPARAM(wp) / (double) WHEEL_DELTA;
+            d64 delta = (d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA;
             Mouse_pushScrollEvent((*window).id, delta, 0.0);
          }
          return 0;
@@ -825,7 +825,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
       case WM_SYSKEYUP: {
          if (!window)
             break;
-         uint32_t wid = (*window).id;
+         u32 wid = (*window).id;
          UINT vk = (UINT) wp;
          bool down = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
          // Modifier keys resolve left/right through the extended-key bit of
@@ -855,7 +855,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_CHAR: {
          if (window) {
-            uint32_t c = (uint32_t) wp;
+            u32 c = (u32) wp;
             if (c > 0)
                Key_pushCharEvent((*window).id, c);
          }
@@ -912,7 +912,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 static void pumpReflection(void) {
    HWND fg = GetForegroundWindow();
    Focus_set(windowIdOf(fg));
-   for (uint32_t i = 1; i < s_refCap; i++) {
+   for (u32 i = 1; i < s_refCap; i++) {
       Window *handle = s_refs[i].handle;
       if (handle == nullptr)
          continue;
@@ -1090,10 +1090,10 @@ static Window *windowAlloc(const WindowDesc *desc) {
 
    wchar_t titleBuf[256];
    const char *t = (*desc).title ? (*desc).title : "vex";
-   size_t tn = strlen(t);
+   bytes tn = strlen(t);
    if (tn >= 256)
       tn = 255;
-   for (size_t i = 0; i < tn; i++)
+   for (bytes i = 0; i < tn; i++)
       titleBuf[i] = (wchar_t) (unsigned char) t[i];
    titleBuf[tn] = 0;
 
@@ -1284,7 +1284,7 @@ bool Window_isTransparent(const Window *window) {
 }
 
 // Read the policy generation used by downstream render-resource rebuilds.
-uint64_t Window_renderGeneration(const Window *window) {
+u64 Window_renderGeneration(const Window *window) {
    return window ? atomic_load_explicit(&(*window).renderGeneration, memory_order_acquire) : 0;
 }
 
@@ -1378,10 +1378,10 @@ void Window_setTitle(Window *window, const char *title) {
    if (window == nullptr || title == nullptr)
       return;
    wchar_t titleBuf[256];
-   size_t tn = strlen(title);
+   bytes tn = strlen(title);
    if (tn >= 256)
       tn = 255;
-   for (size_t i = 0; i < tn; i++)
+   for (bytes i = 0; i < tn; i++)
       titleBuf[i] = (wchar_t) (unsigned char) title[i];
    titleBuf[tn] = 0;
    SetWindowTextW((*window).hwnd, titleBuf);
@@ -1402,7 +1402,7 @@ int Window_height(Window *window) {
 }
 
 // Return the unit scale of the Win32 physical-pixel window API.
-float Window_getScale(const Window *window) {
+f32 Window_getScale(const Window *window) {
    (void) window;
    return 1.0f;
 }
@@ -1413,24 +1413,24 @@ void Window_revalidate(Window *window) {
 }
 
 // Convert compatibility point dimensions to the integer client-size request.
-void Window_setSizePoints(Window *window, float width, float height) {
+void Window_setSizePoints(Window *window, f32 width, f32 height) {
    Window_setSize(window, (int) width, (int) height);
 }
 
 // Return cached client dimensions through the points compatibility outputs.
-void Window_getSizePoints(const Window *window, float *outWidth, float *outHeight) {
-   if (outWidth) *outWidth = (float) Window_width((Window*) window);
-   if (outHeight) *outHeight = (float) Window_height((Window*) window);
+void Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
+   if (outWidth) *outWidth = (f32) Window_width((Window*) window);
+   if (outHeight) *outHeight = (f32) Window_height((Window*) window);
 }
 
-// Return cached client width as a floating-point compatibility value.
-float Window_widthPoints(const Window *window) {
-   return (float) Window_width((Window*) window);
+// Return cached client width as a f32ing-point compatibility value.
+f32 Window_widthPoints(const Window *window) {
+   return (f32) Window_width((Window*) window);
 }
 
-// Return cached client height as a floating-point compatibility value.
-float Window_heightPoints(const Window *window) {
-   return (float) Window_height((Window*) window);
+// Return cached client height as a f32ing-point compatibility value.
+f32 Window_heightPoints(const Window *window) {
+   return (f32) Window_height((Window*) window);
 }
 
 // Alias the client width as the rendering viewport width.
@@ -1444,13 +1444,13 @@ int Window_viewportHeight(const Window *window) {
 }
 
 // Alias the client width through the viewport points compatibility accessor.
-float Window_viewportWidthPoints(const Window *window) {
-   return (float) Window_width((Window*) window);
+f32 Window_viewportWidthPoints(const Window *window) {
+   return (f32) Window_width((Window*) window);
 }
 
 // Alias the client height through the viewport points compatibility accessor.
-float Window_viewportHeightPoints(const Window *window) {
-   return (float) Window_height((Window*) window);
+f32 Window_viewportHeightPoints(const Window *window) {
+   return (f32) Window_height((Window*) window);
 }
 
 // Return the full outer-window width in physical pixels.
@@ -1464,13 +1464,13 @@ int Window_windowHeight(const Window *window) {
 }
 
 // Return the full outer-window width through the points compatibility API.
-float Window_windowWidthPoints(const Window *window) {
-   return (float) Window_width((Window*) window);
+f32 Window_windowWidthPoints(const Window *window) {
+   return (f32) Window_width((Window*) window);
 }
 
 // Return the full outer-window height through the points compatibility API.
-float Window_windowHeightPoints(const Window *window) {
-   return (float) Window_height((Window*) window);
+f32 Window_windowHeightPoints(const Window *window) {
+   return (f32) Window_height((Window*) window);
 }
 
 // Resize the HWND so its client area matches the requested physical dimensions.
@@ -1690,8 +1690,8 @@ bool Window_isViewportFlushToTop(const Window *window) {
 }
 
 // Forward the compatibility request to the inert viewport-flush setter.
-void Window_setFloatingTrafficLights(Window *window, bool floating) {
-   Window_setViewportFlushToTop(window, floating);
+void Window_setFloatingTrafficLights(Window *window, bool f32ing) {
+   Window_setViewportFlushToTop(window, f32ing);
 }
 
 // Map a public traffic-light enum value to its native button slot, if any.
@@ -1722,7 +1722,7 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
 }
 
 ;;PLATFORM_EXCLUSIVE("macOS")
-void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y) {
+void Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
    (void) window;
    (void) x;
    (void) y;
@@ -1730,7 +1730,7 @@ void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y
 }
 
 ;;PLATFORM_EXCLUSIVE("macOS")
-void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *outX, float *outY) {
+void Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY) {
    (void) window;
    fprintf(stderr, "window: Window_macOS_getTrafficLightHeaderPosition is macOS-only (needs a Mac machine)\n");
    if (outX)
@@ -1740,7 +1740,7 @@ void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *out
 }
 
 // Apply the requested alpha to the layered HWND through User32.
-void Window_setOpacity(Window *window, float opacity) {
+void Window_setOpacity(Window *window, f32 opacity) {
    if (window == nullptr)
       return;
    LONG_PTR ex = GetWindowLongPtr((*window).hwnd, GWL_EXSTYLE);
@@ -2015,14 +2015,14 @@ bool Window_present(Window *window, const Buffer *frame) {
       return false;
    if (Window_width(window) <= 0 || Window_height(window) <= 0)
       return false;
-   uint32_t fw = (*frame).width;
-   uint32_t fh = (*frame).height;
+   u32 fw = (*frame).width;
+   u32 fh = (*frame).height;
    if (fw == 0 || fh == 0)
       return false;
-   uint32_t chans = (*frame).channels;
+   u32 chans = (*frame).channels;
    if (chans != 4 && chans != 3 && chans != 1)
       return false;
-   size_t Bytes = (size_t) fw * (size_t) fh * 4u;
+   bytes Bytes = (bytes) fw * (bytes) fh * 4u;
    if (Bytes == 0)
       return false;
    // Reuse the staging slot when the frame dimensions are unchanged; grow it
@@ -2035,12 +2035,12 @@ bool Window_present(Window *window, const Buffer *frame) {
       (*window).frameW = (int) fw;
       (*window).frameH = (int) fh;
    }
-   const uint64_t *data = (*frame).data;
+   const u64 *data = (*frame).data;
    unsigned char *dst = (*window).framePixels;
-   for (uint32_t y = 0; y < fh; y++) {
-      for (uint32_t x = 0; x < fw; x++) {
-         size_t i = (size_t) y * fw + x;
-         uint64_t px = data[i];
+   for (u32 y = 0; y < fh; y++) {
+      for (u32 x = 0; x < fw; x++) {
+         bytes i = (bytes) y * fw + x;
+         u64 px = data[i];
          dst[4 * i + 0] = (unsigned char) ((px >> 16) & 0xFFu); // R (ColorBuffer order)
          dst[4 * i + 1] = (unsigned char) ((px >> 8) & 0xFFu);  // G
          dst[4 * i + 2] = (unsigned char) ((px >> 0) & 0xFFu);  // B
@@ -2144,7 +2144,7 @@ void Window_dispatchEvents(Window *window) {
 
 // --- Focus (the spotlight: one focused window per machine) -------------------
 
-uint32_t Window_id(Window *window) {
+u32 Window_id(Window *window) {
    return window ? (*window).id : FOCUS_BROADCAST;
 }
 
@@ -2185,13 +2185,13 @@ WindowEvent *Window_getLifecycle(Window *window) {
 
 // --- Monitor identity --------------------------------------------------------
 
-uint32_t Window_getMonitorId(const Window *window) {
+u32 Window_getMonitorId(const Window *window) {
    return window ? atomic_load_explicit(&(*window).monitorId, memory_order_acquire) : 0;
 }
 
 // --- Resize reflection -------------------------------------------------------
 
-uint64_t Window_sizeGeneration(Window *window) {
+u64 Window_sizeGeneration(Window *window) {
    if (window == nullptr)
       return 0;
    return atomic_load_explicit(&(*window).sizeGeneration, memory_order_acquire);
@@ -2307,20 +2307,20 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   struct xdg_toplevel *topLevel;     // the window chrome (owned)
  *   char *title;                       // strdup'd title (owned, xdg lifetime)
  *   WindowEvent lifecycle;             // OS lifecycle registry
- *   uint32_t id;                       // engine window id (1..N, 0 = broadcast)
+ *   u32 id;                       // engine window id (1..N, 0 = broadcast)
  *   _Atomic bool shouldClose;          // true once close requested
- *   _Atomic uint64_t sizeGeneration;   // resize-reflection counter
+ *   _Atomic u64 sizeGeneration;   // resize-reflection counter
  *   _Atomic int cachedWidth;           // surface width at last configure
  *   _Atomic int cachedHeight;          // surface height at last configure
  *   _Atomic bool liveResizing;         // set during interactive configure flurries
  *   _Atomic int presentMode;           // present pacing (FIFO/IMMEDIATE), stored
  *   _Atomic bool transparent;          // composite transparency request, stored
- *   _Atomic uint64_t renderGeneration; // policy-reflection counter
+ *   _Atomic u64 renderGeneration; // policy-reflection counter
  *   _Atomic(void*) topLayer;           // content board handle
  *   _Atomic(void*) bottomLayer;        // scene board handle
  *   _Atomic bool enabled;              // false mutes ALL OS input
  *   bool lastFocused;                  // keyboard-enter flip detection
- *   _Atomic uint32_t monitorId;        // wl_output slot id (0 = unmapped)
+ *   _Atomic u32 monitorId;        // wl_output slot id (0 = unmapped)
  *   WindowCursorType cursorType;       // current cursor request
  *   bool decorated;                    // chrome mode (decoration is SSD-owned)
  *   bool fullscreen;                   // xdg toplevel fullscreen state
@@ -2333,12 +2333,12 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   bool closableEnabled;              // stored chrome gate (SSD-owned)
  *   bool minimizeEnabled;              // stored chrome gate (SSD-owned)
  *   bool clickThrough;                 // empty input region when true
- *   float opacity;                     // stored; no base protocol (;;INTENTION)
+ *   f32 opacity;                     // stored; no base protocol (;;INTENTION)
  *   bool shadow;                       // stored; SSD-owned (;;INTENTION)
  *   int frameW, frameH;                // retained shm staging size in px
  *   struct wl_buffer *shmBuffer;       // retained staging buffer (rebuilt on size)
  *   void *shmMap;                      // retained pool mapping (the staging target)
- *   size_t shmSize;                    // current pool capacity in Bytes
+ *   bytes shmSize;                    // current pool capacity in Bytes
  *   WindowResizeRenderFn resizeRenderFn;   // resize-cadence render hook
  *   void *resizeRenderUserdata;        // hook userdata
  *
@@ -2349,7 +2349,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *     Window *handle;               // C handle owning that surface
  *   WaylandOutput                   — wl_output slot record
  *     struct wl_output *output;     // compositor output (may be nulled)
- *     uint32_t id;                  // stable engine id (index + 1)
+ *     u32 id;                  // stable engine id (index + 1)
  *   waylandConnect() / waylandDrain()
  *   windowRefreshSize, waylandOutputIdFor, keyFromKeycode, mirrorModifiers
  *   pointerSetCursorFor, routePointer, routeTouch
@@ -2430,7 +2430,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   - Window_setNaked(window, naked)
  *   - Window_setBorderless(window, borderless)
  *   - Window_setViewportFlushToTop(window, flush) : macOS-only no-op
- *   - Window_setFloatingTrafficLights(window, floating) : macOS-only no-op
+ *   - Window_setFloatingTrafficLights(window, f32ing) : macOS-only no-op
  *   - Window_macOS_setTrafficLightButtonVisible(window, light, visible) : macOS-only stub
  *   - Window_macOS_setTrafficLightHeaderPosition(window, x, y) : macOS-only stub
  *   - Window_setOpacity(window, opacity)    : stored (;;INTENTION)
@@ -2526,8 +2526,8 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 ;;INTENTION("Window_setDRM has no Wayland analogue; stored-and-inert so the "
          "surface stays stable.")
 
-// Multi-tap window for double-click style counting (legacy parity: 250ms).
-static const uint64_t kTapThresholdNanos = 250000000ULL;
+// Multi-tap window for d64-click style counting (legacy parity: 250ms).
+static const u64 kTapThresholdNanos = 250000000ULL;
 
 // --- Global compositor state (one connection, many windows) ------------------
 
@@ -2567,9 +2567,9 @@ struct Window {
    struct xdg_toplevel *topLevel;
    char *title;
    WindowEvent lifecycle;
-   uint32_t id;
+   u32 id;
    _Atomic bool shouldClose;
-   _Atomic uint64_t sizeGeneration;
+   _Atomic u64 sizeGeneration;
    _Atomic int cachedWidth;
    _Atomic int cachedHeight;
    _Atomic bool liveResizing;
@@ -2577,7 +2577,7 @@ struct Window {
    // Pure-state reflection words (no GPU calls in this file).
    _Atomic int presentMode;
    _Atomic bool transparent;
-   _Atomic uint64_t renderGeneration;
+   _Atomic u64 renderGeneration;
 
    // Board slots — opaque layer handles consumed by graphvex/darling; this
    // window stores them, never dereferences them. Panels live on the Frame.
@@ -2587,7 +2587,7 @@ struct Window {
    _Atomic bool enabled;
    _Atomic bool keyEnabled; // stored; OS-level key refusal is Cocoa-only for now
    bool lastFocused;
-   _Atomic uint32_t monitorId;
+   _Atomic u32 monitorId;
    WindowCursorType cursorType;
 
    // Chrome: stored gates (SSD owns the actual decoration).
@@ -2604,7 +2604,7 @@ struct Window {
    bool closableEnabled;
    bool minimizeEnabled;
    bool clickThrough;
-   float opacity;
+   f32 opacity;
    bool shadow;
 
    // Software present path (retained wl_shm staging, mirror of the retired
@@ -2613,7 +2613,7 @@ struct Window {
    int frameH;
    struct wl_buffer *shmBuffer;
    void *shmMap;
-   size_t shmSize;
+   bytes shmSize;
 
    WindowResizeRenderFn resizeRenderFn;
    void *resizeRenderUserdata;
@@ -2630,15 +2630,15 @@ typedef struct WindowSlot {
 } WindowSlot;
 
 static WindowSlot *sRefs = nullptr;
-static uint32_t sRefCap = 0;
+static u32 sRefCap = 0;
 
 // Grow the surface-to-window registry geometrically and clear the new slots.
 static bool windowRefsGrow(void) {
-   uint32_t nextCap = (sRefCap == 0) ? 8u : sRefCap * 2u;
-   WindowSlot *grown = (WindowSlot*) realloc(sRefs, (size_t) nextCap * sizeof(WindowSlot));
+   u32 nextCap = (sRefCap == 0) ? 8u : sRefCap * 2u;
+   WindowSlot *grown = (WindowSlot*) realloc(sRefs, (bytes) nextCap * sizeof(WindowSlot));
    if (grown == nullptr)
       return false;
-   for (uint32_t i = sRefCap; i < nextCap; i++) {
+   for (u32 i = sRefCap; i < nextCap; i++) {
       grown[i].surface = nullptr;
       grown[i].handle = nullptr;
    }
@@ -2648,10 +2648,10 @@ static bool windowRefsGrow(void) {
 }
 
 // Assign a reusable non-broadcast id to a surface and its owning C handle.
-static uint32_t windowIdAcquire(struct wl_surface *surface, Window *handle) {
+static u32 windowIdAcquire(struct wl_surface *surface, Window *handle) {
    if (sRefCap == 0 && !windowRefsGrow())
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < sRefCap; i++) {
+   for (u32 i = 1; i < sRefCap; i++) {
       if (sRefs[i].surface == nullptr) {
          sRefs[i].surface = surface;
          sRefs[i].handle = handle;
@@ -2660,7 +2660,7 @@ static uint32_t windowIdAcquire(struct wl_surface *surface, Window *handle) {
    }
    if (!windowRefsGrow())
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < sRefCap; i++) {
+   for (u32 i = 1; i < sRefCap; i++) {
       if (sRefs[i].surface == nullptr) {
          sRefs[i].surface = surface;
          sRefs[i].handle = handle;
@@ -2671,7 +2671,7 @@ static uint32_t windowIdAcquire(struct wl_surface *surface, Window *handle) {
 }
 
 // Clear a live registry slot when its window is destroyed.
-static void windowIdRelease(uint32_t id) {
+static void windowIdRelease(u32 id) {
    if (id != FOCUS_BROADCAST && id < sRefCap) {
       sRefs[id].surface = nullptr;
       sRefs[id].handle = nullptr;
@@ -2679,10 +2679,10 @@ static void windowIdRelease(uint32_t id) {
 }
 
 // Reverse lookup: which engine id does this surface carry? 0 if unknown.
-static uint32_t windowIdOf(struct wl_surface *surface) {
+static u32 windowIdOf(struct wl_surface *surface) {
    if (surface == nullptr)
       return FOCUS_BROADCAST;
-   for (uint32_t i = 1; i < sRefCap; i++)
+   for (u32 i = 1; i < sRefCap; i++)
       if (sRefs[i].surface == surface)
          return i;
    return FOCUS_BROADCAST;
@@ -2691,7 +2691,7 @@ static uint32_t windowIdOf(struct wl_surface *surface) {
 static Window *windowHandleOf(struct wl_surface *surface) {
    if (surface == nullptr)
       return nullptr;
-   for (uint32_t i = 1; i < sRefCap; i++)
+   for (u32 i = 1; i < sRefCap; i++)
       if (sRefs[i].surface == surface)
          return sRefs[i].handle;
    return nullptr;
@@ -2701,16 +2701,16 @@ static Window *windowHandleOf(struct wl_surface *surface) {
 
 typedef struct WaylandOutput {
    struct wl_output *output;
-   uint32_t id;
+   u32 id;
 } WaylandOutput;
 
 static WaylandOutput *sOutputs = nullptr;
-static uint32_t sOutputCount = 0;
-static uint32_t sOutputCap = 0;
+static u32 sOutputCount = 0;
+static u32 sOutputCap = 0;
 
 // Resolve an output proxy to its stable engine-facing monitor id.
-static uint32_t waylandOutputIdFor(struct wl_output *output) {
-   for (uint32_t i = 0; i < sOutputCount; i++)
+static u32 waylandOutputIdFor(struct wl_output *output) {
+   for (u32 i = 0; i < sOutputCount; i++)
       if (sOutputs[i].output == output)
          return sOutputs[i].id;
    return 0;
@@ -2773,7 +2773,7 @@ static void waylandDrain(void) {
 // --- xdg-shell listeners -----------------------------------------------------
 
 // Acknowledge each compositor configure serial for this surface.
-static void xdgSurfaceConfigure(void *data, struct xdg_surface *surface, uint32_t serial) {
+static void xdgSurfaceConfigure(void *data, struct xdg_surface *surface, u32 serial) {
    Window *window = (Window*) data;
    if (window == nullptr)
       return;
@@ -2785,14 +2785,14 @@ static const struct xdg_surface_listener sXdgSurfaceListener = {
 };
 
 // Reflect compositor state, resize and restore notifications into the C window.
-static void toplevelConfigure(void *data, struct xdg_toplevel *topLevel, int32_t width,
-                       int32_t height, struct wl_array *states) {
+static void toplevelConfigure(void *data, struct xdg_toplevel *topLevel, i32 width,
+                       i32 height, struct wl_array *states) {
    Window *window = (Window*) data;
    if (window == nullptr)
       return;
    (void) topLevel;
    bool fs = false;
-   uint32_t *state = nullptr;
+   u32 *state = nullptr;
    wl_array_for_each(state, states) {
       if (*state == XDG_TOPLEVEL_STATE_FULLSCREEN)
          fs = true;
@@ -2834,7 +2834,7 @@ static const struct xdg_toplevel_listener sToplevelListener = {
 };
 
 // Reply to the compositor's xdg-shell liveness ping.
-static void wmBasePing(void *data, struct xdg_wm_base *wmBase, uint32_t serial) {
+static void wmBasePing(void *data, struct xdg_wm_base *wmBase, u32 serial) {
    (void) data;
    xdg_wm_base_pong(wmBase, serial);
 }
@@ -2908,7 +2908,7 @@ static int keyFromSym(xkb_keysym_t sym) {
 static void mirrorModifiers(Window *window) {
    if (window == nullptr || gXkbState == nullptr)
       return;
-   uint32_t wid = (*window).id;
+   u32 wid = (*window).id;
    bool shift = xkb_state_mod_name_is_active(gXkbState, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) != 0;
    if (shift != Key_isDown(KEY_LEFT_SHIFT))
       Key_pushEvent(wid, KEY_LEFT_SHIFT, shift ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
@@ -2923,15 +2923,15 @@ static void mirrorModifiers(Window *window) {
       Key_pushEvent(wid, KEY_LEFT_SUPER, super ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
 }
 
-static void keyboardKeymap(void *data, struct wl_keyboard *keyboard, uint32_t format,
-                     int32_t fd, uint32_t size) {
+static void keyboardKeymap(void *data, struct wl_keyboard *keyboard, u32 format,
+                     i32 fd, u32 size) {
    (void) data;
    (void) keyboard;
    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || size == 0) {
       close(fd);
       return;
    }
-   char *mapStr = (char*) mmap(nullptr, (size_t) size, PROT_READ, MAP_PRIVATE, fd, 0);
+   char *mapStr = (char*) mmap(nullptr, (bytes) size, PROT_READ, MAP_PRIVATE, fd, 0);
    if (mapStr == MAP_FAILED) {
       close(fd);
       return;
@@ -2950,7 +2950,7 @@ static void keyboardKeymap(void *data, struct wl_keyboard *keyboard, uint32_t fo
    gXkbState = xkb_state_new(gKeymap);
 }
 
-static void keyboardEnter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+static void keyboardEnter(void *data, struct wl_keyboard *keyboard, u32 serial,
                     struct wl_surface *surface, struct wl_array *keys) {
    (void) keyboard;
    (void) serial;
@@ -2964,7 +2964,7 @@ static void keyboardEnter(void *data, struct wl_keyboard *keyboard, uint32_t ser
    Focus_set((*window).id);
 }
 
-static void keyboardLeave(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+static void keyboardLeave(void *data, struct wl_keyboard *keyboard, u32 serial,
                     struct wl_surface *surface) {
    (void) keyboard;
    (void) serial;
@@ -2977,15 +2977,15 @@ static void keyboardLeave(void *data, struct wl_keyboard *keyboard, uint32_t ser
    windowRefreshFocus(window, false);
 }
 
-static void keyboardKey(void *data, struct wl_keyboard *keyboard, uint32_t serial,
-                  uint32_t time, uint32_t key, uint32_t state) {
+static void keyboardKey(void *data, struct wl_keyboard *keyboard, u32 serial,
+                  u32 time, u32 key, u32 state) {
    (void) keyboard;
    (void) serial;
    (void) time;
    Window *window = (Window*) data;
    if (window == nullptr || gXkbState == nullptr)
       return;
-   uint32_t wid = (*window).id;
+   u32 wid = (*window).id;
    int evdev = (int) key - 8;
    int code = (evdev >= 0 && evdev < 256) ? sEvdevMap[evdev] : -1;
    if (code == -1) {
@@ -3001,18 +3001,18 @@ static void keyboardKey(void *data, struct wl_keyboard *keyboard, uint32_t seria
       Key_pushEvent(wid, code, down ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
    if (down) {
       char utf[8] = {0};
-      int n = xkb_state_key_get_utf8(gXkbState, key, utf, (size_t) sizeof(utf) - 1);
+      int n = xkb_state_key_get_utf8(gXkbState, key, utf, (bytes) sizeof(utf) - 1);
       if (n > 0)
          for (int i = 0; i < n; i++)
-            Key_pushCharEvent(wid, (uint32_t) (unsigned char) utf[i]);
+            Key_pushCharEvent(wid, (u32) (unsigned char) utf[i]);
    }
    xkb_state_update_key(gXkbState, key, down ? XKB_KEY_DOWN : XKB_KEY_UP);
    mirrorModifiers(window);
 }
 
-static void keyboardModifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
-                       uint32_t modsDepressed, uint32_t modsLatched,
-                       uint32_t modsLocked, uint32_t group) {
+static void keyboardModifiers(void *data, struct wl_keyboard *keyboard, u32 serial,
+                       u32 modsDepressed, u32 modsLatched,
+                       u32 modsLocked, u32 group) {
    (void) keyboard;
    (void) serial;
    Window *window = (Window*) data;
@@ -3023,7 +3023,7 @@ static void keyboardModifiers(void *data, struct wl_keyboard *keyboard, uint32_t
 }
 
 static void keyboardRepeatInfo(void *data, struct wl_keyboard *keyboard,
-                        int32_t rate, int32_t delay) {
+                        i32 rate, i32 delay) {
    (void) data;
    (void) keyboard;
    (void) rate;
@@ -3056,7 +3056,7 @@ static const char *cursorName(WindowCursorType type) {
 }
 
 // Apply the requested cursor using the current pointer serial and shared theme.
-static void pointerSetCursorFor(uint32_t serial, WindowCursorType type) {
+static void pointerSetCursorFor(u32 serial, WindowCursorType type) {
    if (gPointer == nullptr)
       return;
    if (type == WINDOW_CURSOR_HIDDEN) {
@@ -3089,7 +3089,7 @@ static void pointerSetCursorFor(uint32_t serial, WindowCursorType type) {
    wl_pointer_set_cursor(gPointer, serial, sCursorSurface, (int) (*img).hotspot_x, (int) (*img).hotspot_y);
 }
 
-static void pointerEnter(void *data, struct wl_pointer *pointer, uint32_t serial,
+static void pointerEnter(void *data, struct wl_pointer *pointer, u32 serial,
                    struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy) {
    (void) data;
    (void) serial;
@@ -3098,10 +3098,10 @@ static void pointerEnter(void *data, struct wl_pointer *pointer, uint32_t serial
    Window *window = windowHandleOf(surface);
    if (window == nullptr || !atomic_load_explicit(&(*window).enabled, memory_order_relaxed))
       return;
-   Mouse_pushMoveEvent((*window).id, wl_fixed_to_double(sx), wl_fixed_to_double(sy));
+   Mouse_pushMoveEvent((*window).id, wl_fixed_to_f64(sx), wl_fixed_to_f64(sy));
 }
 
-static void pointerLeave(void *data, struct wl_pointer *pointer, uint32_t serial,
+static void pointerLeave(void *data, struct wl_pointer *pointer, u32 serial,
                    struct wl_surface *surface) {
    (void) data;
    (void) pointer;
@@ -3110,7 +3110,7 @@ static void pointerLeave(void *data, struct wl_pointer *pointer, uint32_t serial
    sPointerSurface = nullptr;
 }
 
-static void pointerMotion(void *data, struct wl_pointer *pointer, uint32_t time,
+static void pointerMotion(void *data, struct wl_pointer *pointer, u32 time,
                     wl_fixed_t sx, wl_fixed_t sy) {
    (void) data;
    (void) pointer;
@@ -3118,13 +3118,13 @@ static void pointerMotion(void *data, struct wl_pointer *pointer, uint32_t time,
    Window *win = windowHandleOf(sPointerSurface);
    if (win == nullptr || !atomic_load_explicit(&(*win).enabled, memory_order_relaxed))
       return;
-   double x = wl_fixed_to_double(sx);
-   double y = wl_fixed_to_double(sy);
+   d64 x = wl_fixed_to_f64(sx);
+   d64 y = wl_fixed_to_f64(sy);
    if ((*win).cursorType == WINDOW_CURSOR_HIDDEN) {
       // Cursor-lock path: the compositor owns the pointer, we only emit
       // deltas from successive absolute positions (Wayland has no warp).
-      static double sLastX = 0.0;
-      static double sLastY = 0.0;
+      static d64 sLastX = 0.0;
+      static d64 sLastY = 0.0;
       static bool sHasLast = false;
       if (sHasLast)
          Mouse_pushMoveDeltaEvent((*win).id, x - sLastX, y - sLastY);
@@ -3136,8 +3136,8 @@ static void pointerMotion(void *data, struct wl_pointer *pointer, uint32_t time,
    Mouse_pushMoveEvent((*win).id, x, y);
 }
 
-static void pointerButton(void *data, struct wl_pointer *pointer, uint32_t serial,
-                    uint32_t time, uint32_t button, uint32_t state) {
+static void pointerButton(void *data, struct wl_pointer *pointer, u32 serial,
+                    u32 time, u32 button, u32 state) {
    (void) data;
    (void) pointer;
    (void) time;
@@ -3161,15 +3161,15 @@ static void pointerButton(void *data, struct wl_pointer *pointer, uint32_t seria
    pointerSetCursorFor(serial, (*win).cursorType);
 }
 
-static void pointerAxis(void *data, struct wl_pointer *pointer, uint32_t time,
-                  uint32_t axis, wl_fixed_t value) {
+static void pointerAxis(void *data, struct wl_pointer *pointer, u32 time,
+                  u32 axis, wl_fixed_t value) {
    (void) data;
    (void) pointer;
    (void) time;
    Window *win = windowHandleOf(sPointerSurface);
    if (win == nullptr || !atomic_load_explicit(&(*win).enabled, memory_order_relaxed))
       return;
-   double v = wl_fixed_to_double(value);
+   d64 v = wl_fixed_to_f64(value);
    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL)
       Mouse_pushScrollEvent((*win).id, 0.0, v);
    else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL)
@@ -3193,8 +3193,8 @@ static const struct wl_pointer_listener sPointerListener = {
 
 // --- Touch -------------------------------------------------------------------
 
-static void touchDown(void *data, struct wl_touch *touch, uint32_t serial,
-                 uint32_t time, struct wl_surface *surface, int32_t id,
+static void touchDown(void *data, struct wl_touch *touch, u32 serial,
+                 u32 time, struct wl_surface *surface, i32 id,
                  wl_fixed_t sx, wl_fixed_t sy) {
    (void) data;
    (void) touch;
@@ -3205,11 +3205,11 @@ static void touchDown(void *data, struct wl_touch *touch, uint32_t serial,
       return;
    int slot = (int) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_DOWN,
-      wl_fixed_to_double(sx), wl_fixed_to_double(sy), 1.0, kTapThresholdNanos);
+      wl_fixed_to_f64(sx), wl_fixed_to_f64(sy), 1.0, kTapThresholdNanos);
 }
 
-static void touchUp(void *data, struct wl_touch *touch, uint32_t serial, uint32_t time,
-               int32_t id) {
+static void touchUp(void *data, struct wl_touch *touch, u32 serial, u32 time,
+               i32 id) {
    (void) data;
    (void) touch;
    (void) serial;
@@ -3221,7 +3221,7 @@ static void touchUp(void *data, struct wl_touch *touch, uint32_t serial, uint32_
    Touch_pushTouchEvent((*win).id, slot, TOUCH_UP, 0.0, 0.0, 0.0, kTapThresholdNanos);
 }
 
-static void touchMotion(void *data, struct wl_touch *touch, uint32_t time, int32_t id,
+static void touchMotion(void *data, struct wl_touch *touch, u32 time, i32 id,
                   wl_fixed_t sx, wl_fixed_t sy) {
    (void) data;
    (void) touch;
@@ -3231,11 +3231,11 @@ static void touchMotion(void *data, struct wl_touch *touch, uint32_t time, int32
       return;
    int slot = (int) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_MOVE,
-      wl_fixed_to_double(sx), wl_fixed_to_double(sy), 1.0, kTapThresholdNanos);
+      wl_fixed_to_f64(sx), wl_fixed_to_f64(sy), 1.0, kTapThresholdNanos);
 }
 
-static void touchCancel(void *data, struct wl_touch *touch, uint32_t serial, uint32_t time,
-                  int32_t id) {
+static void touchCancel(void *data, struct wl_touch *touch, u32 serial, u32 time,
+                  i32 id) {
    (void) data;
    (void) touch;
    (void) serial;
@@ -3263,7 +3263,7 @@ static const struct wl_touch_listener sTouchListener = {
 
 // --- Seat --------------------------------------------------------------------
 
-static void seatCapabilities(void *data, struct wl_seat *seat, uint32_t capabilities) {
+static void seatCapabilities(void *data, struct wl_seat *seat, u32 capabilities) {
    (void) data;
    if ((capabilities & WL_SEAT_CAPABILITY_POINTER) != 0 && gPointer == nullptr) {
       gPointer = wl_seat_get_pointer(seat);
@@ -3294,9 +3294,9 @@ static const struct wl_seat_listener sSeatListener = {
 
 // --- Output ------------------------------------------------------------------
 
-static void outputGeometry(void *data, struct wl_output *output, int32_t x, int32_t y,
-                     int32_t physicalWidth, int32_t physicalHeight, int32_t subpixel,
-                     const char *make, const char *model, int32_t transform) {
+static void outputGeometry(void *data, struct wl_output *output, i32 x, i32 y,
+                     i32 physicalWidth, i32 physicalHeight, i32 subpixel,
+                     const char *make, const char *model, i32 transform) {
    (void) data;
    (void) output;
    (void) x;
@@ -3309,8 +3309,8 @@ static void outputGeometry(void *data, struct wl_output *output, int32_t x, int3
    (void) transform;
 }
 
-static void outputMode(void *data, struct wl_output *output, uint32_t flags,
-                  int32_t width, int32_t height, int32_t refresh) {
+static void outputMode(void *data, struct wl_output *output, u32 flags,
+                  i32 width, i32 height, i32 refresh) {
    (void) data;
    (void) output;
    (void) flags;
@@ -3334,8 +3334,8 @@ static const struct wl_output_listener sOutputListener = {
 // Register an output proxy and assign its session-stable monitor id.
 static void outputAdd(struct wl_output *output) {
    if (sOutputCount == sOutputCap) {
-      uint32_t nextCap = (sOutputCap == 0) ? 4u : sOutputCap * 2u;
-      WaylandOutput *grown = (WaylandOutput*) realloc(sOutputs, (size_t) nextCap * sizeof(WaylandOutput));
+      u32 nextCap = (sOutputCap == 0) ? 4u : sOutputCap * 2u;
+      WaylandOutput *grown = (WaylandOutput*) realloc(sOutputs, (bytes) nextCap * sizeof(WaylandOutput));
       if (grown == nullptr)
          return;
       sOutputs = grown;
@@ -3348,7 +3348,7 @@ static void outputAdd(struct wl_output *output) {
 
 // Mark a removed output slot inactive without renumbering other monitors.
 static void outputRemove(struct wl_output *output) {
-   for (uint32_t i = 0; i < sOutputCount; i++)
+   for (u32 i = 0; i < sOutputCount; i++)
       if (sOutputs[i].output == output) {
          sOutputs[i].output = nullptr;
          return;
@@ -3362,7 +3362,7 @@ static void surfaceEnter(void *data, struct wl_surface *surface, struct wl_outpu
    if (window == nullptr)
       return;
    (void) surface;
-   uint32_t id = waylandOutputIdFor(output);
+   u32 id = waylandOutputIdFor(output);
    if (id != 0)
       atomic_store_explicit(&(*window).monitorId, id, memory_order_relaxed);
 }
@@ -3384,8 +3384,8 @@ static const struct wl_surface_listener sSurfaceListener = {
 
 // --- Registry ----------------------------------------------------------------
 
-static void registryGlobal(void *data, struct wl_registry *registry, uint32_t name,
-                     const char *interface, uint32_t version) {
+static void registryGlobal(void *data, struct wl_registry *registry, u32 name,
+                     const char *interface, u32 version) {
    (void) data;
    if (strcmp(interface, wl_compositor_interface.name) == 0) {
       if (gCompositor == nullptr)
@@ -3417,7 +3417,7 @@ static void registryGlobal(void *data, struct wl_registry *registry, uint32_t na
 }
 
 // Ignore registry removals; bound globals remain owned until disconnect.
-static void registryGlobalRemove(void *data, struct wl_registry *registry, uint32_t name) {
+static void registryGlobalRemove(void *data, struct wl_registry *registry, u32 name) {
    (void) data;
    (void) registry;
    (void) name;
@@ -3493,14 +3493,14 @@ static void waylandDisconnect(void) {
 
 // --- Software present (retained wl_shm pool + buffer) ------------------------
 
-static uint32_t sShmNameSeq = 0;
+static u32 sShmNameSeq = 0;
 
 // Rebuild the retained shm buffer + mapping when the frame size changes. A
 // fresh pool is created when the size grows so the compositor can still be
 // holding the old buffer; the pool object dies right after the buffer is
 // created (the buffer keeps the pool's memory alive server-side).
 static bool windowEnsureShm(Window *window, int w, int h) {
-   size_t Bytes = (size_t) w * (size_t) h * 4u;
+   bytes Bytes = (bytes) w * (bytes) h * 4u;
    if ((*window).shmBuffer && (*window).frameW == w && (*window).frameH == h)
       return (*window).shmMap != nullptr;
    if ((*window).shmBuffer) {
@@ -3761,7 +3761,7 @@ bool Window_isTransparent(const Window *window) {
 }
 
 // Read the render-policy generation with acquire ordering.
-uint64_t Window_renderGeneration(const Window *window) {
+u64 Window_renderGeneration(const Window *window) {
    return window ? atomic_load_explicit(&(*window).renderGeneration, memory_order_acquire) : 0;
 }
 
@@ -3852,7 +3852,7 @@ int Window_height(Window *window) {
 }
 
 // Report unit scale because this Wayland mirror has no fractional-scale support.
-float Window_getScale(const Window *window) {
+f32 Window_getScale(const Window *window) {
    (void) window;
    return 1.0f;
 }
@@ -3863,24 +3863,24 @@ void Window_revalidate(Window *window) {
 }
 
 // Forward logical-size requests to the integer pixel sizing seam.
-void Window_setSizePoints(Window *window, float width, float height) {
+void Window_setSizePoints(Window *window, f32 width, f32 height) {
    Window_setSize(window, (int) width, (int) height);
 }
 
 // Project cached pixel dimensions into the compatibility points outputs.
-void Window_getSizePoints(const Window *window, float *outWidth, float *outHeight) {
-   if (outWidth) *outWidth = (float) Window_width(window);
-   if (outHeight) *outHeight = (float) Window_height(window);
+void Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
+   if (outWidth) *outWidth = (f32) Window_width(window);
+   if (outHeight) *outHeight = (f32) Window_height(window);
 }
 
 // Return the cached width through the points compatibility accessor.
-float Window_widthPoints(const Window *window) {
-   return (float) Window_width(window);
+f32 Window_widthPoints(const Window *window) {
+   return (f32) Window_width(window);
 }
 
 // Return the cached height through the points compatibility accessor.
-float Window_heightPoints(const Window *window) {
-   return (float) Window_height(window);
+f32 Window_heightPoints(const Window *window) {
+   return (f32) Window_height(window);
 }
 
 // Alias the client width as the viewport width.
@@ -3894,13 +3894,13 @@ int Window_viewportHeight(const Window *window) {
 }
 
 // Alias the logical width as the viewport width in points.
-float Window_viewportWidthPoints(const Window *window) {
-   return (float) Window_width(window);
+f32 Window_viewportWidthPoints(const Window *window) {
+   return (f32) Window_width(window);
 }
 
 // Alias the logical height as the viewport height in points.
-float Window_viewportHeightPoints(const Window *window) {
-   return (float) Window_height(window);
+f32 Window_viewportHeightPoints(const Window *window) {
+   return (f32) Window_height(window);
 }
 
 // Alias the client width as the outer-window width in this backend.
@@ -3914,13 +3914,13 @@ int Window_windowHeight(const Window *window) {
 }
 
 // Alias the logical client width as the outer-window width in points.
-float Window_windowWidthPoints(const Window *window) {
-   return (float) Window_width(window);
+f32 Window_windowWidthPoints(const Window *window) {
+   return (f32) Window_width(window);
 }
 
 // Alias the logical client height as the outer-window height in points.
-float Window_windowHeightPoints(const Window *window) {
-   return (float) Window_height(window);
+f32 Window_windowHeightPoints(const Window *window) {
+   return (f32) Window_height(window);
 }
 
 // The compositor owns geometry on Wayland; setSize only nudges the configure
@@ -4110,10 +4110,10 @@ bool Window_isViewportFlushToTop(const Window *window) {
    return false;
 }
 
-// Retain the macOS floating-lights request without a Wayland implementation.
-void Window_setFloatingTrafficLights(Window *window, bool floating) {
+// Retain the macOS f32ing-lights request without a Wayland implementation.
+void Window_setFloatingTrafficLights(Window *window, bool f32ing) {
    (void) window;
-   (void) floating;
+   (void) f32ing;
 }
 
 // macOS-only traffic-light chrome (the Window_macOS_ infix IS the platform
@@ -4134,14 +4134,14 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
 }
 
 // Retain the macOS-only traffic-light placement API as an inert stub.
-void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y) {
+void Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
    (void) window;
    (void) x;
    (void) y;
 }
 
 // Return zero coordinates because this backend has no native traffic lights.
-void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *outX, float *outY) {
+void Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY) {
    if (outX != nullptr)
       *outX = 0.0f;
    if (outY != nullptr)
@@ -4150,7 +4150,7 @@ void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *out
 }
 
 // Store opacity for consumers; Wayland core has no per-surface opacity request.
-void Window_setOpacity(Window *window, float opacity) {
+void Window_setOpacity(Window *window, f32 opacity) {
    if (window == nullptr)
       return;
    (*window).opacity = opacity;
@@ -4354,9 +4354,9 @@ void Window_workerPresentEnd(void) {
 bool Window_present(Window *window, const Buffer *frame) {
    if (window == nullptr || frame == nullptr)
       return false;
-   const uint32_t fw = (*frame).width;
-   const uint32_t fh = (*frame).height;
-   const uint32_t ch = (*frame).channels;
+   const u32 fw = (*frame).width;
+   const u32 fh = (*frame).height;
+   const u32 ch = (*frame).channels;
    if (fw == 0 || fh == 0 || ch == 0 || ch > 4)
       return false;
    if (!windowEnsureShm(window, (int) fw, (int) fh))
@@ -4366,17 +4366,17 @@ bool Window_present(Window *window, const Buffer *frame) {
    // into the mapped ARGB8888 pool. Straight alpha: the compositor blends it
    // against the desktop — the transparent-swapchain ask, honored for free.
    const unsigned char *src = (const unsigned char*) (*frame).data;
-   size_t srcStride = (size_t) fw * ch;
-   uint32_t *dst = (uint32_t*) (*window).shmMap;
-   for (uint32_t y = 0; y < fh; y++) {
-      const unsigned char *row = src + (size_t) y * srcStride;
-      for (uint32_t x = 0; x < fw; x++) {
+   bytes srcStride = (bytes) fw * ch;
+   u32 *dst = (u32*) (*window).shmMap;
+   for (u32 y = 0; y < fh; y++) {
+      const unsigned char *row = src + (bytes) y * srcStride;
+      for (u32 x = 0; x < fw; x++) {
          unsigned char b = row[x * ch + 0];
          unsigned char g = (ch > 1) ? row[x * ch + 1] : 0u;
          unsigned char r = (ch > 2) ? row[x * ch + 2] : 0u;
          unsigned char a = (ch > 3) ? row[x * ch + 3] : 255u;
-         dst[(size_t) y * fw + x] = ((uint32_t) a << 24)
-            | ((uint32_t) r << 16) | ((uint32_t) g << 8) | (uint32_t) b;
+         dst[(bytes) y * fw + x] = ((u32) a << 24)
+            | ((u32) r << 16) | ((u32) g << 8) | (u32) b;
       }
    }
 
@@ -4440,7 +4440,7 @@ void Window_dispatchEvents(Window *window) {
 
 // --- Focus -------------------------------------------------------------------
 
-uint32_t Window_id(Window *window) {
+u32 Window_id(Window *window) {
    return window ? (*window).id : 0;
 }
 
@@ -4472,13 +4472,13 @@ bool Window_isKeyEnabled(const Window *window) {
 
 // --- Monitor identity --------------------------------------------------------
 
-uint32_t Window_getMonitorId(const Window *window) {
+u32 Window_getMonitorId(const Window *window) {
    return window ? atomic_load_explicit(&(*window).monitorId, memory_order_relaxed) : 0;
 }
 
 // --- Resize reflection -------------------------------------------------------
 
-uint64_t Window_sizeGeneration(Window *window) {
+u64 Window_sizeGeneration(Window *window) {
    return window ? atomic_load_explicit(&(*window).sizeGeneration, memory_order_acquire) : 0;
 }
 
@@ -4625,7 +4625,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   - Window_setViewportFlushToTop(window, flush)
  *   - Window_macOS_setTrafficLightButtonVisible(window, light, visible)
  *   - Window_macOS_setTrafficLightHeaderPosition(window, x, y)
- *   - Window_setFloatingTrafficLights(window, floating)
+ *   - Window_setFloatingTrafficLights(window, f32ing)
  *   - Window_setOpacity(window, opacity)
  *   - Window_setTransparentBackground(window, transparent)
  *   - Window_setAlwaysOnTop(window, onTop)
@@ -4757,7 +4757,7 @@ bool Window_isTransparent(const Window *window) {
 
 // Return the unchanged render-policy generation for this stub backend.
 /** Returns zero because this stub does not track render generations. */
-uint64_t Window_renderGeneration(const Window *window) {
+u64 Window_renderGeneration(const Window *window) {
    (void) window;
    return 0;
 }
@@ -4793,7 +4793,7 @@ void Window_setSize(Window *window, int width, int height) {
 
 // Report the unit scale used by this platform stub.
 /** Returns the unit scale used by this unimplemented backend. */
-float Window_getScale(const Window *window) {
+f32 Window_getScale(const Window *window) {
    (void) window;
    return 1.0f;
 }
@@ -4806,7 +4806,7 @@ void Window_revalidate(Window *window) {
 
 // Accept the logical-size API seam; this backend does not retain geometry.
 /** Windows draft stub: ignores point-size changes. */
-void Window_setSizePoints(Window *window, float width, float height) {
+void Window_setSizePoints(Window *window, f32 width, f32 height) {
    (void) window;
    (void) width;
    (void) height;
@@ -4814,7 +4814,7 @@ void Window_setSizePoints(Window *window, float width, float height) {
 
 // Return zero logical dimensions because the stub creates no native window.
 /** Writes zero dimensions to supplied outputs. */
-void Window_getSizePoints(const Window *window, float *outWidth, float *outHeight) {
+void Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
    (void) window;
    if (outWidth) *outWidth = 0.0f;
    if (outHeight) *outHeight = 0.0f;
@@ -4822,14 +4822,14 @@ void Window_getSizePoints(const Window *window, float *outWidth, float *outHeigh
 
 // Return the stub window's logical width, which is always zero.
 /** Returns zero because point width is unavailable in this stub. */
-float Window_widthPoints(const Window *window) {
+f32 Window_widthPoints(const Window *window) {
    (void) window;
    return 0.0f;
 }
 
 // Return the stub window's logical height, which is always zero.
 /** Returns zero because point height is unavailable in this stub. */
-float Window_heightPoints(const Window *window) {
+f32 Window_heightPoints(const Window *window) {
    (void) window;
    return 0.0f;
 }
@@ -4862,13 +4862,13 @@ int Window_viewportHeight(const Window *window) {
 
 // Expose the logical width through the viewport compatibility accessor.
 /** Returns the window point width through the shared accessor. */
-float Window_viewportWidthPoints(const Window *window) {
+f32 Window_viewportWidthPoints(const Window *window) {
    return Window_widthPoints(window);
 }
 
 // Expose the logical height through the viewport compatibility accessor.
 /** Returns the window point height through the shared accessor. */
-float Window_viewportHeightPoints(const Window *window) {
+f32 Window_viewportHeightPoints(const Window *window) {
    return Window_heightPoints(window);
 }
 
@@ -4886,13 +4886,13 @@ int Window_windowHeight(const Window *window) {
 
 // Alias the logical client width as the full window width.
 /** Returns the window point width through the shared accessor. */
-float Window_windowWidthPoints(const Window *window) {
+f32 Window_windowWidthPoints(const Window *window) {
    return Window_widthPoints(window);
 }
 
 // Alias the logical client height as the full window height.
 /** Returns the window point height through the shared accessor. */
-float Window_windowHeightPoints(const Window *window) {
+f32 Window_windowHeightPoints(const Window *window) {
    return Window_heightPoints(window);
 }
 
@@ -4929,7 +4929,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 
 // Return zero because this backend does not resolve monitor identities.
 /** Returns zero because monitor identity is not implemented. */
-uint32_t Window_getMonitorId(const Window *window) {
+u32 Window_getMonitorId(const Window *window) {
    (void) window;
    return 0;
 }
@@ -5065,9 +5065,9 @@ bool Window_isViewportFlushToTop(const Window *window) {
 }
 
 // Forward the compatibility request to the viewport-flush setter.
-/** Maps the compatibility floating setting to viewport flush behavior. */
-void Window_setFloatingTrafficLights(Window *window, bool floating) {
-   Window_setViewportFlushToTop(window, floating);
+/** Maps the compatibility f32ing setting to viewport flush behavior. */
+void Window_setFloatingTrafficLights(Window *window, bool f32ing) {
+   Window_setViewportFlushToTop(window, f32ing);
 }
 
 ;;PLATFORM_EXCLUSIVE("macOS") // No traffic lights on Win32: needs a Mac to mean anything.
@@ -5090,7 +5090,7 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
 
 ;;PLATFORM_EXCLUSIVE("macOS") // No traffic lights on Win32.
 /** Reports the unsupported macOS-only operation to stderr. */
-void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y) {
+void Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
    (void) window;
    (void) x;
    (void) y;
@@ -5099,7 +5099,7 @@ void Window_macOS_setTrafficLightHeaderPosition(Window *window, float x, float y
 
 ;;PLATFORM_EXCLUSIVE("macOS") // No traffic lights on Win32.
 /** Reports the unsupported query and writes zero to supplied outputs. */
-void Window_macOS_getTrafficLightHeaderPosition(const Window *window, float *outX, float *outY) {
+void Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY) {
    (void) window;
    fprintf(stderr, "window: Window_macOS_getTrafficLightHeaderPosition is macOS-only (needs a Mac machine)\n");
    if (outX)
@@ -5227,12 +5227,12 @@ Window *Window_new(const WindowDesc *desc) {
    return nullptr;
 }
 
-uint32_t Window_id(Window *window) {
+u32 Window_id(Window *window) {
    (void) window;
    return 0;
 }
 
-uint64_t Window_sizeGeneration(Window *window) {
+u64 Window_sizeGeneration(Window *window) {
    (void) window;
    return 0;
 }
@@ -5312,7 +5312,7 @@ void Window_setMovableByBackground(Window *window, bool movable) {
    (void) movable;
 }
 
-void Window_setOpacity(Window *window, float opacity) {
+void Window_setOpacity(Window *window, f32 opacity) {
    (void) window;
    (void) opacity;
 }
@@ -5322,7 +5322,7 @@ void Window_setTransparentBackground(Window *window, bool transparent) {
    (void) transparent;
 }
 
-void Window_setBackdropBlur(Window *window, float radius) {
+void Window_setBackdropBlur(Window *window, f32 radius) {
    (void) window;
    (void) radius;
 }
@@ -5435,7 +5435,7 @@ bool Window_present(Window *window, const Buffer *frame) {
    return false;
 }
 
-void Window_presentRGBA(Window *window, const void *pixels, size_t stride, int width, int height) {
+void Window_presentRGBA(Window *window, const void *pixels, bytes stride, int width, int height) {
    (void) window;
    (void) pixels;
    (void) stride;
@@ -5465,7 +5465,7 @@ void *Window_presentSurfaceContents(const Window *window) {
    return nullptr;
 }
 
-bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, size_t destStride) {
+bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, bytes destStride) {
    (void) window;
    (void) surface;
    (void) destRGBA;
@@ -5473,7 +5473,7 @@ bool Window_readPresentSurface(Window *window, void *surface, void *destRGBA, si
    return false;
 }
 
-bool Window_writePNG(const void *pixels, size_t stride, int width, int height, const char *path) {
+bool Window_writePNG(const void *pixels, bytes stride, int width, int height, const char *path) {
    (void) pixels;
    (void) stride;
    (void) width;
@@ -5500,8 +5500,8 @@ bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *ou
 struct TrafficLight {
    void *window;
    bool lightVisible[TRAFFIC_LIGHT_COUNT];
-   float lightOX;
-   float lightOY;
+   f32 lightOX;
+   f32 lightOY;
 };
 
 /** Fallback stub: creates traffic-light adapter for non-macOS platforms. */
@@ -5549,14 +5549,14 @@ bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton b
 }
 
 /** Fallback stub: setHeaderPosition no-op. */
-void TrafficLight_setHeaderPosition(TrafficLight *self, float x, float y) {
+void TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y) {
    (void) self;
    (void) x;
    (void) y;
 }
 
 /** Fallback stub: getHeaderPosition writes zero coordinates. */
-void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float *outY) {
+void TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY) {
    (void) self;
    if (outX)
       *outX = 0.0f;
@@ -5565,9 +5565,9 @@ void TrafficLight_getHeaderPosition(const TrafficLight *self, float *outX, float
 }
 
 /** Fallback stub: setFloating no-op. */
-void TrafficLight_setFloating(TrafficLight *self, bool floating) {
+void TrafficLight_setFloating(TrafficLight *self, bool f32ing) {
    (void) self;
-   (void) floating;
+   (void) f32ing;
 }
 
 #endif

@@ -57,12 +57,12 @@
  *   char version[APP_MAX_VERSION];         // version string, e.g. "1.2.3"
  *   char iconPath[APP_MAX_ICON_PATH];      // icon path reference (default "")
  *   Window *windows[APP_MAX_WINDOWS];      // registered top-level windows
- *   uint32_t window_count;                 // used slots in windows[]
+ *   u32 window_count;                 // used slots in windows[]
  *   atomic_uint phase;                     // AppPhase: the single lifecycle word
  *   void *hot;                           // reload watcher, opaque (setHot)
  *   AppHotPollFn hotPoll;                // reload poll seam (setHotPoll)
- *   _Atomic uint32_t fps;                  // live telemetry: FPS (graphvex writes)
- *   _Atomic uint32_t frametimeUs;          // live telemetry: frametime in microseconds
+ *   _Atomic u32 fps;                  // live telemetry: FPS (graphvex writes)
+ *   _Atomic u32 frametimeUs;          // live telemetry: frametime in microseconds
  *   AppHotReloadFn hotReloadFn;            // hot-reload notification callback (nullable)
  *   void *hotReloadUserdata;               // userdata for hotReloadFn
  *
@@ -168,7 +168,7 @@ static bool appPhaseActive(AppPhase phase) {
 
 /** IDLE or STOPPED -> STARTING. Refused from every admitted phase. */
 static bool appPhaseBegin(Application *self) {
-    uint32_t expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    u32 expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
     for (;;) {
         if (expected != APP_PHASE_IDLE && expected != APP_PHASE_STOPPED)
             return false;
@@ -180,14 +180,14 @@ static bool appPhaseBegin(Application *self) {
 
 /** STARTING -> RUNNING, by the startup worker (or by begin when it is empty). */
 static void appPhaseAdvance(Application *self) {
-    uint32_t expected = APP_PHASE_STARTING;
+    u32 expected = APP_PHASE_STARTING;
     atomic_compare_exchange_strong_explicit(&(*self).phase, &expected,
         APP_PHASE_RUNNING, memory_order_acq_rel, memory_order_relaxed);
 }
 
 /** Any admitted phase -> CLOSING. Idempotent; a no-op in IDLE/STOPPED. */
 static void appPhaseClose(Application *self) {
-    uint32_t expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    u32 expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
     for (;;) {
         if (!appPhaseActive((AppPhase) expected))
             return;
@@ -238,7 +238,7 @@ void Application_shutdown() {
 static bool appAllWindowsClosed(const Application *self) {
     if ((*self).window_count == 0)
         return (*self).hadWindows;
-    for (uint32_t i = 0; i < (*self).window_count; i++)
+    for (u32 i = 0; i < (*self).window_count; i++)
         if (!Window_shouldClose((*self).windows[i]))
             return false;
     return true;
@@ -248,7 +248,7 @@ static bool appAllWindowsClosed(const Application *self) {
  * Closes each pass by resetting the host transient arena: scratch borrowed
  * during this pass dies here, never across frames or swaps. */
 static void appParkSlice(Application *self) {
-    for (uint32_t i = 0; i < APP_PARK_SLICES; i++) {
+    for (u32 i = 0; i < APP_PARK_SLICES; i++) {
         if (!appPhaseRunning(appPhase(self)))
             return;
         Window_pollEvents(); // the Window pumps its own queue (its job)
@@ -311,7 +311,7 @@ void Application_free(Application *self) {
 /** Runs registered start callbacks on the worker until stopped, then marks it done. */
 static void *appStartWorker(void *userdata) {
     Application *self = userdata;
-    for (uint32_t i = 0; i < (*self).startCount && Application_isRunning(self); i++)
+    for (u32 i = 0; i < (*self).startCount && Application_isRunning(self); i++)
         (*self).startFns[i](self, (*self).startUsers[i]);
     atomic_store_explicit(&(*self).workerDone, true, memory_order_release);
     appPhaseAdvance(self); // STARTING -> RUNNING; a pending close keeps CLOSING
@@ -330,7 +330,7 @@ bool Application_begin(Application *self) {
     (*self).ownerThread = pthread_self();
     bool hasWorker = (*self).startCount != 0;
     atomic_store(&(*self).workerDone, !hasWorker);
-    for (uint32_t i = 0; i < (*self).window_count; i++)
+    for (u32 i = 0; i < (*self).window_count; i++)
         if (!Window_shouldClose((*self).windows[i])) Window_show((*self).windows[i]);
     if (hasWorker) {
         if (pthread_create(&(*self).startThread, nullptr, appStartWorker, self) != 0) {
@@ -363,7 +363,7 @@ void Application_close(Application *self) {
 /** Registers a startup callback before the application becomes active. */
 bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *userdata) {
     if (!self || !fn || appPhaseActive(appPhase(self)) || (*self).startCount == APP_MAX_EVENTS) return false;
-    uint32_t i = (*self).startCount++;
+    u32 i = (*self).startCount++;
     (*self).startFns[i] = fn; (*self).startUsers[i] = userdata;
     return true;
 }
@@ -372,8 +372,8 @@ bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *u
 bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *userdata) {
     if (!self || !fn) return false;
     if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
-    uint32_t empty = APP_MAX_EVENTS;
-    for (uint32_t i = 0; i < APP_MAX_EVENTS; i++) {
+    u32 empty = APP_MAX_EVENTS;
+    for (u32 i = 0; i < APP_MAX_EVENTS; i++) {
         if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) return true;
         if (!(*self).pollFns[i] && empty == APP_MAX_EVENTS) empty = i;
     }
@@ -385,7 +385,7 @@ bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *us
 bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const void *userdata) {
     if (!self) return false;
     if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
-    for (uint32_t i = 0; i < APP_MAX_EVENTS; i++)
+    for (u32 i = 0; i < APP_MAX_EVENTS; i++)
         if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) {
             (*self).pollFns[i] = nullptr; (*self).pollUsers[i] = nullptr; return true;
         }
@@ -430,7 +430,7 @@ void Application_poll(Application *self) {
         pthread_mutex_unlock(&(*self).invokeMutex);
     }
     if (Application_isRunning(self))
-        for (uint32_t i = 0; i < APP_MAX_EVENTS; i++)
+        for (u32 i = 0; i < APP_MAX_EVENTS; i++)
             if ((*self).pollFns[i]) (*self).pollFns[i](self, (*self).pollUsers[i]);
     s_current = previous;
 }
@@ -439,7 +439,7 @@ void Application_poll(Application *self) {
 void Application_finish(Application *self) {
     if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
     Application_close(self);
-    for (uint32_t i = 0; i < (*self).window_count; i++)
+    for (u32 i = 0; i < (*self).window_count; i++)
         Window_close((*self).windows[i]);
     // Drain admitted owner work before joining a worker waiting on that work.
     while (!atomic_load_explicit(&(*self).workerDone, memory_order_acquire)) {
@@ -526,7 +526,7 @@ bool Application_addWindow(Application *self, Window *win) {
     if (!self || !win) return false;
     if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
     if (appPhase(self) == APP_PHASE_CLOSING) return false;
-    for (uint32_t i = 0; i < (*self).window_count; i++)
+    for (u32 i = 0; i < (*self).window_count; i++)
         if ((*self).windows[i] == win) return false;
     if ((*self).window_count >= APP_MAX_WINDOWS) return false;
     (*self).windows[(*self).window_count++] = win;
@@ -538,7 +538,7 @@ bool Application_addWindow(Application *self, Window *win) {
 bool Application_removeWindow(Application *self, Window *win) {
     if (!self || !win) return false;
     if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
-    for (uint32_t i = 0; i < (*self).window_count; i++) {
+    for (u32 i = 0; i < (*self).window_count; i++) {
         if ((*self).windows[i] == win) {
             (*self).windows[i] = (*self).windows[--(*self).window_count];
             (*self).windows[(*self).window_count] = nullptr;
@@ -559,7 +559,7 @@ void Application_onHotReload(Application *self, AppHotReloadFn fn, void *userdat
 void Application_pollHot(Application *self) {
     if (!self || !(*self).hot || !(*self).hotPoll)
         return;
-    uint32_t loaded = 0;
+    u32 loaded = 0;
     int r = (*self).hotPoll((*self).hot, &loaded);
     if (r == 0 && loaded > 0 && (*self).hotReloadFn)
         (*self).hotReloadFn(self, loaded, (*self).hotReloadUserdata);
@@ -622,13 +622,13 @@ void Application_setIconPath(Application *self, const char *iconPath) {
 // GETTERS (PUBLIC & PRIVATE)
 ;;GETTER
 /** Returns the latest atomically published frames-per-second value. */
-uint32_t Application_getFps(const Application *self) {
+u32 Application_getFps(const Application *self) {
     return self ? atomic_load_explicit(&(*self).fps, memory_order_relaxed) : 0;
 }
 
 ;;GETTER
 /** Returns the latest atomically published frame duration in microseconds. */
-uint32_t Application_getFrametimeUs(const Application *self) {
+u32 Application_getFrametimeUs(const Application *self) {
     return self ? atomic_load_explicit(&(*self).frametimeUs, memory_order_relaxed) : 0;
 }
 
@@ -668,7 +668,7 @@ const char *Application_getIconPath(const Application *self) {
 
 ;;GETTER
 /** Returns the registered window at index, or nullptr when out of range. */
-Window *Application_getWindow(const Application *self, uint32_t index) {
+Window *Application_getWindow(const Application *self, u32 index) {
     if (!self) return nullptr;
     if (index >= (*self).window_count) return nullptr;
     return (*self).windows[index];
@@ -676,18 +676,18 @@ Window *Application_getWindow(const Application *self, uint32_t index) {
 
 ;;GETTER
 /** Returns the number of registered windows. */
-uint32_t Application_getWindowCount(const Application *self) {
+u32 Application_getWindowCount(const Application *self) {
     if (!self) return 0;
     return (*self).window_count;
 }
 
 ;;GETTER
 /** Copies up to cap borrowed window pointers into out and returns the copied count. */
-uint32_t Application_getWindows(const Application *self, Window **out, uint32_t cap) {
+u32 Application_getWindows(const Application *self, Window **out, u32 cap) {
     if (!self || !out) return 0;
-    uint32_t n = (*self).window_count;
+    u32 n = (*self).window_count;
     if (n > cap) n = cap;
-    for (uint32_t i = 0; i < n; i++)
+    for (u32 i = 0; i < n; i++)
         out[i] = (*self).windows[i];
     return n;
 }

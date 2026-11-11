@@ -23,7 +23,7 @@ int main(void) {
     CHECK(w != nullptr);
 
 #if defined(VEX_PLATFORM_APPLE)
-    // two IOSurfaces = the double buffer; the layer shows whichever we publish
+    // two IOSurfaces = the d64 buffer; the layer shows whichever we publish
     void *front = Window_createPresentSurface(w, 320, 240);
     void *back = Window_createPresentSurface(w, 320, 240);
     CHECK(front != nullptr && back != nullptr);

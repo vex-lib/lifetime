@@ -180,7 +180,7 @@ bool Process_isRunning(const Process *self) {
 
 ;;GETTER
 /** Returns the number of callbacks that completed. */
-uint32_t Process_getInvocationCount(const Process *self) {
+u32 Process_getInvocationCount(const Process *self) {
     return self ? atomic_load_explicit(&(*self).invocationCount, memory_order_relaxed) : 0;
 }
 

@@ -23,7 +23,7 @@ typedef enum CapabilityKind {
     CAPABILITY_CPU_SHA3,        // ARMv8 SHA3
     CAPABILITY_CPU_LSE,         // large-system extensions (atomics)
     CAPABILITY_CPU_FP16,        // IEEE half-precision arithmetic
-    CAPABILITY_CPU_BF16,        // bfloat16
+    CAPABILITY_CPU_BF16,        // bf3216
     CAPABILITY_CPU_I8MM,        // int8 matrix multiply
     CAPABILITY_CPU_SVE,         // scalable vector extension
     CAPABILITY_CPU_SME,         // scalable matrix extension

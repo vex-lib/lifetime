@@ -68,7 +68,7 @@ int main(void) {
         PERMISSION_CONTACTS, PERMISSION_CALENDAR, PERMISSION_PHOTOS,
         PERMISSION_LOCATION, PERMISSION_NOTIFICATIONS
     };
-    for (size_t i = 0; i < sizeof wired / sizeof wired[0]; i++)
+    for (bytes i = 0; i < sizeof wired / sizeof wired[0]; i++)
         CHECK(Permission_status(wired[i]) != PERMISSION_UNSUPPORTED);
     // The target/API-less kinds stay UNSUPPORTED on every host.
     CHECK(Permission_status(PERMISSION_AUTOMATION) == PERMISSION_UNSUPPORTED);

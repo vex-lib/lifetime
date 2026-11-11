@@ -31,7 +31,7 @@ static int g_failures = 0;
 
 int main(void) {
     // Every kind: non-empty name + a bool answer (no crash, no assumption).
-    uint64_t before = 0;
+    u64 before = 0;
     for (int k = 0; k < CAPABILITY_COUNT; k++) {
         CapabilityKind kind = (CapabilityKind) k;
         CHECK(Capability_kindName(kind) != nullptr);
@@ -54,7 +54,7 @@ int main(void) {
     for (int k = 0; k < CAPABILITY_COUNT; k++)
         if (Capability_has((CapabilityKind) k))
             again++;
-    CHECK((uint64_t) again == before);
+    CHECK((u64) again == before);
     CHECK(Capability_osMajor() == Capability_osMajor());
 
 #if defined(VEX_PLATFORM_APPLE)
@@ -65,7 +65,7 @@ int main(void) {
     // Explicit cold probe is idempotent and non-destructive.
     Capability_probe();
     Capability_probe();
-    CHECK((uint64_t) again == before);
+    CHECK((u64) again == before);
 
     printf("capability_test: os=%d, features set=%d of %d\n",
            Capability_osMajor(), again, (int) CAPABILITY_COUNT);
