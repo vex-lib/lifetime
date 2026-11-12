@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "vex.h"
-#include "re/type/type.h"
+#include "re/type/re_type.h"
 
 // INTENTIONAL(vex): Lifetime has no project byte in the type registry yet, so
 // the block keeps its original re-owned id until the host gets its own byte.
