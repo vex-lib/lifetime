@@ -18,14 +18,14 @@ static int g_fail = 0;
         }                                                                  \
     } while (0)
 
-int main(void) {
+int main() {
     Window *w = Window_create("present surface", 320, 240);
     CHECK(w != nullptr);
 
 #if defined(VEX_PLATFORM_APPLE)
     // two IOSurfaces = the d64 buffer; the layer shows whichever we publish
-    void *front = Window_createPresentSurface(w, 320, 240);
-    void *back = Window_createPresentSurface(w, 320, 240);
+    any front = Window_createPresentSurface(w, 320, 240);
+    any back = Window_createPresentSurface(w, 320, 240);
     CHECK(front != nullptr && back != nullptr);
 
     if (front && back) {

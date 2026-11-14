@@ -39,10 +39,10 @@ bool Capability_has(CapabilityKind kind);
 const char *Capability_kindName(CapabilityKind kind);
 
 // Running macOS major version (>= 14, the floor), or 0 when unknown.
-int Capability_osMajor(void);
+int Capability_osMajor();
 
 // Force the one-time probe now (cold; idempotent). Optional: the first
 // Capability_has / Capability_osMajor call probes lazily.
-void Capability_probe(void);
+fn Capability_probe();
 
 #endif

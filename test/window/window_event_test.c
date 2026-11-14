@@ -27,7 +27,7 @@
  * STRUCT FIELDS (local to this file — exactly this file's class):
  * ----------------------------------------------------------------------------
  *   Window *lastWindow;    // the window pointer the last fire forwarded
- *   int fired;             // count of void-slot callbacks received
+ *   int fired;             // count of fn-slot callbacks received
  *   int resizedW;          // received width from onResized
  *   int resizedH;          // received height from onResized
  *   int movedX;            // received x from onMoved
@@ -73,16 +73,16 @@ static int g_nullOwnerHits;
 
 // Null-guarding slot used to prove that a fire with a null stored context
 // still reaches the callback (the callback is responsible for its own guard).
-static void onResizedNullOwnerRec(void *self, Window *window, int width, int height) {
-    (void) self;
-    (void) window;
-    (void) width;
-    (void) height;
+static fn onResizedNullOwnerRec(any self, Window *window, int width, int height) {
+    (fn) self;
+    (fn) window;
+    (fn) width;
+    (fn) height;
     g_nullOwnerHits++;
 }
 
 /** Records the resize callback's window and dimensions in the fixture. */
-static void onResizedRec(void *self, Window *window, int width, int height) {
+static fn onResizedRec(any self, Window *window, int width, int height) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).resizedW = width;
@@ -91,7 +91,7 @@ static void onResizedRec(void *self, Window *window, int width, int height) {
 }
 
 /** Records the move callback's window and top-left coordinates in the fixture. */
-static void onMovedRec(void *self, Window *window, int x, int y) {
+static fn onMovedRec(any self, Window *window, int x, int y) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).movedX = x;
@@ -100,35 +100,35 @@ static void onMovedRec(void *self, Window *window, int x, int y) {
 }
 
 /** Records delivery of the fullscreen callback and its window argument. */
-static void onFullscreenRec(void *self, Window *window) {
+static fn onFullscreenRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).fired++;
 }
 
 /** Records delivery of the minimized callback and its window argument. */
-static void onMinimizedRec(void *self, Window *window) {
+static fn onMinimizedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).fired++;
 }
 
 /** Records delivery of the restored callback and its window argument. */
-static void onRestoredRec(void *self, Window *window) {
+static fn onRestoredRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).fired++;
 }
 
 /** Records delivery of the pressed callback and its window argument. */
-static void onPressedRec(void *self, Window *window) {
+static fn onPressedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).fired++;
 }
 
 /** Records focus acquisition and the associated window. */
-static void onFocusGainedRec(void *self, Window *window) {
+static fn onFocusGainedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).focused = true;
@@ -136,7 +136,7 @@ static void onFocusGainedRec(void *self, Window *window) {
 }
 
 /** Records focus loss and the associated window. */
-static void onFocusLostRec(void *self, Window *window) {
+static fn onFocusLostRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).focused = false;
@@ -144,14 +144,14 @@ static void onFocusLostRec(void *self, Window *window) {
 }
 
 /** Records delivery of the zoom-filled callback and its window argument. */
-static void onZoomFilledRec(void *self, Window *window) {
+static fn onZoomFilledRec(any self, Window *window) {
     Recorder *r = self;
     (*r).lastWindow = window;
     (*r).fired++;
 }
 
 /** Records the occlusion callback's window and visibility state. */
-static void onOcclusionRec(void *self, Window *window, bool visible) {
+static fn onOcclusionRec(any self, Window *window, bool visible) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).lastVisible = visible;
@@ -159,7 +159,7 @@ static void onOcclusionRec(void *self, Window *window, bool visible) {
 }
 
 /** Records a quit request and answers that the window may close. */
-static bool onQuitAllowRec(void *self, Window *window) {
+static bool onQuitAllowRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).quitCalls++;
@@ -167,7 +167,7 @@ static bool onQuitAllowRec(void *self, Window *window) {
 }
 
 /** Records a quit request and answers that the window must remain open. */
-static bool onQuitVetoRec(void *self, Window *window) {
+static bool onQuitVetoRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).quitCalls++;
@@ -182,11 +182,11 @@ static bool onQuitVetoRec(void *self, Window *window) {
         }                                                                    \
     } while(0)
 
-int main(void) {
+int main() {
     int failures = 0;
     WindowEvent ev;
-    (void) WindowEvent_init(&ev);
-    Window *dummyWindow = (Window*) (uintptr_t) 0x1234;
+    (fn) WindowEvent_init(&ev);
+    Window *dummyWindow = (Window*) (pointer) 0x1234;
     Window *nullWindow = nullptr;
 
     // init zeroes every slot; symmetric getters report nullptr/0.
@@ -333,7 +333,7 @@ int main(void) {
 
     // init on null / on an initialized instance: null fails safe, re-init zeros.
     CHECK(WindowEvent_init(nullptr) == false);
-    (void) WindowEvent_init(&ev);
+    (fn) WindowEvent_init(&ev);
     CHECK(WindowEvent_getOnQuitRequested(&ev) == nullptr);
     CHECK(WindowEvent_getSelf(&ev) == nullptr);
 

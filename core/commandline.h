@@ -89,13 +89,13 @@ typedef struct CommandLineEvent {
 // `poll` waits at most timeoutMs (the Bounded Wait Law) and returns false when
 // no event arrived; it must never block unbounded.
 typedef struct CommandLineIo {
-    void *ctx;                                             // borrowed backend state
-    bool (*open)(void *ctx);                               // raw mode + alt screen + colors
-    void (*close)(void *ctx);                              // restore the terminal
-    bool (*size)(void *ctx, bytes *outW, bytes *outH);   // current cell geometry
-    bool (*present)(void *ctx, const char *cells, bytes width, bytes height); // one flush
-    bool (*poll)(void *ctx, int timeoutMs, CommandLineEvent *out); // bounded wait
-    bool (*setMouse)(void *ctx, bool enabled);             // pointer reporting toggle
+    any ctx;                                             // borrowed backend state
+    bool (*open)(any ctx);                               // raw mode + alt screen + colors
+    fn (*close)(any ctx);                              // restore the terminal
+    bool (*size)(any ctx, bytes *outW, bytes *outH);   // current cell geometry
+    bool (*present)(any ctx, const char *cells, bytes width, bytes height); // one flush
+    bool (*poll)(any ctx, int timeoutMs, CommandLineEvent *out); // bounded wait
+    bool (*setMouse)(any ctx, bool enabled);             // pointer reporting toggle
 } CommandLineIo;
 
 // Borrowed application seam: the resident host's view/command code. CommandLine
@@ -103,10 +103,10 @@ typedef struct CommandLineIo {
 // `draw` fills the owned grid; `input` handles one normalized event; returning
 // false requests a clean stop. `detach` releases host bookkeeping for this app.
 typedef struct CommandLineApp {
-    void *ctx;                                                             // borrowed host state
-    bool (*draw)(void *ctx, CommandLine *line);                            // paint the grid
-    bool (*input)(void *ctx, CommandLine *line, const CommandLineEvent *event); // handle one event
-    void (*detach)(void *ctx);                                             // optional release
+    any ctx;                                                             // borrowed host state
+    bool (*draw)(any ctx, CommandLine *line);                            // paint the grid
+    bool (*input)(any ctx, CommandLine *line, const CommandLineEvent *event); // handle one event
+    fn (*detach)(any ctx);                                             // optional release
 } CommandLineApp;
 
 struct CommandLine {
@@ -137,7 +137,7 @@ CommandLine *CommandLine_1(const char *title);
 )(__VA_ARGS__)
 
 // Free the CommandLine. Closes the device if still open (the Teardown Order Law).
-void CommandLine_free(CommandLine *self);
+fn CommandLine_free(CommandLine *self);
 
 // --- Device backend injection (cold; before open) ---
 // A NULL io clears any explicit backend and restores the default. Rejected
@@ -150,7 +150,7 @@ const CommandLineIo *CommandLine_getIo(const CommandLine *self);
 // when the backend has no open/size. Never re-acquires an open device.
 bool CommandLine_open(CommandLine *self);
 // Restore the device and release the grid. No-op when closed. Never blocks.
-void CommandLine_close(CommandLine *self);
+fn CommandLine_close(CommandLine *self);
 
 // THE one resize surface: re-read the device size, grow the grid, re-clamp the
 // app and present once. Always honored; callers never defer it. False only when
@@ -177,8 +177,8 @@ bool CommandLine_tick(CommandLine *self);
 // Returns the exit code (0 on clean stop). Requires an attached app.
 int CommandLine_run(CommandLine *self);
 // Thread-safe, idempotent stop request (flips cancel; the loop observes it).
-void CommandLine_stop(CommandLine *self);
-void CommandLine_requestCancel(CommandLine *self);
+fn CommandLine_stop(CommandLine *self);
+fn CommandLine_requestCancel(CommandLine *self);
 bool CommandLine_isRunning(const CommandLine *self);
 // One loop word, readable from any thread (snapshot semantics).
 CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self);
@@ -200,7 +200,7 @@ bool CommandLine_poll(CommandLine *self, int timeoutMs, CommandLineEvent *out);
 bool CommandLine_setMouseReporting(CommandLine *self, bool enabled);
 
 // --- Telemetry / identity: symmetric setters & getters ---
-void        CommandLine_setTitle(CommandLine *self, const char *title);
+fn        CommandLine_setTitle(CommandLine *self, const char *title);
 const char *CommandLine_getTitle(const CommandLine *self);
 u64    CommandLine_getGeneration(const CommandLine *self);
 bytes      CommandLine_exhaustionCount(const CommandLine *self);

@@ -103,7 +103,7 @@ static u64 processSpawnNowNs() {
 }
 
 /** Sleep for one short interval between non-blocking child reaps. */
-static void processSpawnSleepSlice() {
+static fn processSpawnSleepSlice() {
     struct timespec slice;
     slice.tv_sec = 0;
     slice.tv_nsec = ONE_MILLION;
@@ -174,7 +174,7 @@ ProcessSpawn *ProcessSpawn_1(u64 timeoutMs) {
 
 // CORE FUNCTIONS
 /** Release the table allocation; callers must first stop and reap its child jobs. */
-void ProcessSpawn_free(ProcessSpawn *self) {
+fn ProcessSpawn_free(ProcessSpawn *self) {
     if (!self)
         return;
     Memory_free(self);
@@ -233,7 +233,7 @@ bool ProcessSpawn_poll(ProcessSpawn *self, u64 budgetNs) {
 }
 
 /** Mark the table cancelled and send SIGTERM to every unfinished tracked child. */
-void ProcessSpawn_cancel(ProcessSpawn *self) {
+fn ProcessSpawn_cancel(ProcessSpawn *self) {
     if (!self)
         return;
     (*self).cancelFlag = true;
@@ -246,28 +246,28 @@ void ProcessSpawn_cancel(ProcessSpawn *self) {
 
 // SETTERS
 /** Replace the table's mirrored most-recent pid field. */
-void ProcessSpawn_setPid(ProcessSpawn *self, i32 pid) {
+fn ProcessSpawn_setPid(ProcessSpawn *self, i32 pid) {
     if (!self)
         return;
     (*self).pid = pid;
 }
 
 /** Replace the table's default timeout value in milliseconds. */
-void ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs) {
+fn ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs) {
     if (!self)
         return;
     (*self).timeoutMs = timeoutMs;
 }
 
 /** Replace the table's mirrored last exit-code field. */
-void ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode) {
+fn ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode) {
     if (!self)
         return;
     (*self).exitCode = exitCode;
 }
 
 /** Set or clear the cancellation flag without signaling jobs. */
-void ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag) {
+fn ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag) {
     if (!self)
         return;
     (*self).cancelFlag = cancelFlag;

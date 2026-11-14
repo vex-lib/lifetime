@@ -75,14 +75,14 @@ static win_ctx_t *g_winCtx = nullptr;
 
 // --- Input listeners: echo everything the pipeline produces. ---
 
-static void on_key_down(void *self, int keyEvent, u64 nanos) {
-    (void) self; (void) nanos;
+static fn on_key_down(any self, int keyEvent, u64 nanos) {
+    (fn) self; (fn) nanos;
     printf("key DOWN  %-12s code=%d\n", Key_name(Key_code(keyEvent)), Key_code(keyEvent));
 }
 
 /** Prints key-up events and stops the tour when Escape is released. */
-static void on_key_up(void *self, int keyEvent, u64 nanos) {
-    (void) self; (void) nanos;
+static fn on_key_up(any self, int keyEvent, u64 nanos) {
+    (fn) self; (fn) nanos;
     printf("key UP    %-12s hold=%.1fms taps=%d\n", Key_name(Key_code(keyEvent)),
            Key_lastHoldDurationNanos(Key_code(keyEvent)) / 1e6,
            Key_taps(Key_code(keyEvent)));
@@ -91,24 +91,24 @@ static void on_key_up(void *self, int keyEvent, u64 nanos) {
 }
 
 /** Reports mouse-button presses with the current pointer position. */
-static void on_mouse_down(void *self, int mouseEvent, u64 nanos) {
-    (void) self; (void) nanos;
+static fn on_mouse_down(any self, int mouseEvent, u64 nanos) {
+    (fn) self; (fn) nanos;
     printf("mouse DOWN %s taps=%d at (%.0f, %.0f)\n",
            Mouse_name(Mouse_button(mouseEvent)), Mouse_taps(Mouse_button(mouseEvent)),
            Mouse_x(), Mouse_y());
 }
 
 /** Reports scroll deltas received by the window input listener. */
-static void on_scroll(void *self, d64 dx, d64 dy) {
-    (void) self;
+static fn on_scroll(any self, d64 dx, d64 dy) {
+    (fn) self;
     printf("scroll (%.2f, %.2f)\n", dx, dy);
 }
 
 static int g_moves = 0;
 
 /** Reports pointer movement and counts events for the bounded demo. */
-static void on_move(void *self, d64 x, d64 y) {
-    (void) self;
+static fn on_move(any self, d64 x, d64 y) {
+    (fn) self;
     if (++g_moves % 60 == 0) // throttle: one line per ~60 moves
         printf("move (%.0f, %.0f)\n", x, y);
 }
@@ -129,7 +129,7 @@ static const TouchHandler g_touchListener = {
 };
 
 // --- Per-frame pump: poll, dispatch, and stop at the bounded budget. ---
-static void win_tick(void *userdata) {
+static fn win_tick(any userdata) {
     win_ctx_t *ctx = userdata;
     Window_pollEvents();
     Window_dispatchEvents((*ctx).window);
@@ -144,7 +144,7 @@ static void win_tick(void *userdata) {
 }
 
 // --- The synchronous chrome/policy CONTRACT. ---
-static void runChromeContract(Window *w) {
+static fn runChromeContract(Window *w) {
     CHECK(w != nullptr);
     if (w == nullptr)
         return;
@@ -232,7 +232,7 @@ static void runChromeContract(Window *w) {
     Window_setShouldClose(w, false);
     CHECK(!Window_shouldClose(w));
 
-    // Adapter registration by pointer identity: add (void) then remove (bool).
+    // Adapter registration by pointer identity: add (fn) then remove (bool).
     Window_addKeyAdapter(w, &g_keyListener);
     CHECK(Window_removeKeyAdapter(w, &g_keyListener));
     Window_addMouseAdapter(w, &g_mouseListener);
@@ -315,7 +315,7 @@ static const char *greenLabel(const chrome_step_t *step) {
 }
 
 /** Applies one scripted window-chrome state to the live test window. */
-static void applyStep(win_ctx_t *ctx, const chrome_step_t *step) {
+static fn applyStep(win_ctx_t *ctx, const chrome_step_t *step) {
     Window_setClosable((*ctx).window, (*step).closable);
     Window_setMiniaturizable((*ctx).window, (*step).miniaturizable);
     Window_setResizable((*ctx).window, (*step).resizable);
@@ -329,7 +329,7 @@ static void applyStep(win_ctx_t *ctx, const chrome_step_t *step) {
 }
 
 /** Advances the scripted chrome tour once per window-loop tick. */
-static void tour_tick(void *userdata) {
+static fn tour_tick(any userdata) {
     win_ctx_t *ctx = userdata;
     Window_pollEvents();
     Window_dispatchEvents((*ctx).window);
@@ -345,7 +345,7 @@ static void tour_tick(void *userdata) {
 }
 
 /** Runs the bounded sequence of window chrome states used by the demo. */
-static void runTour(Window *w) {
+static fn runTour(Window *w) {
     win_ctx_t ctx = { .window = w, .frames = 0, .frameBudget = 0 };
     g_winCtx = &ctx;
     Window_setTitle(w, "vex engine");

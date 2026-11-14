@@ -37,7 +37,7 @@
  */
 
 
-u64 Clock_nowNanos(void) {
+u64 Clock_nowNanos() {
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
@@ -45,7 +45,7 @@ u64 Clock_nowNanos(void) {
     return (u64) ts.tv_sec * 1000000000ull + (u64) ts.tv_nsec;
 }
 
-u64 Clock_nowMillis(void) {
+u64 Clock_nowMillis() {
     struct timespec ts;
 
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -53,6 +53,6 @@ u64 Clock_nowMillis(void) {
     return (u64) ts.tv_sec * 1000ull + (u64) ts.tv_nsec / 1000000ull;
 }
 
-d64 Clock_nowSeconds(void) {
+d64 Clock_nowSeconds() {
     return (d64) Clock_nowNanos() / 1000000000.0;
 }

@@ -54,8 +54,8 @@
  * ----------------------------------------------------------------------------
  * Core Functions:
  *   - Capability_has(kind)
- *   - Capability_probe(void)
- *   - Capability_osMajor(void)
+ *   - Capability_probe()
+ *   - Capability_osMajor()
  *
  * Getters:
  *   - Capability_kindName(kind)
@@ -94,7 +94,7 @@ static int probeOsMajor() {
 }
 
 // The one-time cold probe. Idempotent; guarded by s_probed.
-static void probeOnce() {
+static fn probeOnce() {
     if (s_probed)
         return;
     s_probed = true;
@@ -120,7 +120,7 @@ static void probeOnce() {
 // host facts are already cached by the time `main` runs. No caller, no order
 // dependency on other units, and no I/O — sysctl only.
 // INTENTIONAL(vex): the only constructor in the tree. (the static {} way)
-__attribute__((constructor)) static void capabilityBoot() {
+__attribute__((constructor)) static fn capabilityBoot() {
     probeOnce();
 }
 
@@ -134,7 +134,7 @@ bool Capability_has(CapabilityKind kind) {
 }
 
 /** Performs the idempotent cold host capability probe. */
-void Capability_probe() {
+fn Capability_probe() {
     probeOnce();
 }
 

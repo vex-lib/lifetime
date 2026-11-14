@@ -39,15 +39,15 @@ typedef struct {
 } fake_io_t;
 
 /** Records a successful fake launch using the configured shell and directory. */
-static bool fakeSpawn(void *ctx, const char *shell, const char *workDir) {
-    (void) shell; (void) workDir;
+static bool fakeSpawn(any ctx, const char *shell, const char *workDir) {
+    (fn) shell; (fn) workDir;
     fake_io_t *f = ctx;
     (*f).spawns++;
     return true;
 }
 
 /** Records input bytes delivered to the console's injected IO seam. */
-static bool fakeFeed(void *ctx, const char *Bytes, bytes len) {
+static bool fakeFeed(any ctx, const char *Bytes, bytes len) {
     fake_io_t *f = ctx;
     (*f).feeds++;
     bytes n = len < sizeof((*f).lastFeed) - 1 ? len : sizeof((*f).lastFeed) - 1;
@@ -58,7 +58,7 @@ static bool fakeFeed(void *ctx, const char *Bytes, bytes len) {
 }
 
 /** Supplies deterministic child output and its bounded byte count. */
-static bool fakeReap(void *ctx, char *out, bytes outCap, bytes *outLen) {
+static bool fakeReap(any ctx, char *out, bytes outCap, bytes *outLen) {
     fake_io_t *f = ctx;
     (*f).reaps++;
     const char *msg = "out";
@@ -71,18 +71,18 @@ static bool fakeReap(void *ctx, char *out, bytes outCap, bytes *outLen) {
 }
 
 /** Counts cancellation requests made through the fake IO seam. */
-static void fakeCancel(void *ctx) {
+static fn fakeCancel(any ctx) {
     fake_io_t *f = ctx;
     (*f).cancels++;
 }
 
 /** Returns the fixture's child-joined state for Console polling. */
-static bool fakeJoined(const void *ctx) {
+static bool fakeJoined(const_any ctx) {
     const fake_io_t *f = ctx;
     return (*f).joined;
 }
 
-int main(void) {
+int main() {
     // Constructor defaults + the dispatch macro.
     Console *c = Console_0();
     CHECK(c != nullptr);

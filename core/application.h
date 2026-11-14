@@ -38,9 +38,9 @@
 
 typedef struct Application Application;
 
-typedef void (*AppHotReloadFn)(Application *self, u32 loaded, void *userdata);
-typedef void (*ApplicationEventFn)(Application *self, void *userdata);
-typedef int (*AppHotPollFn)(void *hot, u32 *loaded);
+typedef fn (*AppHotReloadFn)(Application *self, u32 loaded, any userdata);
+typedef fn (*ApplicationEventFn)(Application *self, any userdata);
+typedef int (*AppHotPollFn)(any hot, u32 *loaded);
 #define APP_MAX_EVENTS 16
 
 // One lifecycle, one word. The legal transitions are listed here and enforced
@@ -86,25 +86,25 @@ struct Application {
     u32 window_count;                 // used slots in windows[]
     bool hadWindows;                      // one-way latch: a window was ever registered
     atomic_uint phase;                     // AppPhase: the single lifecycle word
-    void *hot;                             // reload watcher (opaque; hotcwap fills via setHotPoll)
+    any hot;                             // reload watcher (opaque; hotcwap fills via setHotPoll)
     AppHotPollFn hotPoll;                  // reload poll seam (nullable; hotcwap provides)
-    void *hostLifetime;                    // owning Kernel Lifetime (opaque; set at start)
+    any hostLifetime;                    // owning Kernel Lifetime (opaque; set at start)
     _Atomic u32 fps;                  // live telemetry: FPS (graphvex writes)
     _Atomic u32 frametimeUs;          // live telemetry: frametime in microseconds (graphvex writes)
     AppHotReloadFn hotReloadFn;            // hot-reload notification callback (nullable)
-    void *hotReloadUserdata;               // userdata for hotReloadFn
+    any hotReloadUserdata;               // userdata for hotReloadFn
     ApplicationEventFn startFns[APP_MAX_EVENTS];
-    void *startUsers[APP_MAX_EVENTS];
+    any startUsers[APP_MAX_EVENTS];
     u32 startCount;
     ApplicationEventFn pollFns[APP_MAX_EVENTS]; // owner-thread service bridges
-    void *pollUsers[APP_MAX_EVENTS];
+    any pollUsers[APP_MAX_EVENTS];
     pthread_t ownerThread, startThread;
     _Atomic bool workerDone;               // one-way latch: startup callbacks finished
     bool workerLaunched;                   // startThread exists and needs a join
     pthread_mutex_t invokeMutex;
     pthread_cond_t invokeCondition;
     ApplicationEventFn invokeFn;           // one synchronous worker -> owner mailbox
-    void *invokeUser;
+    any invokeUser;
     AppInvokePhase invokePhase;            // under invokeMutex
 };
 
@@ -113,8 +113,8 @@ struct Application {
 // Auto-invoked by the FIRST Application() constructor; idempotent beyond
 // that. Explicit calls are optional and redundant. Teardown
 // (Application_shutdown) stays caller-owned.
-bool Application_init(void);
-void Application_shutdown(void);
+bool Application_init();
+fn Application_shutdown();
 
 // --- Overloaded constructors (the Window chooser idiom) ---
 //
@@ -124,7 +124,7 @@ void Application_shutdown(void);
 //
 // Strings are copied in (fixed storage, zero steady-state malloc).
 // Getters return pointers into internal storage, stable until the next set.
-Application *Application_0(void);
+Application *Application_0();
 Application *Application_1(const char *name);
 Application *Application_3(const char *name, const char *author, const char *version);
 
@@ -136,19 +136,19 @@ Application *Application_3(const char *name, const char *author, const char *ver
 )(__VA_ARGS__)
 
 // Free the Application. Registered windows are untouched (OS-owned).
-void Application_free(Application *self);
+fn Application_free(Application *self);
 
 // --- Lifecycle (start/run/free on the native owner thread) ---
-void Application_start(Application *self);
+fn Application_start(Application *self);
 // Nonblocking arm for Kernel's multi-application reactor; false if already active.
 bool Application_begin(Application *self);
 // Service owner callbacks/mailbox; Kernel and Application_run call this.
-void Application_poll(Application *self);
+fn Application_poll(Application *self);
 // Stop, close registered windows on their owner thread, drain/join worker.
-void Application_finish(Application *self);
+fn Application_finish(Application *self);
 // Thread-safe, idempotent close request. Does not destroy borrowed Window handles.
-void Application_close(Application *self);
-void Application_stop(Application *self);
+fn Application_close(Application *self);
+fn Application_stop(Application *self);
 bool Application_isRunning(const Application *self);
 // One lifecycle word, readable from any thread (snapshot semantics).
 AppPhase Application_getPhase(const Application *self);
@@ -158,13 +158,13 @@ bool Application_isActive(const Application *self);
 // Stable symbolic name for a phase (cold path; never null).
 const char *Application_getPhaseName(AppPhase phase);
 // Register before starting. Start callbacks run in registration order on a worker.
-bool Application_addStartEvent(Application *self, ApplicationEventFn fn, void *userdata);
-bool Application_addPollEvent(Application *self, ApplicationEventFn fn, void *userdata);
-bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const void *userdata);
+bool Application_addStartEvent(Application *self, ApplicationEventFn fn, any userdata);
+bool Application_addPollEvent(Application *self, ApplicationEventFn fn, any userdata);
+bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const_any userdata);
 // Synchronous owner-thread work; false if closing. Never call while holding UI locks.
-bool Application_invoke(Application *self, ApplicationEventFn fn, void *userdata);
+bool Application_invoke(Application *self, ApplicationEventFn fn, any userdata);
 // Current application on its native owner thread (NULL outside lifecycle).
-Application *Application_current(void);
+Application *Application_current();
 
 // --- Completion predicate (drives the Kernel completion reactor) ---
 // True when the app can never end itself: the phase has left STARTING/RUNNING
@@ -177,7 +177,7 @@ bool Application_isFinished(const Application *self);
 // BLOCKS until every registered window is closed (or stop flips running).
 // The Window pumps native events; spoke input and owner service callbacks run
 // in 5ms slices. Empty windows live on their own — no graphvex dependency.
-void Application_run(Application *self);
+fn Application_run(Application *self);
 
 // --- Hot-reload drive (generation-driven, _main thread only) ---
 // Poll this app's reload watcher (bind via Application_setHot + setHotPoll):
@@ -185,29 +185,29 @@ void Application_run(Application *self);
 // every executed swap. No-op when hot or hotPoll is NULL/unset. R0 never
 // names the watcher type — hotcwap adapts. Called by the Kernel reactor
 // and the parked loop at a ~250ms cadence.
-void Application_pollHot(Application *self);
+fn Application_pollHot(Application *self);
 
 // --- Lifecycle callbacks ---
-void Application_onHotReload(Application *self, AppHotReloadFn fn, void *userdata);
+fn Application_onHotReload(Application *self, AppHotReloadFn fn, any userdata);
 
 // --- Telemetry ---
 u32   Application_getFps(const Application *self);
 u32   Application_getFrametimeUs(const Application *self);
-void      *Application_getHot(const Application *self);
+any Application_getHot(const Application *self);
 // Opt-in: assign a pre-initialized reload watcher (opaque; hotcwap owns the
 // type) plus its poll seam. NULL disables.
-void        Application_setHot(Application *self, void *hot);
-void        Application_setHotPoll(Application *self, AppHotPollFn poll);
-void        Application_setHostLifetime(Application *self, void *lifetime);
+fn        Application_setHot(Application *self, any hot);
+fn        Application_setHotPoll(Application *self, AppHotPollFn poll);
+fn        Application_setHostLifetime(Application *self, any lifetime);
 
 // --- Identity: symmetric setters / getters (the Symmetric Getter/Setter Completeness Law) ---
-void        Application_setName(Application *self, const char *name);
+fn        Application_setName(Application *self, const char *name);
 const char *Application_getName(const Application *self);
-void        Application_setAuthor(Application *self, const char *author);
+fn        Application_setAuthor(Application *self, const char *author);
 const char *Application_getAuthor(const Application *self);
-void        Application_setVersion(Application *self, const char *version);
+fn        Application_setVersion(Application *self, const char *version);
 const char *Application_getVersion(const Application *self);
-void        Application_setIconPath(Application *self, const char *iconPath);
+fn        Application_setIconPath(Application *self, const char *iconPath);
 const char *Application_getIconPath(const Application *self);
 
 // --- Window registry (multiwindow) ---

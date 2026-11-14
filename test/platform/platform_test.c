@@ -75,7 +75,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main(void)
+int main()
 {
     // Every axis and both names must resolve to something non-empty.
     CHECK(VEX_PLATFORM_NAME[0] != '\0');
@@ -132,7 +132,7 @@ int main(void)
 #endif
 
     // The floor is 64-bit; the header's _Static_assert must agree with the build.
-    CHECK(sizeof(void*) * 8 == VEX_ARCH_BITS);
+    CHECK(sizeof(any) * 8 == VEX_ARCH_BITS);
 
     if (g_failures) {
         printf("platform_test: %d failure(s)\n", g_failures);

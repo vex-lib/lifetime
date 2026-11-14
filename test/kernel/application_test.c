@@ -32,8 +32,8 @@ static int g_failures = 0;
     } while (0)
 
 /** Records the application reload callback's load result for later assertions. */
-static void onHotReloadStub(Application *self, u32 loaded, void *userdata) {
-    (void) self; (void) loaded; (void) userdata;
+static fn onHotReloadStub(Application *self, u32 loaded, any userdata) {
+    (fn) self; (fn) loaded; (fn) userdata;
 }
 
 // A start callback that blocks until the test opens the gate, so STARTING is
@@ -46,8 +46,8 @@ typedef struct StartGate {
     atomic_int calls;
 } StartGate;
 
-static void gatedStart(Application *self, void *userdata) {
-    (void) self;
+static fn gatedStart(Application *self, any userdata) {
+    (fn) self;
     StartGate *gate = userdata;
     atomic_fetch_add_explicit(&(*gate).entered, 1, memory_order_release);
     pthread_mutex_lock(&(*gate).lock);
@@ -57,7 +57,7 @@ static void gatedStart(Application *self, void *userdata) {
     atomic_fetch_add_explicit(&(*gate).calls, 1, memory_order_release);
 }
 
-static void gateOpen(StartGate *gate) {
+static fn gateOpen(StartGate *gate) {
     pthread_mutex_lock(&(*gate).lock);
     (*gate).open = true;
     pthread_cond_broadcast(&(*gate).ready);
@@ -99,7 +99,7 @@ static bool waitCounter(atomic_int *counter, int want, long timeoutMs) {
     }
 }
 
-int main(void) {
+int main() {
     // Constructors + defaults.
     Application *a = Application();
     CHECK(a != nullptr);
@@ -167,7 +167,7 @@ int main(void) {
     CHECK(Application_isActive(p));
     CHECK(!Application_isRunning(p));
     CHECK(Application_isFinished(p));
-    CHECK(!Application_addWindow(p, (Window*) (uintptr_t) 0x77));
+    CHECK(!Application_addWindow(p, (Window*) (pointer) 0x77));
     CHECK(Application_getPhase(p) == APP_PHASE_CLOSING);
 
     Application_finish(p);
@@ -227,8 +227,8 @@ int main(void) {
     pthread_mutex_destroy(&gate2.lock);
 
     // Window registry with opaque sentinel handles (never dereferenced here).
-    Window *w1 = (Window*) (uintptr_t) 0x1;
-    Window *w2 = (Window*) (uintptr_t) 0x2;
+    Window *w1 = (Window*) (pointer) 0x1;
+    Window *w2 = (Window*) (pointer) 0x2;
     CHECK(Application_addWindow(a, w1));
     CHECK(!Application_addWindow(a, w1));            // duplicate
     CHECK(!Application_addWindow(a, nullptr));       // null
@@ -251,15 +251,15 @@ int main(void) {
 
     // Fill to the cap: the next add is refused.
     Application_removeWindow(a, w2);
-    for (uintptr_t i = 0; i < APP_MAX_WINDOWS; i++)
+    for (pointer i = 0; i < APP_MAX_WINDOWS; i++)
         CHECK(Application_addWindow(a, (Window*) (0x100 + i)));
     CHECK(Application_getWindowCount(a) == APP_MAX_WINDOWS);
-    CHECK(!Application_addWindow(a, (Window*) (uintptr_t) 0x999));
+    CHECK(!Application_addWindow(a, (Window*) (pointer) 0x999));
 
-    // Reload watcher slot (opaque void*) + poll seam + reload callback.
+    // Reload watcher slot (opaque any) + poll seam + reload callback.
     CHECK(Application_getHot(a) == nullptr);
-    Application_setHot(a, (void*) (uintptr_t) 0x5);
-    CHECK(Application_getHot(a) == (void*) (uintptr_t) 0x5);
+    Application_setHot(a, (any) (pointer) 0x5);
+    CHECK(Application_getHot(a) == (any) (pointer) 0x5);
     Application_setHot(a, nullptr);
     Application_onHotReload(a, onHotReloadStub, a);
     Application_pollHot(a); // no watcher/seam -> no-op

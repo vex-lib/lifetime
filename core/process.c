@@ -33,8 +33,8 @@
  * STRUCT FIELDS (Mirroring kernel/process.h — exactly this file's class):
  * ----------------------------------------------------------------------------
  *   _Atomic(ProcessEntry) entry;   // current callback
- *   _Atomic(void*) context;        // borrowed callback data
- *   _Atomic(void*) hot;            // borrowed association, NOT a module pin
+ *   _Atomic(any) context;        // borrowed callback data
+ *   _Atomic(any) hot;            // borrowed association, NOT a module pin
  *   _Atomic(const char*) name;     // borrowed immutable label
  *   atomic_bool occupied;          // non-waiting admission gate
  *   atomic_bool inFlight;          // callback execution telemetry
@@ -88,12 +88,12 @@ Process *Process_1(ProcessEntry entry) {
 }
 
 /** Creates a process with a borrowed context and no name. */
-Process *Process_2(ProcessEntry entry, void *context) {
+Process *Process_2(ProcessEntry entry, any context) {
     return Process_3(nullptr, entry, context);
 }
 
 /** Allocates a process whose callback, name, and context are borrowed. */
-Process *Process_3(const char *name, ProcessEntry entry, void *context) {
+Process *Process_3(const char *name, ProcessEntry entry, any context) {
     if (!entry)
         return nullptr;
     Process *self = (Process*) calloc(1, sizeof(Process));
@@ -119,7 +119,7 @@ ProcessResult Process_run(Process *self, int *exitStatus) {
                                                  memory_order_acquire, memory_order_relaxed))
         return PROCESS_BUSY;
     ProcessEntry entry = atomic_load_explicit(&(*self).entry, memory_order_relaxed);
-    void *context = atomic_load_explicit(&(*self).context, memory_order_relaxed);
+    any context = atomic_load_explicit(&(*self).context, memory_order_relaxed);
     atomic_store_explicit(&(*self).inFlight, true, memory_order_release);
     *exitStatus = (*entry)(context);
     atomic_fetch_add_explicit(&(*self).invocationCount, 1, memory_order_relaxed);
@@ -143,7 +143,7 @@ bool Process_free(Process *self) {
 // SETTERS (PUBLIC & PRIVATE)
 ;;SETTER
 /** Replaces the entry, context, and borrowed hot association as one admission. */
-ProcessResult Process_replace(Process *self, ProcessEntry entry, void *context, void *hot) {
+ProcessResult Process_replace(Process *self, ProcessEntry entry, any context, any hot) {
     if (!self || !entry)
         return PROCESS_INVALID;
     bool expected = false;
@@ -192,13 +192,13 @@ ProcessEntry Process_getEntry(const Process *self) {
 
 ;;GETTER
 /** Returns the borrowed callback context, or nullptr for a null process. */
-void *Process_getContext(const Process *self) {
+any Process_getContext(const Process *self) {
     return self ? atomic_load_explicit(&(*self).context, memory_order_relaxed) : nullptr;
 }
 
 ;;GETTER
 /** Returns the associated hot handle; this association does not pin its module. */
-void *Process_getHot(const Process *self) {
+any Process_getHot(const Process *self) {
     return self ? atomic_load_explicit(&(*self).hot, memory_order_relaxed) : nullptr;
 }
 

@@ -98,7 +98,7 @@
 // All io.fn-pointers are nullable — NULL degrades gracefully per the Cold-Strict, Hot-Minimal Validation Law.")
 
 /** Copies a string into a bounded buffer and always terminates nonempty output. */
-static void console_clamp_copy(char *dst, bytes cap, const char *src) {
+static fn console_clamp_copy(char *dst, bytes cap, const char *src) {
     if (!dst || cap == 0)
         return;
     if (!src) {
@@ -186,7 +186,7 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
 }
 
 /** Sets the cancellation flag and invokes the optional seam cancellation callback. */
-void Console_cancel(Console *self) {
+fn Console_cancel(Console *self) {
     if (!self)
         return;
     atomic_store_explicit(&(*self).cancel, true, memory_order_relaxed);
@@ -196,7 +196,7 @@ void Console_cancel(Console *self) {
 }
 
 /** Requests cancellation if active, clears the borrowed IO table, and frees self. */
-void Console_free(Console *self) {
+fn Console_free(Console *self) {
     if (!self)
         return;
     if ((*self).running)
@@ -222,7 +222,7 @@ int Console_getExitStatus(const Console *self) {
 // SETTERS (PUBLIC & PRIVATE)
 ;;SETTER
 /** Copies the shell string into the console's bounded shell buffer. */
-void Console_setShell(Console *self, const char *shell) {
+fn Console_setShell(Console *self, const char *shell) {
     if (!self)
         return;
     console_clamp_copy((*self).shell, CONSOLE_MAX_SHELL, shell);
@@ -230,7 +230,7 @@ void Console_setShell(Console *self, const char *shell) {
 
 ;;SETTER
 /** Copies the working directory into the console's bounded path buffer. */
-void Console_setWorkDir(Console *self, const char *workDir) {
+fn Console_setWorkDir(Console *self, const char *workDir) {
     if (!self)
         return;
     console_clamp_copy((*self).workDir, CONSOLE_MAX_WORKDIR, workDir);
@@ -238,7 +238,7 @@ void Console_setWorkDir(Console *self, const char *workDir) {
 
 ;;SETTER
 /** Copies the IO callbacks and replaces their context with ioCtx. */
-void Console_setIo(Console *self, const ConsoleIo *io, void *ioCtx) {
+fn Console_setIo(Console *self, const ConsoleIo *io, any ioCtx) {
     if (!self)
         return;
     if (!io) {

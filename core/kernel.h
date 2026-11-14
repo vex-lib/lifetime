@@ -102,18 +102,18 @@ typedef enum KernelDeferredKind {
 
 typedef struct KernelDeferred {
     KernelDeferredKind kind;  // which registry the pending add targets
-    void *ptr;                // Application* / Process* / Console* (as void*)
+    any ptr;                // Application* / Process* / Console* (as any)
 } KernelDeferred;
 
 // Run function signature: runs on its own supervised worker thread during Kernel_runAll
-typedef void (*KernelRunFn)(void *userdata);
+typedef fn (*KernelRunFn)(any userdata);
 
 // End function signature: invoked when Kernel_runAll completes or on Kernel_stop
-typedef void (*KernelEndFn)(Kernel *self, void *userdata);
+typedef fn (*KernelEndFn)(Kernel *self, any userdata);
 
 typedef struct KernelRunSlot {
     KernelRunFn fn;
-    void *userdata;
+    any userdata;
     pthread_t thread;
     _Atomic bool threadLaunched;
     _Atomic bool done;
@@ -121,13 +121,13 @@ typedef struct KernelRunSlot {
 
 typedef struct KernelEndSlot {
     KernelEndFn fn;
-    void *userdata;
+    any userdata;
 } KernelEndSlot;
 
 struct Kernel {
     Lifetime lifetime;                     // Lifetime memory substrate (master + transient arenas)
-    void *arena;                           // opaque master arena (provider-attested, never dereferenced)
-    void *transientArena;                  // opaque scratch arena (reset, never freed mid-run)
+    any arena;                           // opaque master arena (provider-attested, never dereferenced)
+    any transientArena;                  // opaque scratch arena (reset, never freed mid-run)
     u64 arenaType;                    // provider-reported id, nonzero = attested
     u64 transientArenaType;           // provider-reported id, nonzero = attested
     Application *applications[KERNEL_MAX_APPS];  // windowed apps (opaque to engines)
@@ -137,7 +137,7 @@ struct Kernel {
     // BEFORE Kernel_runApplication; a null seat falls back to the parked
     // Application_run loop, so hotcwap compiles and links standalone with zero
     // graphvex symbols (no weak externs, no Mach-O undefined-symbol traps).
-    int (*gfxAppRun)(void *context, bool (*continueFn)(void*), bool (*pollFn)(void));
+    int (*gfxAppRun)(any context, bool (*continueFn)(any), bool (*pollFn)());
     Process     *processes[KERNEL_MAX_PROCS];    // one-shot invokables
     u32 processCount;                       // used slots in processes[]
     Console     *consoles[KERNEL_MAX_CONSOLES];  // session pumps
@@ -179,7 +179,7 @@ struct Kernel {
 // The Kernel struct itself is calloc-owned in Phase 1 (mirrors
 // Application_0); migration to arena-owned Kernel is tracked via
 // ;;INTENTION in kernel.c per the Conflict Triage Law.
-Kernel *Kernel_0(void);
+Kernel *Kernel_0();
 Kernel *Kernel_1(bytes arenaBytes);
 Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes);
 
@@ -198,9 +198,9 @@ Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes);
 bool Kernel_free(Kernel *self);
 
 // Legacy shim over Kernel_free: kept so existing callers link without edits.
-// Warns-and-leaks (returns void) when the registry is non-empty instead of
+// Warns-and-leaks (returns fn) when the registry is non-empty instead of
 // force-clearing it — prefer Kernel_free and check the result.
-void Kernel_destroy(Kernel *self);
+fn Kernel_destroy(Kernel *self);
 
 // --- Supervisor state ---
 // Ends a live Kernel_runAll run: transitions RUNNING -> DRAINING, stops every
@@ -210,7 +210,7 @@ void Kernel_destroy(Kernel *self);
 // hooks, and only then returns to READY. Called while READY (no run live) it
 // fires the end hooks directly (fire-once). Called while DRAINING it is a
 // no-op — the arming thread already owns teardown. Safe from any thread.
-void Kernel_stop(Kernel *self);
+fn Kernel_stop(Kernel *self);
 
 // Current lifecycle phase (KernelPhase). Snapshot semantics: DRAINING may
 // already have returned to READY by the time the caller acts on it.
@@ -282,9 +282,9 @@ Application *Kernel_getApplication(const Kernel *self, u32 index);
 // --- GfxLoop runner seat (registered, never linked) ---
 // Install the demand-driven Application loop (graphvex's frame scheduler) into
 // the seat. Null-safe; passing NULL clears the seat (fallback parked loop).
-void Kernel_setGfxAppRunner(Kernel *self, int (*fn)(void *context, bool (*continueFn)(void*), bool (*pollFn)(void)));
+fn Kernel_setGfxAppRunner(Kernel *self, int (*fn)(any context, bool (*continueFn)(any), bool (*pollFn)()));
 // The installed runner, or NULL when unset.
-int (*Kernel_getGfxAppRunner(const Kernel *self))(void *context, bool (*continueFn)(void*), bool (*pollFn)(void));
+int (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)());
 // Number of registered applications.
 u32 Kernel_getApplicationCount(const Kernel *self);
 // Copy registry into out[] (up to cap), returns entries written.
@@ -312,14 +312,14 @@ u32     Kernel_getCommandLineCount(const Kernel *self);
 u32     Kernel_getCommandLines(const Kernel *self, CommandLine **out, u32 cap);
 
 // --- Run functions (async background execution) & End functions (lifecycle completion) ---
-bool     Kernel_addRunFunction(Kernel *self, KernelRunFn fn, void *userdata);
-bool     Kernel_addEndFunction(Kernel *self, KernelEndFn fn, void *userdata);
+bool     Kernel_addRunFunction(Kernel *self, KernelRunFn fn, any userdata);
+bool     Kernel_addEndFunction(Kernel *self, KernelEndFn fn, any userdata);
 u32 Kernel_getRunFunctionCount(const Kernel *self);
 u32 Kernel_getEndFunctionCount(const Kernel *self);
 
 // --- Arena access (the Symmetric Getter/Setter Completeness Law symmetric getters) ---
-void *Kernel_getArena(const Kernel *self);
-void *Kernel_getTransientArena(const Kernel *self);
+any Kernel_getArena(const Kernel *self);
+any Kernel_getTransientArena(const Kernel *self);
 Lifetime *Kernel_getLifetime(Kernel *self);
 const Lifetime *Kernel_lifetime(const Kernel *self);
 

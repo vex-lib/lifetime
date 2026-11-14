@@ -123,7 +123,7 @@ CommandLine *CommandLine_1(const char *title) {
     return self;
 }
 
-void CommandLine_free(CommandLine *self) {
+fn CommandLine_free(CommandLine *self) {
     if (self == nullptr)
         return;
     if ((*self).opened)
@@ -181,7 +181,7 @@ bool CommandLine_open(CommandLine *self) {
     return true;
 }
 
-void CommandLine_close(CommandLine *self) {
+fn CommandLine_close(CommandLine *self) {
     if (self == nullptr || !(*self).opened)
         return;
     CommandLineIo io = (*self).io;
@@ -270,7 +270,7 @@ bool CommandLine_detachApp(CommandLine *self) {
 }
 
 /** Requests cancel; only a live loop consumes it (IDLE stops are discarded). */
-static void cmdRequestCancel(CommandLine *self) {
+static fn cmdRequestCancel(CommandLine *self) {
     u32 expected = COMMANDLINE_RUN_RUNNING;
     atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
         COMMANDLINE_RUN_CANCELLED, memory_order_acq_rel, memory_order_relaxed);
@@ -353,12 +353,12 @@ int CommandLine_run(CommandLine *self) {
     return rc;
 }
 
-void CommandLine_stop(CommandLine *self) {
+fn CommandLine_stop(CommandLine *self) {
     if (self != nullptr)
         cmdRequestCancel(self);
 }
 
-void CommandLine_requestCancel(CommandLine *self) {
+fn CommandLine_requestCancel(CommandLine *self) {
     CommandLine_stop(self);
 }
 
@@ -405,7 +405,7 @@ bool CommandLine_setMouseReporting(CommandLine *self, bool enabled) {
     return io.setMouse(io.ctx, enabled);
 }
 
-void CommandLine_setTitle(CommandLine *self, const char *title) {
+fn CommandLine_setTitle(CommandLine *self, const char *title) {
     if (self == nullptr)
         return;
     const char *src = title ? title : "vex";

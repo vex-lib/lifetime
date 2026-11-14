@@ -33,14 +33,14 @@
 typedef struct Window Window;
 
 // Slot signatures (function-pointer typedefs: types, not classes).
-typedef bool (*WindowQuitRequestedFn)(void *self, Window *window);
-typedef void (*WindowResizedFn)(void *self, Window *window, int width, int height);
-typedef void (*WindowMovedFn)(void *self, Window *window, int x, int y);
-typedef void (*WindowNoArgFn)(void *self, Window *window);
-typedef void (*WindowOcclusionFn)(void *self, Window *window, bool visible);
+typedef bool (*WindowQuitRequestedFn)(any self, Window *window);
+typedef fn (*WindowResizedFn)(any self, Window *window, int width, int height);
+typedef fn (*WindowMovedFn)(any self, Window *window, int x, int y);
+typedef fn (*WindowNoArgFn)(any self, Window *window);
+typedef fn (*WindowOcclusionFn)(any self, Window *window, bool visible);
 
 typedef struct WindowEvent {
-    void *self;                               // opaque owner of every slot
+    any self;                               // opaque owner of every slot
     WindowQuitRequestedFn onQuitRequested;    // close btn / Cmd+Q / Cmd+W / Alt+F4 (true = may quit)
     WindowNoArgFn onAfterQuit;                // fired after window is destroyed
     WindowResizedFn onResized;                // content size changed (pixels)
@@ -64,61 +64,61 @@ bool WindowEvent_init(WindowEvent *self);
 // Quit is the vetoable slot: returns true when no slot is set OR the slot
 // returns true (may quit); false when the app declines.
 bool WindowEvent_fireQuitRequested(WindowEvent *self, Window *window);
-void WindowEvent_fireAfterQuit(WindowEvent *self, Window *window);
-void WindowEvent_fireResized(WindowEvent *self, Window *window, int width, int height);
-void WindowEvent_fireMoved(WindowEvent *self, Window *window, int x, int y);
-void WindowEvent_fireFullscreen(WindowEvent *self, Window *window);
-void WindowEvent_fireMinimized(WindowEvent *self, Window *window);
-void WindowEvent_fireRestored(WindowEvent *self, Window *window);
-void WindowEvent_firePressed(WindowEvent *self, Window *window);
-void WindowEvent_fireFocusGained(WindowEvent *self, Window *window);
-void WindowEvent_fireFocusLost(WindowEvent *self, Window *window);
-void WindowEvent_fireZoomFilled(WindowEvent *self, Window *window);
-void WindowEvent_fireZoomBack(WindowEvent *self, Window *window);
-void WindowEvent_fireOcclusionChanged(WindowEvent *self, Window *window, bool visible);
+fn WindowEvent_fireAfterQuit(WindowEvent *self, Window *window);
+fn WindowEvent_fireResized(WindowEvent *self, Window *window, int width, int height);
+fn WindowEvent_fireMoved(WindowEvent *self, Window *window, int x, int y);
+fn WindowEvent_fireFullscreen(WindowEvent *self, Window *window);
+fn WindowEvent_fireMinimized(WindowEvent *self, Window *window);
+fn WindowEvent_fireRestored(WindowEvent *self, Window *window);
+fn WindowEvent_firePressed(WindowEvent *self, Window *window);
+fn WindowEvent_fireFocusGained(WindowEvent *self, Window *window);
+fn WindowEvent_fireFocusLost(WindowEvent *self, Window *window);
+fn WindowEvent_fireZoomFilled(WindowEvent *self, Window *window);
+fn WindowEvent_fireZoomBack(WindowEvent *self, Window *window);
+fn WindowEvent_fireOcclusionChanged(WindowEvent *self, Window *window, bool visible);
 
 // --- Setters / Getters (the Symmetric Getter/Setter Completeness Law) ---
 // Null-safe: setters no-op on null self/fn, getters return NULL.
-void      WindowEvent_setSelf(WindowEvent *self, void *owner);
-void     *WindowEvent_getSelf(const WindowEvent *self);
+fn      WindowEvent_setSelf(WindowEvent *self, any owner);
+any WindowEvent_getSelf(const WindowEvent *self);
 
-void    WindowEvent_setOnQuitRequested(WindowEvent *self, WindowQuitRequestedFn fn);
+fn    WindowEvent_setOnQuitRequested(WindowEvent *self, WindowQuitRequestedFn fn);
 WindowQuitRequestedFn WindowEvent_getOnQuitRequested(const WindowEvent *self);
 
-void    WindowEvent_setOnAfterQuit(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnAfterQuit(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnAfterQuit(const WindowEvent *self);
 
-void    WindowEvent_setOnResized(WindowEvent *self, WindowResizedFn fn);
+fn    WindowEvent_setOnResized(WindowEvent *self, WindowResizedFn fn);
 WindowResizedFn WindowEvent_getOnResized(const WindowEvent *self);
 
-void    WindowEvent_setOnMoved(WindowEvent *self, WindowMovedFn fn);
+fn    WindowEvent_setOnMoved(WindowEvent *self, WindowMovedFn fn);
 WindowMovedFn WindowEvent_getOnMoved(const WindowEvent *self);
 
-void    WindowEvent_setOnFullscreen(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnFullscreen(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnFullscreen(const WindowEvent *self);
 
-void    WindowEvent_setOnMinimized(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnMinimized(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnMinimized(const WindowEvent *self);
 
-void    WindowEvent_setOnRestored(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnRestored(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnRestored(const WindowEvent *self);
 
-void    WindowEvent_setOnPressed(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnPressed(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnPressed(const WindowEvent *self);
 
-void    WindowEvent_setOnFocusGained(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnFocusGained(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnFocusGained(const WindowEvent *self);
 
-void    WindowEvent_setOnFocusLost(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnFocusLost(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnFocusLost(const WindowEvent *self);
 
-void    WindowEvent_setOnZoomFilled(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnZoomFilled(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnZoomFilled(const WindowEvent *self);
 
-void    WindowEvent_setOnZoomBack(WindowEvent *self, WindowNoArgFn fn);
+fn    WindowEvent_setOnZoomBack(WindowEvent *self, WindowNoArgFn fn);
 WindowNoArgFn WindowEvent_getOnZoomBack(const WindowEvent *self);
 
-void    WindowEvent_setOnOcclusionChanged(WindowEvent *self, WindowOcclusionFn fn);
+fn    WindowEvent_setOnOcclusionChanged(WindowEvent *self, WindowOcclusionFn fn);
 WindowOcclusionFn WindowEvent_getOnOcclusionChanged(const WindowEvent *self);
 
 #endif

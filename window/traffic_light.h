@@ -19,20 +19,20 @@ typedef enum TrafficLightButton {
 typedef struct TrafficLight TrafficLight;
 
 // --- Constructors ---
-TrafficLight *TrafficLight_create(void *nsWindowHandle);
-void TrafficLight_destroy(TrafficLight *self);
+TrafficLight *TrafficLight_create(any nsWindowHandle);
+fn TrafficLight_destroy(TrafficLight *self);
 
 // --- Visibility ---
-void TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, bool visible);
+fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, bool visible);
 bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton button);
 
 // --- Header Position (content-relative) ---
-void TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y);
-void TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY);
+fn TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y);
+fn TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY);
 
 // --- State & Layout ---
-void TrafficLight_resetBase(TrafficLight *self);
-void TrafficLight_refresh(TrafficLight *self);
-void TrafficLight_setFloating(TrafficLight *self, bool f32ing);
+fn TrafficLight_resetBase(TrafficLight *self);
+fn TrafficLight_refresh(TrafficLight *self);
+fn TrafficLight_setFloating(TrafficLight *self, bool f32ing);
 
 #endif // WINDOW_TRAFFIC_LIGHT_H

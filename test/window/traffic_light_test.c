@@ -26,7 +26,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main(void) {
+int main() {
     // Nil-handle bookkeeping: visibility still tracks.
     TrafficLight *tl = TrafficLight_create(nullptr);
     CHECK(tl != nullptr);

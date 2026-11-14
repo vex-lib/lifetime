@@ -27,22 +27,22 @@ typedef struct FakeApp {
     bool stopOnInput;
 } FakeApp;
 
-static bool fOpen(void *ctx) { (*((Fake*) ctx)).opens++; return true; }
-static void fClose(void *ctx) { (*((Fake*) ctx)).closes++; }
-static bool fSize(void *ctx, bytes *w, bytes *h) {
+static bool fOpen(any ctx) { (*((Fake*) ctx)).opens++; return true; }
+static fn fClose(any ctx) { (*((Fake*) ctx)).closes++; }
+static bool fSize(any ctx, bytes *w, bytes *h) {
     Fake *f = (Fake*) ctx;
     *w = (*f).w; *h = (*f).h;
     return (*f).w > 0 && (*f).h > 0;
 }
-static bool fPresent(void *ctx, const char *cells, bytes w, bytes h) {
+static bool fPresent(any ctx, const char *cells, bytes w, bytes h) {
     Fake *f = (Fake*) ctx;
-    (void) cells; (void) w; (void) h;
+    (fn) cells; (fn) w; (fn) h;
     (*f).presents++;
     return true;
 }
-static bool fPoll(void *ctx, int timeoutMs, CommandLineEvent *out) {
+static bool fPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
     Fake *f = (Fake*) ctx;
-    (void) timeoutMs;
+    (fn) timeoutMs;
     (*f).polls++;
     if (!(*f).pending)
         return false;
@@ -50,9 +50,9 @@ static bool fPoll(void *ctx, int timeoutMs, CommandLineEvent *out) {
     *out = (*f).next;
     return true;
 }
-static bool fMouse(void *ctx, bool enabled) { (*((Fake*) ctx)).mouse = enabled ? 1 : 0; return true; }
+static bool fMouse(any ctx, bool enabled) { (*((Fake*) ctx)).mouse = enabled ? 1 : 0; return true; }
 
-static bool aDraw(void *ctx, CommandLine *line) {
+static bool aDraw(any ctx, CommandLine *line) {
     FakeApp *a = (FakeApp*) ctx;
     (*a).draws++;
     char *cells = CommandLine_getCells(line);
@@ -60,9 +60,9 @@ static bool aDraw(void *ctx, CommandLine *line) {
         memset(cells, '.', CommandLine_getWidth(line) * CommandLine_getHeight(line));
     return true;
 }
-static bool aInput(void *ctx, CommandLine *line, const CommandLineEvent *event) {
+static bool aInput(any ctx, CommandLine *line, const CommandLineEvent *event) {
     FakeApp *a = (FakeApp*) ctx;
-    (void) event;
+    (fn) event;
     (*a).inputs++;
     if ((*a).stopOnInput) {
         CommandLine_stop(line);
@@ -84,7 +84,7 @@ static CommandLineIo fakeIo(Fake *f) {
     return io;
 }
 
-int main(void) {
+int main() {
     int failures = 0;
 #define CHECK(cond, msg) do { if (!(cond)) { printf("FAIL: %s\n", msg); failures++; } } while (0)
 

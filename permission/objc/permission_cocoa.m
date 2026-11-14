@@ -201,7 +201,7 @@ static bool requestCamera() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
-                             completionHandler:^(BOOL granted) { (void) granted; }];
+                             completionHandler:^(BOOL granted) { (fn) granted; }];
     return true;
 }
 
@@ -210,7 +210,7 @@ static bool requestMicrophone() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
-                             completionHandler:^(BOOL granted) { (void) granted; }];
+                             completionHandler:^(BOOL granted) { (fn) granted; }];
     return true;
 }
 
@@ -222,8 +222,8 @@ static bool requestContacts() {
         g_contactStore = [[CNContactStore alloc] init];
     [g_contactStore requestAccessForEntityType:CNEntityTypeContacts
                              completionHandler:^(BOOL granted, NSError *error) {
-                                 (void) granted;
-                                 (void) error;
+                                 (fn) granted;
+                                 (fn) error;
                              }];
     return true;
 }
@@ -236,16 +236,16 @@ static bool requestCalendar() {
         g_eventStore = [[EKEventStore alloc] init];
     if (@available(macOS 14.0, *)) {
         [g_eventStore requestFullAccessToEventsWithCompletion:^(BOOL granted, NSError *error) {
-            (void) granted;
-            (void) error;
+            (fn) granted;
+            (fn) error;
         }];
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         [g_eventStore requestAccessToEntityType:EKEntityTypeEvent
                                      completion:^(BOOL granted, NSError *error) {
-                                         (void) granted;
-                                         (void) error;
+                                         (fn) granted;
+                                         (fn) error;
                                      }];
 #pragma clang diagnostic pop
     }
@@ -259,7 +259,7 @@ static bool requestPhotos() {
     if (@available(macOS 11.0, *)) {
         [PHPhotoLibrary requestAuthorizationForAccessLevel:PHAccessLevelReadWrite
                                                   handler:^(PHAuthorizationStatus status) {
-                                                      (void) status;
+                                                      (fn) status;
                                                   }];
     }
     return true;
@@ -284,8 +284,8 @@ static bool requestNotifications() {
     [[UNUserNotificationCenter currentNotificationCenter]
         requestAuthorizationWithOptions:options
                       completionHandler:^(BOOL granted, NSError *error) {
-                          (void) granted;
-                          (void) error;
+                          (fn) granted;
+                          (fn) error;
                       }];
     return true;
 }
@@ -319,8 +319,8 @@ bool permissionBackendRequest(PermissionKind kind) {
         case PERMISSION_KEY_LISTEN:     return CGRequestListenEventAccess();
         case PERMISSION_POST_EVENT:     return CGRequestPostEventAccess();
         case PERMISSION_ACCESSIBILITY: {
-            const void *keys[] = { (const void*) kAXTrustedCheckOptionPrompt };
-            const void *values[] = { (const void*) kCFBooleanTrue };
+            const_any keys[] = { (const_any) kAXTrustedCheckOptionPrompt };
+            const_any values[] = { (const_any) kCFBooleanTrue };
             CFDictionaryRef options = CFDictionaryCreate(
                 nullptr, keys, values, 1,
                 &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);

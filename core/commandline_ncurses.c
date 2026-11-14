@@ -31,7 +31,7 @@
  *   static bool g_mouse           : pointer reporting enabled
  * FUNCTION REGISTRY (all static; exposed only through CommandLine_defaultIo):
  *   ncOpen, ncClose, ncSize, ncPresent, ncPoll, ncSetMouse
- *   CommandLine_defaultIo(void)   : returns the populated fn-table by value
+ *   CommandLine_defaultIo()   : returns the populated fn-table by value
  * CONTRACT: single owner thread; no threads, sockets or allocation owned. poll
  * waits at most timeoutMs (the Bounded Wait Law). present is one refresh.
  * Unsupported terminals degrade (open returns false) rather than crashing.
@@ -41,8 +41,8 @@
 static bool g_open = false;
 static bool g_mouse = false;
 
-static bool ncOpen(void *ctx) {
-    (void) ctx;
+static bool ncOpen(any ctx) {
+    (fn) ctx;
     if (g_open)
         return true;
     if (initscr() == nullptr)
@@ -59,8 +59,8 @@ static bool ncOpen(void *ctx) {
     return true;
 }
 
-static void ncClose(void *ctx) {
-    (void) ctx;
+static fn ncClose(any ctx) {
+    (fn) ctx;
     if (!g_open)
         return;
     if (g_mouse) {
@@ -71,8 +71,8 @@ static void ncClose(void *ctx) {
     g_open = false;
 }
 
-static bool ncSize(void *ctx, bytes *outW, bytes *outH) {
-    (void) ctx;
+static bool ncSize(any ctx, bytes *outW, bytes *outH) {
+    (fn) ctx;
     if (!g_open)
         return false;
     int rows = 0, cols = 0;
@@ -84,8 +84,8 @@ static bool ncSize(void *ctx, bytes *outW, bytes *outH) {
     return true;
 }
 
-static bool ncPresent(void *ctx, const char *cells, bytes width, bytes height) {
-    (void) ctx;
+static bool ncPresent(any ctx, const char *cells, bytes width, bytes height) {
+    (fn) ctx;
     if (!g_open || cells == nullptr || width == 0 || height == 0)
         return false;
     for (bytes y = 0; y < height; ++y) {
@@ -97,8 +97,8 @@ static bool ncPresent(void *ctx, const char *cells, bytes width, bytes height) {
     return refresh() != ERR;
 }
 
-static bool ncSetMouse(void *ctx, bool enabled) {
-    (void) ctx;
+static bool ncSetMouse(any ctx, bool enabled) {
+    (fn) ctx;
     if (!g_open)
         return false;
     if (enabled) {
@@ -129,8 +129,8 @@ static CommandLineKey ncMapKey(int ch) {
     }
 }
 
-static bool ncPoll(void *ctx, int timeoutMs, CommandLineEvent *out) {
-    (void) ctx;
+static bool ncPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
+    (fn) ctx;
     if (!g_open || out == nullptr)
         return false;
     timeout(timeoutMs);

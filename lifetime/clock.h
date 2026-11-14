@@ -18,12 +18,12 @@
 // Across a hot swap the host holds the clock, so time continues.
 
 // Monotonic nanos since an arbitrary host epoch. Never decreases.
-u64 Clock_nowNanos(void);
+u64 Clock_nowNanos();
 
 // Unix wall millis since 1970-01-01T00:00:00Z. For timestamps, never deltas.
-u64 Clock_nowMillis(void);
+u64 Clock_nowMillis();
 
 // Monotonic seconds (d64) for module frame functions. One conversion.
-d64 Clock_nowSeconds(void);
+d64 Clock_nowSeconds();
 
 #endif

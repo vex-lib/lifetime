@@ -31,7 +31,7 @@ typedef struct DrainProbe {
 } DrainProbe;
 
 /** Marks worker completion after its fixture work interval. */
-static void slowWorker(void *context) {
+static fn slowWorker(any context) {
     DrainProbe *probe = (DrainProbe*) context;
     struct timespec ts = {0, 80000000L}; // 80ms of "work"
     nanosleep(&ts, nullptr);
@@ -39,7 +39,7 @@ static void slowWorker(void *context) {
 }
 
 /** Captures worker quiescence and phase when the end hook runs. */
-static void observerHook(Kernel *kernel, void *userdata) {
+static fn observerHook(Kernel *kernel, any userdata) {
     DrainProbe *probe = (DrainProbe*) userdata;
     atomic_store_explicit(&(*probe).hookSawDone,
                           atomic_load_explicit(&(*probe).workerDone, memory_order_acquire),
@@ -50,7 +50,7 @@ static void observerHook(Kernel *kernel, void *userdata) {
 }
 
 /** Checks live-phase registration rejection while keeping the run active. */
-static void registrar(void *context) {
+static fn registrar(any context) {
     Kernel *kernel = (Kernel*) context;
     CHECK("phase RUNNING inside run", Kernel_getPhase(kernel) == KERNEL_PHASE_RUNNING);
     CHECK("addRunFunction refused while live",
@@ -61,11 +61,11 @@ static void registrar(void *context) {
 }
 
 /** Calls Kernel_run on a separate thread for lifecycle-order assertions. */
-static void *runner(void *context) {
-    return (void*) (intptr_t) Kernel_run((Kernel*) context);
+static any runner(any context) {
+    return (any) (intptr_t) Kernel_run((Kernel*) context);
 }
 
-int main(void) {
+int main() {
     // 1. External stop: hooks fire once, after worker quiescence, in DRAINING.
     Kernel *kernel = Kernel();
     DrainProbe probe = {0};

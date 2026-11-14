@@ -116,22 +116,22 @@ bool Permission_openSettings(PermissionKind kind) {
 #if !defined(VEX_PLATFORM_APPLE)
     /** Non-Apple fallback: reports every permission as unsupported. */
     PermissionStatus permissionBackendStatus(PermissionKind kind) {
-        (void) kind;
+        (fn) kind;
         return PERMISSION_UNSUPPORTED;
     }
     /** Non-Apple fallback: no permission request backend is available. */
     bool permissionBackendRequest(PermissionKind kind) {
-        (void) kind;
+        (fn) kind;
         return false;
     }
     /** Non-Apple fallback: no request can require an OS restart. */
     bool permissionBackendRequiresRestart(PermissionKind kind) {
-        (void) kind;
+        (fn) kind;
         return false;
     }
     /** Non-Apple fallback: no platform settings surface is provided. */
     bool permissionBackendOpenSettings(PermissionKind kind) {
-        (void) kind;
+        (fn) kind;
         return false;
     }
 #endif

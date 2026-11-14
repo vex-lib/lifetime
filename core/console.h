@@ -31,13 +31,13 @@ typedef struct Console Console;
 // implements this).  All fn-pointers are optional: NULL means unimplemented;
 // the Console guards every call and degrades (returns false, keeps old state).
 typedef struct ConsoleIo {
-    void *ctx;                                              // borrowed: R2 ProcessSpawn job
-    bool (*spawn)(void *ctx, const char *shell, const char *workDir);
-    bool (*feed)(void *ctx, const char *Bytes, bytes len); // write to stdin pipe
-    bool (*reap)(void *ctx, char *out, bytes outCap,
+    any ctx;                                              // borrowed: R2 ProcessSpawn job
+    bool (*spawn)(any ctx, const char *shell, const char *workDir);
+    bool (*feed)(any ctx, const char *Bytes, bytes len); // write to stdin pipe
+    bool (*reap)(any ctx, char *out, bytes outCap,
                  bytes *outLen);                           // non-blocking ≤100ms
-    void (*cancel)(void *ctx);                              // SIGTERM; never blocks
-    bool (*joined)(const void *ctx);                        // true once child is reaped
+    fn (*cancel)(any ctx);                              // SIGTERM; never blocks
+    bool (*joined)(const_any ctx);                        // true once child is reaped
 } ConsoleIo;
 
 struct Console {
@@ -54,7 +54,7 @@ struct Console {
 //   Console()             -> default shell "/bin/sh"
 //   Console(shell)        -> named shell
 //
-Console *Console_0(void);
+Console *Console_0();
 Console *Console_1(const char *shell);
 
 #define CONSOLE_CHOOSER(_0, _1, NAME, ...) NAME
@@ -66,7 +66,7 @@ Console *Console_1(const char *shell);
 
 // Free the session.  If still running: cancel first (the Teardown Order Law / the Bounded Wait Law), never blocks.
 // Null-safe.
-void Console_free(Console *self);
+fn Console_free(Console *self);
 
 // --- Core ---
 // Start a session: spawn via io.seam.  False if io not set, io.spawn is NULL,
@@ -85,7 +85,7 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen);
 // Request graceful termination (SIGTERM via io.cancel).  Does not wait;
 // the supervising thread calls Console_poll + joined() to observe completion
 // per the Bounded Wait Law.
-void Console_cancel(Console *self);
+fn Console_cancel(Console *self);
 
 bool     Console_isRunning(const Console *self);
 int      Console_getExitStatus(const Console *self);
@@ -93,17 +93,17 @@ int      Console_getExitStatus(const Console *self);
 // --- Setters / Getters (the Symmetric Getter/Setter Completeness Law) ---
 // Clamp policy (the Cold-Strict, Hot-Minimal Validation Law): strings that exceed CONSOLE_MAX_SHELL or
 // CONSOLE_MAX_WORKDIR are clamped (truncated with NUL); the setter is a
-// void function per house style (Application_setName) and the overview
+// fn function per house style (Application_setName) and the overview
 // documents the clamp behavior.  Callers needing truncation feedback copy
 // via snprintf + manual length check against cap.
-void        Console_setShell(Console *self, const char *shell);
+fn        Console_setShell(Console *self, const char *shell);
 const char *Console_getShell(const Console *self);
 
-void        Console_setWorkDir(Console *self, const char *workDir);
+fn        Console_setWorkDir(Console *self, const char *workDir);
 const char *Console_getWorkDir(const Console *self);
 
 // Io seam injection (nullable — NULL disables execution until re-set).
-void          Console_setIo(Console *self, const ConsoleIo *io, void *ioCtx);
+fn          Console_setIo(Console *self, const ConsoleIo *io, any ioCtx);
 const ConsoleIo *Console_getIo(const Console *self);
 
 #endif

@@ -23,7 +23,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main(void) {
+int main() {
     // Every kind has a non-empty name and a valid status, and checking a status
     // never prompts.
     for (int k = 0; k < PERMISSION_COUNT; k++) {

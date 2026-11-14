@@ -32,17 +32,17 @@ typedef struct TestCall {
 } TestCall;
 
 /** Returns the original entry's context value or its null-context sentinel. */
-static int original(void *context) {
+static int original(any context) {
     return context ? *(int*) context : 11;
 }
 
 /** Returns the replacement entry's offset value or its null-context sentinel. */
-static int replacement(void *context) {
+static int replacement(any context) {
     return context ? *(int*) context + 100 : 22;
 }
 
 /** Verifies nested invocation and mutation are refused while the process runs. */
-static int reentrant(void *context) {
+static int reentrant(any context) {
     Process *process = (Process*) context;
     int result = 123;
     CHECK("running", Process_isRunning(process));
@@ -69,7 +69,7 @@ static bool waitFor(atomic_bool *flag) {
 }
 
 /** Holds a process invocation until the test releases its bounded rendezvous. */
-static int heldEntry(void *context) {
+static int heldEntry(any context) {
     TestCall *call = (TestCall*) context;
     (*call).thread = pthread_self();
     atomic_store_explicit(&(*call).entered, true, memory_order_release);
@@ -79,13 +79,13 @@ static int heldEntry(void *context) {
 }
 
 /** Runs the held process callback on the test's worker thread. */
-static void *worker(void *context) {
+static any worker(any context) {
     TestCall *call = (TestCall*) context;
     (*call).result = Process_run((*call).process, &(*call).exitStatus);
     return nullptr;
 }
 
-int main(void) {
+int main() {
     int result = 123;
     int oldContext = -1;
     int newContext = 7;

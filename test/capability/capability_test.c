@@ -29,7 +29,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main(void) {
+int main() {
     // Every kind: non-empty name + a bool answer (no crash, no assumption).
     u64 before = 0;
     for (int k = 0; k < CAPABILITY_COUNT; k++) {

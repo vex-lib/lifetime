@@ -23,7 +23,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -34,7 +34,7 @@ static int g_failures = 0;
     else { printf("[bridge_seam_test] FAIL %s\n", name); g_failures++; } \
 } while (0)
 
-int main(void) {
+int main() {
     printf("=== Running Bridge Seam Test Suite ===\n");
 
     // #1 Pane/board compositing is the consumer's pass — inert here.

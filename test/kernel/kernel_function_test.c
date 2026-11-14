@@ -28,7 +28,7 @@
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
  * Core Functions:
- *   - main(void)
+ *   - main()
  * ============================================================================
  */
 
@@ -46,7 +46,7 @@ typedef struct TestRunContext {
 } TestRunContext;
 
 /** Updates the run fixture from a worker thread to prove asynchronous execution. */
-static void sampleRunFunction(void *userdata) {
+static fn sampleRunFunction(any userdata) {
     TestRunContext *ctx = (TestRunContext*) userdata;
     (*ctx).threadId = pthread_self();
     atomic_store_explicit(&(*ctx).threadRan, true, memory_order_relaxed);
@@ -63,13 +63,13 @@ typedef struct TestEndContext {
 } TestEndContext;
 
 /** Records the kernel and call count observed by the end-hook fixture. */
-static void sampleEndFunction(Kernel *kernel, void *userdata) {
+static fn sampleEndFunction(Kernel *kernel, any userdata) {
     TestEndContext *ctx = (TestEndContext*) userdata;
     (*ctx).receivedKernel = kernel;
     atomic_fetch_add_explicit(&(*ctx).endCalls, 1, memory_order_relaxed);
 }
 
-int main(void) {
+int main() {
     printf("=== Running Kernel Run/End Function Test Suite ===\n");
 
     // Test 1: Count getters and initial state

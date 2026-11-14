@@ -37,18 +37,18 @@ ProcessSpawn *ProcessSpawn_0();
 ProcessSpawn *ProcessSpawn_1(u64 timeoutMs);
 #define ProcessSpawn(...) CONSTRUCTOR_DISPATCH(ProcessSpawn, __VA_ARGS__)
 
-void ProcessSpawn_free(ProcessSpawn *self);
+fn ProcessSpawn_free(ProcessSpawn *self);
 bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs, ProcessSpawn *dest);
 bool ProcessSpawn_poll(ProcessSpawn *self, u64 budgetNs);
-void ProcessSpawn_cancel(ProcessSpawn *self);
+fn ProcessSpawn_cancel(ProcessSpawn *self);
 
-void ProcessSpawn_setPid(ProcessSpawn *self, i32 pid);
+fn ProcessSpawn_setPid(ProcessSpawn *self, i32 pid);
 i32 ProcessSpawn_getPid(const ProcessSpawn *self);
-void ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs);
+fn ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs);
 u64 ProcessSpawn_getTimeoutMs(const ProcessSpawn *self);
-void ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode);
+fn ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode);
 i32 ProcessSpawn_getExitCode(const ProcessSpawn *self);
-void ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag);
+fn ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag);
 bool ProcessSpawn_isCancelFlag(const ProcessSpawn *self);
 u32 ProcessSpawn_getCount(const ProcessSpawn *self);
 i32 ProcessSpawn_getJobPid(const ProcessSpawn *self, u32 i);

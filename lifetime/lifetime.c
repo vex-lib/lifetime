@@ -11,7 +11,7 @@
  * DEFINITION: Lifetime
  * ============================================================================
  * memory substrate abstraction bridging R1 host execution with R2 persistent
- * and transient memory arenas. hotcwap operates purely on opaque void* pointers
+ * and transient memory arenas. hotcwap operates purely on opaque any pointers
  * without including vexspoke headers, preserving decoupling while strictly
  * validating pointer legitimacy (16-byte alignment, non-null, user address range >= 64KB).
  *
@@ -28,13 +28,13 @@
  * ============================================================================
  * SUMMARY:
  *   Provides the memory substrate for the R0 host kernel. Owns the master
- *   persistent arena and the per-tick transient scratch arena as opaque void* handles.
+ *   persistent arena and the per-tick transient scratch arena as opaque any handles.
  *
  *   R0 Host (lifetime) NEVER includes higher-tier headers. Instead,
- *   lifetime treats all memory pointers as opaque void* and actively enforces
+ *   lifetime treats all memory pointers as opaque any and actively enforces
  *   pointer legitimacy via Lifetime_isLegit:
  *     1. Non-null pointer check
- *     2. 16-byte alignment doctrine ((uintptr_t)ptr & 15 == 0)
+ *     2. 16-byte alignment doctrine ((pointer)ptr & 15 == 0)
  *     3. Valid user address range (ptr >= 0x10000 to avoid null/guard pages)
  *
  *   All allocations and bindings are validated through Lifetime_isLegit and
@@ -42,11 +42,11 @@
  *
  * STRUCT FIELDS (Mirroring spoke/lifetime.h — exactly this file's class):
  * ----------------------------------------------------------------------------
- *   void *persistentArena;    // master session arena (opaque void*)
- *   void *transientArena;     // per-tick scratch arena (opaque void*)
+ *   any persistentArena;    // master session arena (opaque any)
+ *   any transientArena;     // per-tick scratch arena (opaque any)
  *   u64 persistentType;  // LIFETIME_TYPE_ARENA (nonzero = attested)
  *   u64 transientType;   // LIFETIME_TYPE_ARENA (nonzero = attested)
- *   void *relational;         // relational symbol root (opaque void*)
+ *   any relational;         // relational symbol root (opaque any)
  *
  * PRIVATE HELPERS:
  * ----------------------------------------------------------------------------
@@ -87,13 +87,13 @@
  * ============================================================================
  */
 
-// Dynamic link symbols provided by the underlying memory runtime (pure void* ABI).
+// Dynamic link symbols provided by the underlying memory runtime (pure any ABI).
 // hotcwap does NOT include nio/mem.h or any vexspoke header files.
-extern void *MemoryArena_create(bytes totalBytes);
-extern void MemoryArena_destroy(void *arena);
-extern void MemoryArena_freeAll(void *arena);
-extern void *MemoryArena_alloc(void *arena, u64 typeId, bytes numBytes);
-extern void MemoryArena_free(void *arena, void *ptr);
+extern any MemoryArena_create(bytes totalBytes);
+extern fn MemoryArena_destroy(any arena);
+extern fn MemoryArena_freeAll(any arena);
+extern any MemoryArena_alloc(any arena, u64 typeId, bytes numBytes);
+extern fn MemoryArena_free(any arena, any ptr);
 
 // CONSTRUCTORS (PUBLIC & PRIVATE)
 /** Creates persistent and transient arenas, substituting defaults for zero sizes. */
@@ -104,7 +104,7 @@ Lifetime Lifetime_create(bytes persistentBytes, bytes transientBytes) {
     if (transientBytes == 0)
         transientBytes = 64 * 1024 * 1024;
 
-    void *p = MemoryArena_create(persistentBytes);
+    any p = MemoryArena_create(persistentBytes);
     if (!Lifetime_isLegit(p)) {
         if (p != nullptr) {
             MemoryArena_destroy(p);
@@ -112,7 +112,7 @@ Lifetime Lifetime_create(bytes persistentBytes, bytes transientBytes) {
         return lt;
     }
 
-    void *t = MemoryArena_create(transientBytes);
+    any t = MemoryArena_create(transientBytes);
     if (!Lifetime_isLegit(t)) {
         MemoryArena_destroy(p);
         if (t != nullptr) {
@@ -130,9 +130,9 @@ Lifetime Lifetime_create(bytes persistentBytes, bytes transientBytes) {
 }
 
 /** Wraps externally supplied arenas only when their pointers and type IDs validate. */
-Lifetime Lifetime_bind(void *persistentArena, void *transientArena,
+Lifetime Lifetime_bind(any persistentArena, any transientArena,
                        u64 persistentType, u64 transientType,
-                       void *relational) {
+                       any relational) {
     Lifetime lt = {
         .persistentArena = persistentArena,
         .transientArena = transientArena,
@@ -149,11 +149,11 @@ Lifetime Lifetime_bind(void *persistentArena, void *transientArena,
 
 // CORE FUNCTIONS (PUBLIC & PRIVATE)
 /** Checks non-null, 16-byte alignment, and the minimum user-address threshold. */
-bool Lifetime_isLegit(const void *ptr) {
+bool Lifetime_isLegit(const_any ptr) {
     if (ptr == nullptr) {
         return false;
     }
-    uintptr_t addr = (uintptr_t) ptr;
+    pointer addr = (pointer) ptr;
     // 16-byte arena alignment doctrine
     if ((addr & 15) != 0) {
         return false;
@@ -186,7 +186,7 @@ bool Lifetime_isValid(const Lifetime *lifetime) {
 }
 
 /** Destroys valid transient and persistent arenas and clears the record fields. */
-void Lifetime_destroy(Lifetime *lifetime) {
+fn Lifetime_destroy(Lifetime *lifetime) {
     if (lifetime == nullptr)
         return;
     if ((*lifetime).transientArena != nullptr) {
@@ -207,17 +207,17 @@ void Lifetime_destroy(Lifetime *lifetime) {
 }
 
 /** Releases all allocations from the valid transient arena. */
-void Lifetime_resetTransient(Lifetime *lifetime) {
+fn Lifetime_resetTransient(Lifetime *lifetime) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).transientArena))
         return;
     MemoryArena_freeAll((*lifetime).transientArena);
 }
 
 /** Allocates typed bytes from the persistent arena and validates the result pointer. */
-void *Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
+any Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).persistentArena))
         return nullptr;
-    void *ptr = MemoryArena_alloc((*lifetime).persistentArena, typeId, Bytes);
+    any ptr = MemoryArena_alloc((*lifetime).persistentArena, typeId, Bytes);
     if (!Lifetime_isLegit(ptr)) {
         return nullptr;
     }
@@ -225,10 +225,10 @@ void *Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
 }
 
 /** Allocates typed bytes from the transient arena and validates the result pointer. */
-void *Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
+any Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).transientArena))
         return nullptr;
-    void *ptr = MemoryArena_alloc((*lifetime).transientArena, typeId, Bytes);
+    any ptr = MemoryArena_alloc((*lifetime).transientArena, typeId, Bytes);
     if (!Lifetime_isLegit(ptr)) {
         return nullptr;
     }
@@ -236,7 +236,7 @@ void *Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
 }
 
 /** Frees a validated pointer through the persistent arena. */
-void Lifetime_freePersistent(Lifetime *lifetime, void *ptr) {
+fn Lifetime_freePersistent(Lifetime *lifetime, any ptr) {
     if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).persistentArena) || !Lifetime_isLegit(ptr))
         return;
     MemoryArena_free((*lifetime).persistentArena, ptr);
@@ -244,14 +244,14 @@ void Lifetime_freePersistent(Lifetime *lifetime, void *ptr) {
 
 // ACCESSORS (PUBLIC)
 /** Gets the bound relational symbol root (null-safe). */
-void *Lifetime_getRelational(const Lifetime *lifetime) {
+any Lifetime_getRelational(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
     return (*lifetime).relational;
 }
 
 /** Sets the relational symbol root after validating pointer legitimacy. */
-void Lifetime_setRelational(Lifetime *lifetime, void *relational) {
+fn Lifetime_setRelational(Lifetime *lifetime, any relational) {
     if (lifetime == nullptr)
         return;
     if (relational != nullptr && !Lifetime_isLegit(relational))
@@ -260,14 +260,14 @@ void Lifetime_setRelational(Lifetime *lifetime, void *relational) {
 }
 
 /** Gets the persistent arena handle (null-safe). */
-void *Lifetime_getPersistentArena(const Lifetime *lifetime) {
+any Lifetime_getPersistentArena(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
     return (*lifetime).persistentArena;
 }
 
 /** Gets the transient arena handle (null-safe). */
-void *Lifetime_getTransientArena(const Lifetime *lifetime) {
+any Lifetime_getTransientArena(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
     return (*lifetime).transientArena;
