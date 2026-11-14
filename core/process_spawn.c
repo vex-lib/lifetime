@@ -1,3 +1,4 @@
+#include "vex.h"
 #include "process_spawn.h"
 // Lifetime host; bounded child-job ABI preserved.
 
@@ -8,7 +9,6 @@
 #include <unistd.h>
 
 #include "re/nio/mem.h"
-#include "vex.h"
 
 extern char **environ;
 

@@ -1,6 +1,4 @@
-#include "util/annotation.h"
-
-#include <stdbool.h>
+#include "vex.h"
 #include <stdio.h>
 
 #include "window/window.h"

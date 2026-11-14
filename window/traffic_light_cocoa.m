@@ -5,10 +5,11 @@
 // Window state per the Single Class Per File Law and the Window Decoupling Law.
 
 #import <AppKit/AppKit.h>
+
+#include "vex.h"
 #include <stdlib.h>
 
 #include "window/traffic_light.h"
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

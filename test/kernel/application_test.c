@@ -10,16 +10,13 @@
 // Headless except for the single real-window isFinished case (skipped cleanly
 // where no window server exists).
 
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdatomic.h>
 #include <time.h>
 
 #include "core/application.h"
 #include "window/window.h"
-#include "util/test_support.h"
 
 static int g_failures = 0;
 

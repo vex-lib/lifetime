@@ -17,10 +17,10 @@
 // This backend never relaunches or exits the process: it reports what the OS
 // says and nothing more (the relaunch is the user's to make).
 
+#include "vex.h"
 #include "../permission.h"
 #include "../permission_backend.h"
 
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -37,7 +37,6 @@
 #import <CoreLocation/CoreLocation.h>
 #import <UserNotifications/UserNotifications.h>
 
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

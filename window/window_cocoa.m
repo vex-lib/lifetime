@@ -30,6 +30,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <IOSurface/IOSurface.h>
 #import <stdatomic.h>
+
+#include "vex.h"
 #include <math.h>
 
 #include "window/window.h"
@@ -38,7 +40,6 @@
 #include "input/key.h"
 #include "input/mouse.h"
 #include "input/touch.h"
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

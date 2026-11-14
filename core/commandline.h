@@ -1,8 +1,7 @@
 #ifndef HOT_KERNEL_COMMANDLINE_H
 #define HOT_KERNEL_COMMANDLINE_H
 
-#include <stdint.h>
-#include <stdatomic.h>
+#include "vex.h"
 
 // kernel/commandline.h — R1 terminal-application host (the fourth process kind).
 //

@@ -1,10 +1,6 @@
 #ifndef CORE_PROCESS_SPAWN_H
 #define CORE_PROCESS_SPAWN_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "vex.h"
 #include "re/type/re_type.h"
 

@@ -1,6 +1,8 @@
 #ifndef CAPABILITY_CAPABILITY_H
 #define CAPABILITY_CAPABILITY_H
 
+#include "vex.h"
+
 // capability/capability.h — the R1 host capability probe (the Capability
 // Gating Law). Answers "can THIS machine do X?" at runtime for host/CPU
 // features that are NEWER than the platform floor (the Platform Support Floor

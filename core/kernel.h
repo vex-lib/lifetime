@@ -1,10 +1,7 @@
 #ifndef HOT_KERNEL_KERNEL_H
 #define HOT_KERNEL_KERNEL_H
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 #include <pthread.h>
 
 #include "lifetime/lifetime.h"

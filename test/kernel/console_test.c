@@ -12,7 +12,7 @@
 //
 // Headless, deterministic.
 
-#include <stddef.h>
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
 

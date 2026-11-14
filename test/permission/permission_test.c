@@ -7,7 +7,7 @@
 // prompting paths are IRL actions and are never thrown at a headless suite (the
 // lab/IRL split, applied to permissions).
 
-#include "util/platform.h"
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
 

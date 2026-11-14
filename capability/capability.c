@@ -1,10 +1,8 @@
+#include "vex.h"
 #include "../capability/capability.h"
 
 // following the directory going forward:
 // worktree > organization > repository > <directory tree> > file
-#include "types.h"
-#include "util/annotation.h"
-#include "util/platform.h"
 
 #if defined(VEX_PLATFORM_APPLE)
 #include <sys/sysctl.h>

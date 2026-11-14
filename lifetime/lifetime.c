@@ -1,9 +1,7 @@
+#include "vex.h"
 #include "lifetime.h"
 
-#include <stdint.h>
-#include <stddef.h>
 
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

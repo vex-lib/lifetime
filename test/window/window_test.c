@@ -14,10 +14,10 @@
 // The Window Oracle Law's lab/IRL split: the automated half is deterministic
 // and bounded; the tour is the IRL probe and is never presented as proof.
 
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
 
-#include "util/annotation.h"
 #include "engine/loop.h"
 #include "input/key.h"
 #include "input/mouse.h"

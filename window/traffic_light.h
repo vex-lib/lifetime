@@ -1,7 +1,7 @@
 #ifndef WINDOW_TRAFFIC_LIGHT_H
 #define WINDOW_TRAFFIC_LIGHT_H
 
-#include <stdbool.h>
+#include "vex.h"
 
 // window/traffic_light.h — macOS traffic-light chrome management.
 //

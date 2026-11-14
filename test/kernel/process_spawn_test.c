@@ -1,27 +1,29 @@
 // Engine child table: actual spawning, exhaustion without mutation, reap/reuse,
 // cancellation-before-free and null-safe accessors. Outer runner has a watchdog.
 // Existing silent errors, destructor precondition and absent toString are gaps.
+
+#include "vex.h"
 #include "core/process_spawn.h"
 #include "re/nio/mem.h"
 #include <assert.h>
 #include <time.h>
 
 /* Reads a monotonic timestamp for the bounded child-process reap watchdog. */
-static u64 nowNs(void) {
+static u64 nowNs() {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return (u64) t.tv_sec * 1000000000ULL + (u64) t.tv_nsec;
 }
 
 /* Polls a child until completion while enforcing a two-second external bound. */
-static void reap(ProcessSpawn *owner) {
+static fn reap(ProcessSpawn *owner) {
     u64 start = nowNs();
     while (!ProcessSpawn_poll(owner, PROCESS_SPAWN_POLL_MAX_NS))
         assert(nowNs() - start < 2000000000ULL);
 }
 
 /* Proves spawn, capacity, reap/reuse, cancellation, and null-safe accessors. */
-int main(void) {
+int main() {
     ProcessSpawn *a = ProcessSpawn();
     ProcessSpawn *b = ProcessSpawn(20);
     assert(a && b && ProcessSpawn_getTimeoutMs(b) == 20);

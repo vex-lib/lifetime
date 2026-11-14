@@ -1,14 +1,13 @@
+#include "vex.h"
 #include "application.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdatomic.h>
 #include <time.h>
 
 #include "lifetime/lifetime.h"
 
-#include "util/annotation.h"
 #include "../../vexspoke/input/key.h"
 #include "../../vexspoke/input/mouse.h"
 #include "../../vexspoke/input/touch.h"

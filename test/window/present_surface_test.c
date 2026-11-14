@@ -4,7 +4,7 @@
 // displays them, and present publishes a surface by swapping the layer's
 // contents. Apple-only; elsewhere the surface is NULL and calls are no-ops.
 
-#include "util/platform.h"
+#include "vex.h"
 #include <stdio.h>
 
 #include "window/window.h"

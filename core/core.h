@@ -3,6 +3,7 @@
 
 // core/core.h — the R0 kernel-host directory door.
 
+#include "vex.h"
 #include "application.h"
 #include "commandline.h"
 #include "console.h"

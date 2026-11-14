@@ -1,6 +1,8 @@
 #ifndef PERMISSION_PERMISSION_H
 #define PERMISSION_PERMISSION_H
 
+#include "vex.h"
+
 // permission/permission.h — OS capability permission requests (R1 host).
 //
 // Answers "may I do X?" for the capabilities a host app must ask the operating

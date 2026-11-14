@@ -1,4 +1,3 @@
-#include "util/platform.h"
 
 #if defined(VEX_PLATFORM_WINDOWS)
 // window/window_win32.c — the lean Win32 backend for the Window API (draft).
@@ -45,12 +44,10 @@
 #define NOMINMAX
 #endif
 
+#include "vex.h"
 #include <windows.h>
 #include <dwmapi.h>
 #include <wingdi.h>
-#include <stdatomic.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -62,7 +59,6 @@
 #include "input/mouse.h"
 #include "input/touch.h"
 #include "buffer/buffer.h"
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**
@@ -2246,9 +2242,6 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
-#include <stdatomic.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

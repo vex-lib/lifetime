@@ -1,10 +1,7 @@
 #ifndef HOT_PROCESS_CONSOLE_H
 #define HOT_PROCESS_CONSOLE_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdatomic.h>
+#include "vex.h"
 
 // kernel/console.h — Session state machine for shell scripts / REPL sessions.
 //

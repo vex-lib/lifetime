@@ -1,10 +1,10 @@
+#include "vex.h"
 #include "commandline.h"
 
 #include <string.h>
 
 #include <curses.h>
 
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

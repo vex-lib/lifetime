@@ -1,10 +1,7 @@
 #ifndef WINDOW_WINDOW_H
 #define WINDOW_WINDOW_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
+#include "vex.h"
 #include "lang/annotation.h"
 
 #include "../../vexspoke/event/keyhandler.h"

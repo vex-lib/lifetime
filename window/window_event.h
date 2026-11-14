@@ -1,7 +1,7 @@
 #ifndef WINDOW_WINDOW_EVENT_H
 #define WINDOW_WINDOW_EVENT_H
 
-#include <stdbool.h>
+#include "vex.h"
 
 // window/window_event.h — Per-window OS lifecycle event registry.
 //

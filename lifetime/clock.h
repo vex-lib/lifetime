@@ -1,9 +1,7 @@
 #ifndef LIFETIME_CLOCK_H
 #define LIFETIME_CLOCK_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 
 // lifetime/clock.h — the R0 ground-truth clock.
 //

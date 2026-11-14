@@ -9,11 +9,10 @@
 //
 // macOS-only (the backend is traffic_light_cocoa.m); wired under `if(APPLE)`.
 
-#include <stdbool.h>
+#include "vex.h"
 #include <stdio.h>
 
 #include "window/traffic_light.h"
-#include "util/test_support.h"
 #include "window/window.h"
 
 static int g_failures = 0;

@@ -6,10 +6,9 @@
 // null-slot no-ops, null-self safety, and the single vetoable slot
 // (onQuitRequested — true = may quit, false = app declines).
 
-#include <stdint.h>
+#include "vex.h"
 #include <stdio.h>
 
-#include "util/annotation.h"
 #include "window/window_event.h"
 
 ;;OVERVIEW

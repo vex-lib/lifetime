@@ -1,11 +1,10 @@
+#include "vex.h"
 #include "commandline.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "util/annotation.h"
-#include "util/throw.h"
 
 ;;DEFINITION
 /**

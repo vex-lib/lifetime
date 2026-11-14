@@ -1,15 +1,13 @@
 #ifndef HOT_PROCESS_PROCESS_H
 #define HOT_PROCESS_PROCESS_H
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "vex.h"
 
 // One caller-thread invocation at a time. Name, context and hot association
 // are borrowed; code and data must remain live while referenced. No module
 // pin, thread or cancellation mechanism is created here. Before free,
 // deregister and externally exclude ALL concurrent API callers.
-typedef int (*ProcessEntry)(void *context);
+typedef int (*ProcessEntry)(any context);
 
 typedef enum ProcessResult {
     PROCESS_OK = 0,

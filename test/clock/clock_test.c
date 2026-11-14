@@ -5,12 +5,14 @@
 //   - millis within sane unix range and consistent with nanos;
 //   - seconds agree with nanos within one tick;
 //   - no frame count, no pause/scale — ground truth only.
+
+#include "vex.h"
 #include "lifetime/clock.h"
 
 #include <assert.h>
 #include <stdio.h>
 
-int main(void) {
+int main() {
     u64 n1 = Clock_nowNanos();
     u64 n2 = Clock_nowNanos();
     assert(n2 >= n1);

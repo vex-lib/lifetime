@@ -1,8 +1,7 @@
+#include "vex.h"
 #include "window/window_event.h"
 
-#include <stddef.h>
 
-#include "util/annotation.h"
 
 ;;DEFINITION
 /**

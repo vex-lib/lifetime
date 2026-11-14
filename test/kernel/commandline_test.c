@@ -8,12 +8,13 @@
  * reset, rejection preservation, bounded poll delivery, mouse toggle,
  * projections, null safety, and Kernel registration as the fourth kind.
  */
+
+#include "vex.h"
 #include <stdio.h>
 #include <string.h>
 
 #include "core/commandline.h"
 #include "core/kernel.h"
-#include "util/test_support.h"
 
 typedef struct Fake {
     int opens, closes, presents, mouse, polls;

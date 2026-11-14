@@ -1,10 +1,7 @@
 #ifndef HOT_PROCESS_APPLICATION_H
 #define HOT_PROCESS_APPLICATION_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdatomic.h>
+#include "vex.h"
 #include <pthread.h>
 
 #include "../window/window.h"
