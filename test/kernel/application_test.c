@@ -30,7 +30,7 @@ static int g_failures = 0;
 
 /** Records the application reload callback's load result for later assertions. */
 static fn onHotReloadStub(Application *self, u32 loaded, any userdata) {
-    (fn) self; (fn) loaded; (fn) userdata;
+    (discard) self; (discard) loaded; (discard) userdata;
 }
 
 // A start callback that blocks until the test opens the gate, so STARTING is
@@ -44,7 +44,7 @@ typedef struct StartGate {
 } StartGate;
 
 static fn gatedStart(Application *self, any userdata) {
-    (fn) self;
+    (discard) self;
     StartGate *gate = userdata;
     atomic_fetch_add_explicit(&(*gate).entered, 1, memory_order_release);
     pthread_mutex_lock(&(*gate).lock);

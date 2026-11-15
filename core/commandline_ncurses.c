@@ -42,7 +42,7 @@ static bool g_open = false;
 static bool g_mouse = false;
 
 static bool ncOpen(any ctx) {
-    (fn) ctx;
+    (discard) ctx;
     if (g_open)
         return true;
     if (initscr() == nullptr)
@@ -60,7 +60,7 @@ static bool ncOpen(any ctx) {
 }
 
 static fn ncClose(any ctx) {
-    (fn) ctx;
+    (discard) ctx;
     if (!g_open)
         return;
     if (g_mouse) {
@@ -72,7 +72,7 @@ static fn ncClose(any ctx) {
 }
 
 static bool ncSize(any ctx, bytes *outW, bytes *outH) {
-    (fn) ctx;
+    (discard) ctx;
     if (!g_open)
         return false;
     int rows = 0, cols = 0;
@@ -85,7 +85,7 @@ static bool ncSize(any ctx, bytes *outW, bytes *outH) {
 }
 
 static bool ncPresent(any ctx, const char *cells, bytes width, bytes height) {
-    (fn) ctx;
+    (discard) ctx;
     if (!g_open || cells == nullptr || width == 0 || height == 0)
         return false;
     for (bytes y = 0; y < height; ++y) {
@@ -98,7 +98,7 @@ static bool ncPresent(any ctx, const char *cells, bytes width, bytes height) {
 }
 
 static bool ncSetMouse(any ctx, bool enabled) {
-    (fn) ctx;
+    (discard) ctx;
     if (!g_open)
         return false;
     if (enabled) {
@@ -130,7 +130,7 @@ static CommandLineKey ncMapKey(int ch) {
 }
 
 static bool ncPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
-    (fn) ctx;
+    (discard) ctx;
     if (!g_open || out == nullptr)
         return false;
     timeout(timeoutMs);

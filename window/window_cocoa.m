@@ -475,7 +475,7 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Publish each content-size step and invoke the resize render hook in the tracking turn. */
-- (fn)setFrameSize:(NSSize)newSize {
+- (discard)setFrameSize:(NSSize)newSize {
     [super setFrameSize:newSize];
     Window *w = windowHandleOf([self window]);
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
@@ -506,7 +506,7 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Mark the window as resizing before AppKit begins its live-resize callbacks. */
-- (fn)viewWillStartLiveResize {
+- (discard)viewWillStartLiveResize {
     Window *w = windowHandleOf([self window]);
     if (w)
         atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
@@ -514,7 +514,7 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Clear live-resize state and reconcile the final size and render hook. */
-- (fn)viewDidEndLiveResize {
+- (discard)viewDidEndLiveResize {
     Window *w = windowHandleOf([self window]);
     if (w) {
         atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
@@ -536,7 +536,7 @@ static CGFloat windowBackingScale(const Window *window);
 @implementation WindowAppDelegate
 /** Allow the process to terminate after its final native window closes. */
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*) sender {
-    (fn) sender;
+    (discard) sender;
     return YES;
 }
 @end
@@ -552,7 +552,7 @@ static CGFloat windowBackingScale(const Window *window);
 @implementation WindowDelegate
 /** Ask lifecycle listeners whether AppKit should accept the close request. */
 - (BOOL)windowShouldClose:(NSWindow*) sender {
-    (fn) sender;
+    (discard) sender;
     Window *w = self.handlePtr;
     if (w)
         return WindowEvent_fireQuitRequested(&(*w).lifecycle, w);
@@ -560,31 +560,31 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Set the C close latch when AppKit reports that the native window closed. */
-- (fn)windowWillClose:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowWillClose:(NSNotification*) notification {
+    (discard) notification;
     if (self.shouldClosePtr)
         atomic_store_explicit(self.shouldClosePtr, true, memory_order_relaxed);
 }
 
 /** Revalidate physical size and monitor state after the window changes screens. */
-- (fn)windowDidChangeScreen:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidChangeScreen:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         Window_revalidate(w);
 }
 
 /** Revalidate pixel geometry after AppKit changes backing scale properties. */
-- (fn)windowDidChangeBackingProperties:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidChangeBackingProperties:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         Window_revalidate(w);
 }
 
 /** Refresh cached size and origin after AppKit completes a resize notification. */
-- (fn)windowDidResize:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidResize:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
         fprintf(stderr, "dr:\n");
@@ -595,8 +595,8 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Refresh the cached screen origin after AppKit moves the window. */
-- (fn)windowDidMove:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidMove:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
         fprintf(stderr, "dm:\n");
@@ -605,16 +605,16 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Mark fullscreen transition work as live resizing before AppKit animates. */
-- (fn)windowWillEnterFullScreen:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowWillEnterFullScreen:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
 }
 
 /** Publish final fullscreen geometry and notify lifecycle listeners. */
-- (fn)windowDidEnterFullScreen:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidEnterFullScreen:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
         atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
@@ -625,16 +625,16 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Mark fullscreen exit as live resizing until AppKit completes the transition. */
-- (fn)windowWillExitFullScreen:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowWillExitFullScreen:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
 }
 
 /** Reconcile restored geometry, render once after transition, and notify listeners. */
-- (fn)windowDidExitFullScreen:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidExitFullScreen:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
         atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
@@ -649,16 +649,16 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Mark the native minimize animation so resize rendering can be suppressed. */
-- (fn)windowWillMiniaturize:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowWillMiniaturize:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         atomic_store_explicit(&(*w).miniaturizing, true, memory_order_relaxed);
 }
 
 /** Clear transition state and publish the minimized lifecycle event. */
-- (fn)windowDidMiniaturize:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidMiniaturize:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
         atomic_store_explicit(&(*w).miniaturizing, false, memory_order_relaxed);
@@ -667,16 +667,16 @@ static CGFloat windowBackingScale(const Window *window);
 }
 
 /** Mark the restore animation so intermediate geometry is not rendered. */
-- (fn)windowWillDeminiaturize:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowWillDeminiaturize:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w)
         atomic_store_explicit(&(*w).miniaturizing, true, memory_order_relaxed);
 }
 
 /** Clear transition state, refresh size, and publish restoration. */
-- (fn)windowDidDeminiaturize:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidDeminiaturize:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
         atomic_store_explicit(&(*w).miniaturizing, false, memory_order_relaxed);
@@ -689,8 +689,8 @@ static CGFloat windowBackingScale(const Window *window);
 // event before AppKit performs the standard-frame change.
 /** Publish the zoom-fill lifecycle event before AppKit applies the target frame. */
 - (BOOL)windowShouldZoom:(NSWindow*) sender toFrame:(NSRect)newFrame {
-    (fn) sender;
-    (fn) newFrame;
+    (discard) sender;
+    (discard) newFrame;
     Window *w = self.handlePtr;
     if (w)
         WindowEvent_fireZoomFilled(&(*w).lifecycle, w);
@@ -702,8 +702,8 @@ static CGFloat windowBackingScale(const Window *window);
 // window reads zero state bits, so it reports not-visible and the renderer
 // rests. The notification itself is the flip signal — no extra cache.
 /** Publish whether the native window is currently visible to the user. */
-- (fn)windowDidChangeOcclusionState:(NSNotification*) notification {
-    (fn) notification;
+- (discard)windowDidChangeOcclusionState:(NSNotification*) notification {
+    (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
         bool visible = false;
@@ -1131,7 +1131,7 @@ static bool windowPollEvents(bool singleStep) {
 
 // Drain the process-wide AppKit queue and refresh registered window state.
 fn Window_pollEvents() {
-    (fn) windowPollEvents(false);
+    (discard) windowPollEvents(false);
 }
 
 // Dispatch at most one AppKit event and report whether another remains queued.
@@ -1141,7 +1141,7 @@ bool Window_pollEventStep() {
 
 // Wait for one process-wide AppKit event for the requested bounded interval.
 fn Window_waitEvents(Window *window, int timeoutMs) {
-    (fn) window;   // the AppKit event pump is process-wide
+    (discard) window;   // the AppKit event pump is process-wide
     @autoreleasepool {
         NSDate *until = timeoutMs > 0
             ? [NSDate dateWithTimeIntervalSinceNow:(d64) timeoutMs / 1000.0]
@@ -1201,7 +1201,7 @@ fn Window_waitEvents(Window *window, int timeoutMs) {
 static const CGFloat kWindowResizeBorderPoints = 6.0;
 
 /** Route titlebar d64-click gestures before ordinary AppKit event delivery. */
-- (fn)sendEvent:(NSEvent*) event {
+- (discard)sendEvent:(NSEvent*) event {
     if (event.type == NSEventTypeLeftMouseDown && event.clickCount == 2) {
         NSPoint p = [event locationInWindow];
         NSSize size = self.frame.size;
@@ -1504,60 +1504,60 @@ u64 Window_renderGeneration(const Window *window) {
 
 // ;;INTENTION("Graphics board slots and layer ordering are GPU-era stubs retired per the Window Decoupling Law. A Window is a dumb presentation surface; graphics layers and surfaces are managed by graphvex.")
 fn Window_orderLayers(Window *window) {
-    (fn) window;
+    (discard) window;
 }
 
 // Retain the retired lower-layer setter as an inert compatibility seam.
 fn Window_setBottomLayer(Window *window, any layer) {
-    (fn) window;
-    (fn) layer;
+    (discard) window;
+    (discard) layer;
 }
 
 // Return no layer because the lean window no longer owns graphics layers.
 any Window_getBottomLayer(const Window *window) {
-    (fn) window;
+    (discard) window;
     return nullptr;
 }
 
 // Retain the retired upper-layer setter as an inert compatibility seam.
 fn Window_setTopLayer(Window *window, any layer) {
-    (fn) window;
-    (fn) layer;
+    (discard) window;
+    (discard) layer;
 }
 
 // Return no layer because the lean window no longer owns graphics layers.
 any Window_getTopLayer(const Window *window) {
-    (fn) window;
+    (discard) window;
     return nullptr;
 }
 
 // ;;INTENTION("Pane/board compositing was the GPU-era shim's job; on this window it is inert (still-unmigrated darling compositor retains the call). Pane work migrates to the render personal' own pass; retires together with the composite seam.")
 bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
-    (fn) window;
-    (fn) panel;
-    (fn) width;
-    (fn) height;
+    (discard) window;
+    (discard) panel;
+    (discard) width;
+    (discard) height;
     return false;
 }
 
 // Retain the retired pane API as an inert failure on the lean window backend.
 bool Window_resizePanes(Window *window, Panel *panel, int width, int height) {
-    (fn) window;
-    (fn) panel;
-    (fn) width;
-    (fn) height;
+    (discard) window;
+    (discard) panel;
+    (discard) width;
+    (discard) height;
     return false;
 }
 
 // Keep the retired pane-compositor entry point linkable without rendering.
 fn Window_compositePanes(Window *window, Panel *contentPanel) {
-    (fn) window;
-    (fn) contentPanel;
+    (discard) window;
+    (discard) contentPanel;
 }
 
 // Keep the retired board-compositor entry point linkable without rendering.
 fn Window_compositeBoards(Window *window) {
-    (fn) window;
+    (discard) window;
 }
 
 // --- Runtime state ----------------------------------------------------------
@@ -2328,7 +2328,7 @@ any Window_createPresentSurface(Window *window, int widthPx, int heightPx) {
 
 // Release the retained IOSurface reference supplied by the caller.
 fn Window_destroyPresentSurface(Window *window, any surface) {
-    (fn) window;
+    (discard) window;
     if (surface != nullptr)
         CFRelease((CFTypeRef) surface);
 }
@@ -2373,7 +2373,7 @@ any Window_presentSurfaceContents(const Window *window) {
 
 // Copy IOSurface pixels into the caller's RGBA destination when dimensions permit.
 bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes destStride) {
-    (fn) window;
+    (discard) window;
     if (surface == nullptr || destRGBA == nullptr || destStride == 0)
         return false;
     IOSurfaceRef s = (IOSurfaceRef) surface;
@@ -2464,14 +2464,14 @@ fn Window_bringToFront(Window *window) {
 
 // Attach a child window using AppKit's parent-child ordering relationship.
 fn Window_attachChild(Window *parent, Window *child) {
-    (fn) parent;
-    (fn) child;
+    (discard) parent;
+    (discard) child;
 }
 
 // Remove an existing child-window relationship from its parent.
 fn Window_detachChild(Window *parent, Window *child) {
-    (fn) parent;
-    (fn) child;
+    (discard) parent;
+    (discard) child;
 }
 
 // --- Minimize ---
@@ -2642,8 +2642,8 @@ WindowCursorType Window_getCursorType(const Window *window) {
 
 // ;;INTENTION("Window_present on the fresh window is inert (`return false`): a pure AppKit window has no raster target of its own. Software present was GPU-era shim logic; the render personal own pixel paths. Retires with the composite seam.")
 bool Window_present(Window *window, const Buffer *frame) {
-    (fn) window;
-    (fn) frame;
+    (discard) window;
+    (discard) frame;
     return false;
 }
 
@@ -2663,13 +2663,13 @@ any Window_nativeHandle(const Window *window) {
 
 // ;;INTENTION("Window_metalLayer is gone from this file by design (no Metal here). Returns nullptr so the VK_EXT_metal_surface path degrades cleanly until the render personal create their own CAMetalLayer on the content view. Retires with the composite seam.")
 any Window_metalLayer(Window *window) {
-    (fn) window;
+    (discard) window;
     return nullptr;
 }
 
 // ;;INTENTION("Gravity ownership moved out of the window (no layer here). No-op; retires with the composite seam.")
 fn Window_setGravityTopLeft(Window *window) {
-    (fn) window;
+    (discard) window;
 }
 
 // ;;INTENTION("Worker present transaction was GPU-era (presentsWithTransaction drawables). No layer means nothing to commit; no-op. Retires with the composite seam.")
@@ -2725,7 +2725,7 @@ bool Window_removeTouchAdapter(Window *window, const TouchHandler *adapter) {
 
 // Drain key, mouse, and touch callback queues for the engine input modules.
 fn Window_dispatchEvents(Window *window) {
-    (fn) window;
+    (discard) window;
     Key_dispatchEvents();
     Mouse_dispatchEvents();
     Touch_dispatchEvents();

@@ -40,7 +40,7 @@ typedef struct {
 
 /** Records a successful fake launch using the configured shell and directory. */
 static bool fakeSpawn(any ctx, const char *shell, const char *workDir) {
-    (fn) shell; (fn) workDir;
+    (discard) shell; (discard) workDir;
     fake_io_t *f = ctx;
     (*f).spawns++;
     return true;

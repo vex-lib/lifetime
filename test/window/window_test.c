@@ -76,13 +76,13 @@ static win_ctx_t *g_winCtx = nullptr;
 // --- Input listeners: echo everything the pipeline produces. ---
 
 static fn on_key_down(any self, int keyEvent, u64 nanos) {
-    (fn) self; (fn) nanos;
+    (discard) self; (discard) nanos;
     printf("key DOWN  %-12s code=%d\n", Key_name(Key_code(keyEvent)), Key_code(keyEvent));
 }
 
 /** Prints key-up events and stops the tour when Escape is released. */
 static fn on_key_up(any self, int keyEvent, u64 nanos) {
-    (fn) self; (fn) nanos;
+    (discard) self; (discard) nanos;
     printf("key UP    %-12s hold=%.1fms taps=%d\n", Key_name(Key_code(keyEvent)),
            Key_lastHoldDurationNanos(Key_code(keyEvent)) / 1e6,
            Key_taps(Key_code(keyEvent)));
@@ -92,7 +92,7 @@ static fn on_key_up(any self, int keyEvent, u64 nanos) {
 
 /** Reports mouse-button presses with the current pointer position. */
 static fn on_mouse_down(any self, int mouseEvent, u64 nanos) {
-    (fn) self; (fn) nanos;
+    (discard) self; (discard) nanos;
     printf("mouse DOWN %s taps=%d at (%.0f, %.0f)\n",
            Mouse_name(Mouse_button(mouseEvent)), Mouse_taps(Mouse_button(mouseEvent)),
            Mouse_x(), Mouse_y());
@@ -100,7 +100,7 @@ static fn on_mouse_down(any self, int mouseEvent, u64 nanos) {
 
 /** Reports scroll deltas received by the window input listener. */
 static fn on_scroll(any self, d64 dx, d64 dy) {
-    (fn) self;
+    (discard) self;
     printf("scroll (%.2f, %.2f)\n", dx, dy);
 }
 
@@ -108,7 +108,7 @@ static int g_moves = 0;
 
 /** Reports pointer movement and counts events for the bounded demo. */
 static fn on_move(any self, d64 x, d64 y) {
-    (fn) self;
+    (discard) self;
     if (++g_moves % 60 == 0) // throttle: one line per ~60 moves
         printf("move (%.0f, %.0f)\n", x, y);
 }
@@ -232,7 +232,7 @@ static fn runChromeContract(Window *w) {
     Window_setShouldClose(w, false);
     CHECK(!Window_shouldClose(w));
 
-    // Adapter registration by pointer identity: add (fn) then remove (bool).
+    // Adapter registration by pointer identity: add (discard) then remove (bool).
     Window_addKeyAdapter(w, &g_keyListener);
     CHECK(Window_removeKeyAdapter(w, &g_keyListener));
     Window_addMouseAdapter(w, &g_mouseListener);

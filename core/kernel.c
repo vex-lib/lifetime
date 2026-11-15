@@ -315,7 +315,7 @@ bool Kernel_free(Kernel *self) {
 fn Kernel_destroy(Kernel *self) {
     if (!self)
         return;
-    (fn) Kernel_free(self);
+    (discard) Kernel_free(self);
 }
 
 /** Requests draining and stops active applications and consoles. */
@@ -508,20 +508,20 @@ static fn kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
             Process *p = (Process*) ptr;
             if (kernelAddProcessInternal(self, p)) {
                 int exitStatus = 0;
-                (fn) Process_run(p, &exitStatus);
+                (discard) Process_run(p, &exitStatus);
             }
             break;
         }
         case KERNEL_DEFERRED_CONSOLE: {
             Console *c = (Console*) ptr;
             if (kernelAddConsoleInternal(self, c))
-                (fn) Console_run(c);
+                (discard) Console_run(c);
             break;
         }
         case KERNEL_DEFERRED_COMMANDLINE: {
             CommandLine *cl = (CommandLine*) ptr;
             if (kernelAddCommandLineInternal(self, cl) && !CommandLine_isOpen(cl))
-                (fn) CommandLine_open(cl);
+                (discard) CommandLine_open(cl);
             break;
         }
         case KERNEL_DEFERRED_NONE:
@@ -607,7 +607,7 @@ static fn kernelStartApplication(Kernel *self, Application *a) {
         return;
     if (self)
         Application_setHostLifetime(a, &(*self).lifetime);
-    (fn) Application_begin(a);
+    (discard) Application_begin(a);
     u32 winCount = Application_getWindowCount(a);
     for (u32 i = 0; i < winCount; i++) {
         Window *w = Application_getWindow(a, i);
@@ -676,13 +676,13 @@ int Kernel_runAll(Kernel *self) {
     for (u32 i = 0; i < (*self).consoleCount; i++) {
         Console *c = (*self).consoles[i];
         if (c)
-            (fn) Console_run(c);
+            (discard) Console_run(c);
     }
     // Terminal applications: acquire the device, then drive it each pass below.
     for (u32 i = 0; i < (*self).commandlineCount; i++) {
         CommandLine *cl = (*self).commandlines[i];
         if (cl && !CommandLine_isOpen(cl))
-            (fn) CommandLine_open(cl);
+            (discard) CommandLine_open(cl);
     }
     for (u32 i = 0; i < (*self).applicationCount; i++)
         kernelStartApplication(self, (*self).applications[i]);
@@ -714,13 +714,13 @@ int Kernel_runAll(Kernel *self) {
                 continue;
             bytes n = 0;
             if (Console_poll(c, buf, sizeof(buf), &n) && n > 0)
-                (fn) fwrite(buf, 1, n, stdout);
+                (discard) fwrite(buf, 1, n, stdout);
         }
         // Terminal applications: one non-blocking draw/resize/input pass each.
         for (u32 i = 0; i < (*self).commandlineCount; i++) {
             CommandLine *cl = (*self).commandlines[i];
             if (cl && CommandLine_isOpen(cl) && CommandLine_hasApp(cl) && !CommandLine_isCancelled(cl))
-                (fn) CommandLine_tick(cl);
+                (discard) CommandLine_tick(cl);
         }
 
         if ((pass % 50) == 0) {
@@ -776,7 +776,7 @@ int Kernel_runAll(Kernel *self) {
 
 /** Forwards one process invocation and returns its callback status or kernel error. */
 int Kernel_runProcess(Kernel *self, Process *p) {
-    (fn) self;
+    (discard) self;
     if (!p)
         return KERNEL_EXIT_NO_APPS;
     int exitStatus = 0;
@@ -787,7 +787,7 @@ int Kernel_runProcess(Kernel *self, Process *p) {
 
 /** Starts a console session through its configured IO seam. */
 bool Kernel_runConsole(Kernel *self, Console *c) {
-    (fn) self;
+    (discard) self;
     return c ? Console_run(c) : false;
 }
 
@@ -796,7 +796,7 @@ bool Kernel_runConsole(Kernel *self, Console *c) {
 // reactor drives the same CommandLine with CommandLine_tick instead.
 /** Runs one CommandLine terminal-application loop; returns its exit code. */
 int Kernel_runCommandLine(Kernel *self, CommandLine *c) {
-    (fn) self;
+    (discard) self;
     if (!c)
         return KERNEL_EXIT_NO_APPS;
     if (!CommandLine_isOpen(c) && !CommandLine_open(c))

@@ -37,13 +37,13 @@ static bool fSize(any ctx, bytes *w, bytes *h) {
 }
 static bool fPresent(any ctx, const char *cells, bytes w, bytes h) {
     Fake *f = (Fake*) ctx;
-    (fn) cells; (fn) w; (fn) h;
+    (discard) cells; (discard) w; (discard) h;
     (*f).presents++;
     return true;
 }
 static bool fPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
     Fake *f = (Fake*) ctx;
-    (fn) timeoutMs;
+    (discard) timeoutMs;
     (*f).polls++;
     if (!(*f).pending)
         return false;
@@ -63,7 +63,7 @@ static bool aDraw(any ctx, CommandLine *line) {
 }
 static bool aInput(any ctx, CommandLine *line, const CommandLineEvent *event) {
     FakeApp *a = (FakeApp*) ctx;
-    (fn) event;
+    (discard) event;
     (*a).inputs++;
     if ((*a).stopOnInput) {
         CommandLine_stop(line);

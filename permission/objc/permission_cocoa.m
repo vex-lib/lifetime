@@ -200,7 +200,7 @@ static bool requestCamera() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
-                             completionHandler:^(BOOL granted) { (fn) granted; }];
+                             completionHandler:^(BOOL granted) { (discard) granted; }];
     return true;
 }
 
@@ -209,7 +209,7 @@ static bool requestMicrophone() {
     if (!hostHasBundle())
         return false;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
-                             completionHandler:^(BOOL granted) { (fn) granted; }];
+                             completionHandler:^(BOOL granted) { (discard) granted; }];
     return true;
 }
 
@@ -221,8 +221,8 @@ static bool requestContacts() {
         g_contactStore = [[CNContactStore alloc] init];
     [g_contactStore requestAccessForEntityType:CNEntityTypeContacts
                              completionHandler:^(BOOL granted, NSError *error) {
-                                 (fn) granted;
-                                 (fn) error;
+                                 (discard) granted;
+                                 (discard) error;
                              }];
     return true;
 }
@@ -235,16 +235,16 @@ static bool requestCalendar() {
         g_eventStore = [[EKEventStore alloc] init];
     if (@available(macOS 14.0, *)) {
         [g_eventStore requestFullAccessToEventsWithCompletion:^(BOOL granted, NSError *error) {
-            (fn) granted;
-            (fn) error;
+            (discard) granted;
+            (discard) error;
         }];
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         [g_eventStore requestAccessToEntityType:EKEntityTypeEvent
                                      completion:^(BOOL granted, NSError *error) {
-                                         (fn) granted;
-                                         (fn) error;
+                                         (discard) granted;
+                                         (discard) error;
                                      }];
 #pragma clang diagnostic pop
     }
@@ -258,7 +258,7 @@ static bool requestPhotos() {
     if (@available(macOS 11.0, *)) {
         [PHPhotoLibrary requestAuthorizationForAccessLevel:PHAccessLevelReadWrite
                                                   handler:^(PHAuthorizationStatus status) {
-                                                      (fn) status;
+                                                      (discard) status;
                                                   }];
     }
     return true;
@@ -283,8 +283,8 @@ static bool requestNotifications() {
     [[UNUserNotificationCenter currentNotificationCenter]
         requestAuthorizationWithOptions:options
                       completionHandler:^(BOOL granted, NSError *error) {
-                          (fn) granted;
-                          (fn) error;
+                          (discard) granted;
+                          (discard) error;
                       }];
     return true;
 }

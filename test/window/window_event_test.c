@@ -73,10 +73,10 @@ static int g_nullOwnerHits;
 // Null-guarding slot used to prove that a fire with a null stored context
 // still reaches the callback (the callback is responsible for its own guard).
 static fn onResizedNullOwnerRec(any self, Window *window, int width, int height) {
-    (fn) self;
-    (fn) window;
-    (fn) width;
-    (fn) height;
+    (discard) self;
+    (discard) window;
+    (discard) width;
+    (discard) height;
     g_nullOwnerHits++;
 }
 
@@ -184,7 +184,7 @@ static bool onQuitVetoRec(any self, Window *window) {
 int main() {
     int failures = 0;
     WindowEvent ev;
-    (fn) WindowEvent_init(&ev);
+    (discard) WindowEvent_init(&ev);
     Window *dummyWindow = (Window*) (pointer) 0x1234;
     Window *nullWindow = nullptr;
 
@@ -332,7 +332,7 @@ int main() {
 
     // init on null / on an initialized instance: null fails safe, re-init zeros.
     CHECK(WindowEvent_init(nullptr) == false);
-    (fn) WindowEvent_init(&ev);
+    (discard) WindowEvent_init(&ev);
     CHECK(WindowEvent_getOnQuitRequested(&ev) == nullptr);
     CHECK(WindowEvent_getSelf(&ev) == nullptr);
 
