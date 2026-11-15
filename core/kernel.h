@@ -65,7 +65,7 @@
 // Process exit codes returned by the Kernel_run dispatch entry.
 #define KERNEL_EXIT_OK 0
 #define KERNEL_EXIT_NO_APPS -1
-// Kernel's legacy int return surface maps Process admission failure to -2.
+// Kernel's legacy i32 return surface maps Process admission failure to -2.
 // Use Process_run directly to distinguish admission status from callback codes.
 #define KERNEL_EXIT_PROCESS_FAILED -2
 
@@ -134,7 +134,7 @@ struct Kernel {
     // BEFORE Kernel_runApplication; a null seat falls back to the parked
     // Application_run loop, so hotcwap compiles and links standalone with zero
     // graphvex symbols (no weak externs, no Mach-O undefined-symbol traps).
-    int (*gfxAppRun)(any context, bool (*continueFn)(any), bool (*pollFn)());
+    i32 (*gfxAppRun)(any context, bool (*continueFn)(any), bool (*pollFn)());
     Process     *processes[KERNEL_MAX_PROCS];    // one-shot invokables
     u32 processCount;                       // used slots in processes[]
     Console     *consoles[KERNEL_MAX_CONSOLES];  // session pumps
@@ -245,12 +245,12 @@ bool Kernel_isRunning(const Kernel *self);
 // Kernel_stop() ends the run; Kernel_run returns the first non-zero Process
 // exit seen, or KERNEL_EXIT_OK. It returns KERNEL_EXIT_NO_APPS when nothing
 // is registered. The 2-arity forms stay blocking/non-supervising per kind.
-int  Kernel_runAll(Kernel *self);
-int  Kernel_runProcess(Kernel *self, Process *p);
+i32  Kernel_runAll(Kernel *self);
+i32  Kernel_runProcess(Kernel *self, Process *p);
 bool Kernel_runConsole(Kernel *self, Console *c);
-int  Kernel_runApplication(Kernel *self, Application *a);
+i32  Kernel_runApplication(Kernel *self, Application *a);
 // Blocking terminal-application loop for one CommandLine (the 2-arity form).
-int  Kernel_runCommandLine(Kernel *self, CommandLine *c);
+i32  Kernel_runCommandLine(Kernel *self, CommandLine *c);
 
 #define KERNEL_RUN_CHOOSER(_0, _1, _2, NAME, ...) NAME
 
@@ -279,9 +279,9 @@ Application *Kernel_getApplication(const Kernel *self, u32 index);
 // --- GfxLoop runner seat (registered, never linked) ---
 // Install the demand-driven Application loop (graphvex's frame scheduler) into
 // the seat. Null-safe; passing NULL clears the seat (fallback parked loop).
-fn Kernel_setGfxAppRunner(Kernel *self, int (*fn)(any context, bool (*continueFn)(any), bool (*pollFn)()));
+fn Kernel_setGfxAppRunner(Kernel *self, i32 (*fn)(any context, bool (*continueFn)(any), bool (*pollFn)()));
 // The installed runner, or NULL when unset.
-int (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)());
+i32 (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)());
 // Number of registered applications.
 u32 Kernel_getApplicationCount(const Kernel *self);
 // Copy registry into out[] (up to cap), returns entries written.

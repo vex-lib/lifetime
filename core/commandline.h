@@ -77,9 +77,9 @@ typedef enum CommandLineRunPhase {
 // CommandLineKey for special keys or the literal character code for text/control.
 typedef struct CommandLineEvent {
     CommandLineEventKind kind;
-    int key;      // CommandLineKey or a printable/control code
-    int x;        // cell column for pointer events (0 otherwise)
-    int y;        // cell row for pointer events (0 otherwise)
+    i32 key;      // CommandLineKey or a printable/control code
+    i32 x;        // cell column for pointer events (0 otherwise)
+    i32 y;        // cell row for pointer events (0 otherwise)
 } CommandLineEvent;
 
 // Injectable device backend (the Conflict Triage Law managed exception). The
@@ -93,7 +93,7 @@ typedef struct CommandLineIo {
     fn (*close)(any ctx);                              // restore the terminal
     bool (*size)(any ctx, bytes *outW, bytes *outH);   // current cell geometry
     bool (*present)(any ctx, const char *cells, bytes width, bytes height); // one flush
-    bool (*poll)(any ctx, int timeoutMs, CommandLineEvent *out); // bounded wait
+    bool (*poll)(any ctx, i32 timeoutMs, CommandLineEvent *out); // bounded wait
     bool (*setMouse)(any ctx, bool enabled);             // pointer reporting toggle
 } CommandLineIo;
 
@@ -174,7 +174,7 @@ bool CommandLine_detachApp(CommandLine *self);
 bool CommandLine_tick(CommandLine *self);
 // Blocking terminal-application loop: tick until cancel/stop or a false result.
 // Returns the exit code (0 on clean stop). Requires an attached app.
-int CommandLine_run(CommandLine *self);
+i32 CommandLine_run(CommandLine *self);
 // Thread-safe, idempotent stop request (flips cancel; the loop observes it).
 fn CommandLine_stop(CommandLine *self);
 fn CommandLine_requestCancel(CommandLine *self);
@@ -195,7 +195,7 @@ bool CommandLine_clear(CommandLine *self);
 // --- Input ---
 // Bounded device poll (waits at most timeoutMs). False when no event arrived or
 // the backend is absent; *out is zeroed. Never blocks unbounded.
-bool CommandLine_poll(CommandLine *self, int timeoutMs, CommandLineEvent *out);
+bool CommandLine_poll(CommandLine *self, i32 timeoutMs, CommandLineEvent *out);
 bool CommandLine_setMouseReporting(CommandLine *self, bool enabled);
 
 // --- Telemetry / identity: symmetric setters & getters ---

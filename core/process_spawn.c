@@ -102,7 +102,7 @@ static u64 processSpawnNowNs() {
     return (u64) ts.tv_sec * ONE_BILLION + (u64) ts.tv_nsec;
 }
 
-/** Sleep for one short interval between non-blocking child reaps. */
+/** Sleep for one i16 interval between non-blocking child reaps. */
 static fn processSpawnSleepSlice() {
     struct timespec slice;
     slice.tv_sec = 0;
@@ -136,7 +136,7 @@ static bool processSpawnReapOnce(ProcessSpawn *self) {
         ProcessSpawnJob *job = &(*self).jobs[i];
         if ((*job).pid == 0 || (*job).done)
             continue;
-        int status = 0;
+        i32 status = 0;
         pid_t got = waitpid((pid_t)(*job).pid, &status, WNOHANG);
         if (got == 0) {
             allDone = false;
@@ -199,7 +199,7 @@ bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs,
         return false;
     pid_t child = 0;
     char *const *args = (char *const*) argv;
-    int rc = posix_spawnp(&child, (*argv), nullptr, nullptr, args, environ);
+    i32 rc = posix_spawnp(&child, (*argv), nullptr, nullptr, args, environ);
     if (rc != 0)
         return false;
     (*slot).pid = (i32) child;

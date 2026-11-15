@@ -40,7 +40,7 @@
  * STRUCT FIELDS: none — procedural. State is file-static and set exactly once:
  *   u64 s_bits;   // one bit per CapabilityKind
  *   bool     s_probed; // the one-time probe has run
- *   int      s_osMajor;// running macOS major (0 = unknown), -1 = not yet probed
+ *   i32      s_osMajor;// running macOS major (0 = unknown), -1 = not yet probed
  *
  * PRIVATE HELPERS:
  * ----------------------------------------------------------------------------
@@ -61,7 +61,7 @@
  */
 static u64 s_bits = 0;      // one bit per CapabilityKind
 static bool s_probed = false;    // the one-time probe has run
-static int s_osMajor = -1;       // running macOS major (0 = unknown)
+static i32 s_osMajor = -1;       // running macOS major (0 = unknown)
 
 #if defined(VEX_PLATFORM_APPLE)
 // Read one hw.optional.* boolean sysctl; missing/nonzero semantics -> bool.
@@ -75,14 +75,14 @@ static bool sysctlFlag(const char *name) {
 #endif
 
 // The running macOS major version, or 0 when unknown.
-static int probeOsMajor() {
+static i32 probeOsMajor() {
     #if defined(VEX_PLATFORM_APPLE)
         char buf[32];
         bytes size = sizeof buf;
         if (sysctlbyname("kern.osproductversion", buf, &size, nullptr, 0) != 0)
             return 0;
         buf[sizeof buf - 1] = '\0';
-        int major = 0;
+        i32 major = 0;
         for (const char *p = buf; *p >= '0' && *p <= '9'; p++)
             major = major * 10 + (*p - '0');
         return major;
@@ -137,7 +137,7 @@ fn Capability_probe() {
 }
 
 /** Returns the cached operating-system major version, or zero when unknown. */
-int Capability_osMajor() {
+i32 Capability_osMajor() {
     probeOnce();
     return s_osMajor;
 }

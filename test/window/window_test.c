@@ -24,7 +24,7 @@
 #include "input/touch.h"
 #include "window/window.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -37,8 +37,8 @@ static int g_failures = 0;
 typedef struct {
     Window *window;
     Loop loop;
-    int frames;
-    int frameBudget;
+    i32 frames;
+    i32 frameBudget;
 } win_ctx_t;
 
 ;;OVERVIEW
@@ -54,8 +54,8 @@ typedef struct {
  * ----------------------------------------------------------------------------
  *   Window *window;    // test window (OS-owned handle)
  *   Loop loop;         // fixed-timestep loop state
- *   int frames;        // pumped frame counter
- *   int frameBudget;   // bounded stop (0 = run until closed, the tour case)
+ *   i32 frames;        // pumped frame counter
+ *   i32 frameBudget;   // bounded stop (0 = run until closed, the tour case)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -75,13 +75,13 @@ static win_ctx_t *g_winCtx = nullptr;
 
 // --- Input listeners: echo everything the pipeline produces. ---
 
-static fn on_key_down(any self, int keyEvent, u64 nanos) {
+static fn on_key_down(any self, i32 keyEvent, u64 nanos) {
     (discard) self; (discard) nanos;
     printf("key DOWN  %-12s code=%d\n", Key_name(Key_code(keyEvent)), Key_code(keyEvent));
 }
 
 /** Prints key-up events and stops the tour when Escape is released. */
-static fn on_key_up(any self, int keyEvent, u64 nanos) {
+static fn on_key_up(any self, i32 keyEvent, u64 nanos) {
     (discard) self; (discard) nanos;
     printf("key UP    %-12s hold=%.1fms taps=%d\n", Key_name(Key_code(keyEvent)),
            Key_lastHoldDurationNanos(Key_code(keyEvent)) / 1e6,
@@ -91,7 +91,7 @@ static fn on_key_up(any self, int keyEvent, u64 nanos) {
 }
 
 /** Reports mouse-button presses with the current pointer position. */
-static fn on_mouse_down(any self, int mouseEvent, u64 nanos) {
+static fn on_mouse_down(any self, i32 mouseEvent, u64 nanos) {
     (discard) self; (discard) nanos;
     printf("mouse DOWN %s taps=%d at (%.0f, %.0f)\n",
            Mouse_name(Mouse_button(mouseEvent)), Mouse_taps(Mouse_button(mouseEvent)),
@@ -104,7 +104,7 @@ static fn on_scroll(any self, d64 dx, d64 dy) {
     printf("scroll (%.2f, %.2f)\n", dx, dy);
 }
 
-static int g_moves = 0;
+static i32 g_moves = 0;
 
 /** Reports pointer movement and counts events for the bounded demo. */
 static fn on_move(any self, d64 x, d64 y) {
@@ -289,7 +289,7 @@ typedef struct {
     bool miniaturizable;
     bool resizable;
     bool fullscreen_button;
-    int undecorated;
+    i32 undecorated;
 } chrome_step_t;
 
 static const chrome_step_t g_steps[] = {
@@ -306,7 +306,7 @@ static const chrome_step_t g_steps[] = {
     { .label = "back to decorated",                        .closable = true, .miniaturizable = true, .resizable = true, .fullscreen_button = true, .undecorated = WINDOW_DECORATED },
 };
 
-#define STEP_COUNT ((int)(sizeof(g_steps) / sizeof(g_steps[0])))
+#define STEP_COUNT ((i32)(sizeof(g_steps) / sizeof(g_steps[0])))
 
 static const char *greenLabel(const chrome_step_t *step) {
     if (!(*step).resizable)
@@ -338,7 +338,7 @@ static fn tour_tick(any userdata) {
         Loop_stop(&(*ctx).loop);
         return;
     }
-    int step = (*ctx).frames / STEP_FRAMES;
+    i32 step = (*ctx).frames / STEP_FRAMES;
     if (step < STEP_COUNT && (*ctx).frames % STEP_FRAMES == 0)
         applyStep(ctx, &g_steps[step]);
     (*ctx).frames++;
@@ -356,7 +356,7 @@ static fn runTour(Window *w) {
     printf("window closed after %d frames\n", ctx.frames);
 }
 
-int main(int argc, char **argv) {
+i32 main(i32 argc, char **argv) {
     bool tour = (argc > 1 && strcmp(argv[1], "--tour") == 0);
 
     Window *w = Window_create("vex", 640, 480);

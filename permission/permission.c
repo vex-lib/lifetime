@@ -85,28 +85,28 @@ const char *Permission_statusName(PermissionStatus status) {
 // PUBLIC API (portable dispatch — bounds-checked once, then the backend decides)
 /** Queries a permission through the platform backend, or reports unsupported. */
 PermissionStatus Permission_status(PermissionKind kind) {
-    if ((int) kind < 0 || kind >= PERMISSION_COUNT)
+    if ((i32) kind < 0 || kind >= PERMISSION_COUNT)
         return PERMISSION_UNSUPPORTED;
     return permissionBackendStatus(kind);
 }
 
 /** Requests the specified permission through the platform backend. */
 bool Permission_request(PermissionKind kind) {
-    if ((int) kind < 0 || kind >= PERMISSION_COUNT)
+    if ((i32) kind < 0 || kind >= PERMISSION_COUNT)
         return false;
     return permissionBackendRequest(kind);
 }
 
 /** Reports whether a permission grant requires an application restart. */
 bool Permission_requiresRestart(PermissionKind kind) {
-    if ((int) kind < 0 || kind >= PERMISSION_COUNT)
+    if ((i32) kind < 0 || kind >= PERMISSION_COUNT)
         return false;
     return permissionBackendRequiresRestart(kind);
 }
 
 /** Opens the platform settings surface for the requested permission, if available. */
 bool Permission_openSettings(PermissionKind kind) {
-    if ((int) kind < 0 || kind >= PERMISSION_COUNT)
+    if ((i32) kind < 0 || kind >= PERMISSION_COUNT)
         return false;
     return permissionBackendOpenSettings(kind);
 }

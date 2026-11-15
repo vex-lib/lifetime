@@ -26,16 +26,16 @@
  * STRUCT FIELDS (local to this file — exactly this file's class):
  * ----------------------------------------------------------------------------
  *   Window *lastWindow;    // the window pointer the last fire forwarded
- *   int fired;             // count of fn-slot callbacks received
- *   int resizedW;          // received width from onResized
- *   int resizedH;          // received height from onResized
- *   int movedX;            // received x from onMoved
- *   int movedY;            // received y from onMoved
- *   int movedCalls;        // count of onMoved invocations
+ *   i32 fired;             // count of fn-slot callbacks received
+ *   i32 resizedW;          // received width from onResized
+ *   i32 resizedH;          // received height from onResized
+ *   i32 movedX;            // received x from onMoved
+ *   i32 movedY;            // received y from onMoved
+ *   i32 movedCalls;        // count of onMoved invocations
  *   bool quitAnswer;       // what the quit slot replies (true = may quit)
- *   int quitCalls;         // count of quit slot invocations
+ *   i32 quitCalls;         // count of quit slot invocations
  *   bool focused;          // focus-state echo: true = gained, false = lost
- *   int occludedCalls;     // count of occlusion slot invocations
+ *   i32 occludedCalls;     // count of occlusion slot invocations
  *   bool lastVisible;      // received visible flag from onOcclusionChanged
  *
  * FUNCTION REGISTRY:
@@ -52,27 +52,27 @@
 
 typedef struct {
     Window *lastWindow;
-    int fired;
-    int resizedW;
-    int resizedH;
-    int movedX;
-    int movedY;
-    int movedCalls;
+    i32 fired;
+    i32 resizedW;
+    i32 resizedH;
+    i32 movedX;
+    i32 movedY;
+    i32 movedCalls;
     bool quitAnswer;
-    int quitCalls;
+    i32 quitCalls;
     bool focused;
-    int occludedCalls;
+    i32 occludedCalls;
     bool lastVisible;
 } Recorder;
 
 static Recorder g_rec;
 
 // Counts invocations of a slot whose stored context is null (context is data).
-static int g_nullOwnerHits;
+static i32 g_nullOwnerHits;
 
 // Null-guarding slot used to prove that a fire with a null stored context
 // still reaches the callback (the callback is responsible for its own guard).
-static fn onResizedNullOwnerRec(any self, Window *window, int width, int height) {
+static fn onResizedNullOwnerRec(any self, Window *window, i32 width, i32 height) {
     (discard) self;
     (discard) window;
     (discard) width;
@@ -81,7 +81,7 @@ static fn onResizedNullOwnerRec(any self, Window *window, int width, int height)
 }
 
 /** Records the resize callback's window and dimensions in the fixture. */
-static fn onResizedRec(any self, Window *window, int width, int height) {
+static fn onResizedRec(any self, Window *window, i32 width, i32 height) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).resizedW = width;
@@ -90,7 +90,7 @@ static fn onResizedRec(any self, Window *window, int width, int height) {
 }
 
 /** Records the move callback's window and top-left coordinates in the fixture. */
-static fn onMovedRec(any self, Window *window, int x, int y) {
+static fn onMovedRec(any self, Window *window, i32 x, i32 y) {
     Recorder *r = (Recorder*) self;
     (*r).lastWindow = window;
     (*r).movedX = x;
@@ -181,8 +181,8 @@ static bool onQuitVetoRec(any self, Window *window) {
         }                                                                    \
     } while(0)
 
-int main() {
-    int failures = 0;
+i32 main() {
+    i32 failures = 0;
     WindowEvent ev;
     (discard) WindowEvent_init(&ev);
     Window *dummyWindow = (Window*) (pointer) 0x1234;

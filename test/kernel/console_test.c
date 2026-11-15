@@ -18,7 +18,7 @@
 
 #include "core/console.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -29,10 +29,10 @@ static int g_failures = 0;
     } while (0)
 
 typedef struct {
-    int spawns;
-    int feeds;
-    int reaps;
-    int cancels;
+    i32 spawns;
+    i32 feeds;
+    i32 reaps;
+    i32 cancels;
     bool joined;
     char lastFeed[64];
     bytes lastFeedLen;
@@ -82,7 +82,7 @@ static bool fakeJoined(const_any ctx) {
     return (*f).joined;
 }
 
-int main() {
+i32 main() {
     // Constructor defaults + the dispatch macro.
     Console *c = Console_0();
     CHECK(c != nullptr);
@@ -148,7 +148,7 @@ int main() {
     // free-while-running cancels first (the Teardown Order Law).
     Console *c4 = Console_1("sh");
     Console_setIo(c4, &io, &f);
-    int before = f.cancels;
+    i32 before = f.cancels;
     CHECK(Console_run(c4));
     Console_free(c4);
     CHECK(f.cancels == before + 1);

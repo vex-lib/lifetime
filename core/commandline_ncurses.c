@@ -75,7 +75,7 @@ static bool ncSize(any ctx, bytes *outW, bytes *outH) {
     (discard) ctx;
     if (!g_open)
         return false;
-    int rows = 0, cols = 0;
+    i32 rows = 0, cols = 0;
     getmaxyx(stdscr, rows, cols);
     if (rows <= 0 || cols <= 0)
         return false;
@@ -89,9 +89,9 @@ static bool ncPresent(any ctx, const char *cells, bytes width, bytes height) {
     if (!g_open || cells == nullptr || width == 0 || height == 0)
         return false;
     for (bytes y = 0; y < height; ++y) {
-        if (move((int) y, 0) == ERR)
+        if (move((i32) y, 0) == ERR)
             return false;
-        if (addnstr(cells + y * width, (int) width) == ERR)
+        if (addnstr(cells + y * width, (i32) width) == ERR)
             return false;
     }
     return refresh() != ERR;
@@ -111,7 +111,7 @@ static bool ncSetMouse(any ctx, bool enabled) {
     return true;
 }
 
-static CommandLineKey ncMapKey(int ch) {
+static CommandLineKey ncMapKey(i32 ch) {
     switch (ch) {
         case KEY_UP: return COMMANDLINE_KEY_UP;
         case KEY_DOWN: return COMMANDLINE_KEY_DOWN;
@@ -129,12 +129,12 @@ static CommandLineKey ncMapKey(int ch) {
     }
 }
 
-static bool ncPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
+static bool ncPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     (discard) ctx;
     if (!g_open || out == nullptr)
         return false;
     timeout(timeoutMs);
-    int ch = getch();
+    i32 ch = getch();
     if (ch == ERR)
         return false;
     if (ch == KEY_RESIZE) {
@@ -163,15 +163,15 @@ static bool ncPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
     CommandLineKey key = ncMapKey(ch);
     (*out).kind = COMMANDLINE_EVENT_KEY;
     if (key != COMMANDLINE_KEY_NONE) {
-        (*out).key = (int) key;
+        (*out).key = (i32) key;
     } else if (ch == '\n' || ch == KEY_ENTER) {
-        (*out).key = (int) COMMANDLINE_KEY_ENTER;
+        (*out).key = (i32) COMMANDLINE_KEY_ENTER;
     } else if (ch >= 32 && ch < 127) {
         (*out).key = ch;
     } else if (ch >= 1 && ch < 32) {
         (*out).key = ch;   // control code (e.g. Ctrl-Q = 17)
     } else {
-        (*out).key = (int) COMMANDLINE_KEY_UNKNOWN;
+        (*out).key = (i32) COMMANDLINE_KEY_UNKNOWN;
     }
     return true;
 }

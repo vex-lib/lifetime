@@ -15,7 +15,7 @@
 #include "window/traffic_light.h"
 #include "window/window.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -25,7 +25,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main() {
+i32 main() {
     // Nil-handle bookkeeping: visibility still tracks.
     TrafficLight *tl = TrafficLight_create(nullptr);
     CHECK(tl != nullptr);

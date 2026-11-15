@@ -98,10 +98,10 @@
  *   u32 id;                       // engine window id (1..N, 0 = broadcast)
  *   _Atomic bool shouldClose;          // true once close requested
  *   _Atomic u64 sizeGeneration;   // resize-reflection counter
- *   _Atomic int cachedWidth;           // client width at last WM_SIZE
- *   _Atomic int cachedHeight;          // client height at last WM_SIZE
+ *   _Atomic i32 cachedWidth;           // client width at last WM_SIZE
+ *   _Atomic i32 cachedHeight;          // client height at last WM_SIZE
  *   _Atomic bool liveResizing;         // set during WM_ENTERSIZEMOVE..EXIT
- *   _Atomic int presentMode;           // present pacing (FIFO/IMMEDIATE), stored
+ *   _Atomic i32 presentMode;           // present pacing (FIFO/IMMEDIATE), stored
  *   _Atomic bool transparent;          // composite transparency request, stored
  *   _Atomic u64 renderGeneration; // policy-reflection counter
  *   _Atomic(any) topLayer;           // content board handle
@@ -113,8 +113,8 @@
  *   bool decorated;                    // chrome mode (WS_OVERLAPPED vs WS_POPUP)
  *   bool fullscreen;                   // fullscreen state
  *   WINDOWPLACEMENT prevPlacement;     // restored placement for fullscreen toggle
- *   int minWidth, minHeight;           // WM_GETMINMAXINFO minimums (0 = unset)
- *   int maxWidth, maxHeight;           // WM_GETMINMAXINFO maximums (0 = unbounded)
+ *   i32 minWidth, minHeight;           // WM_GETMINMAXINFO minimums (0 = unset)
+ *   i32 maxWidth, maxHeight;           // WM_GETMINMAXINFO maximums (0 = unbounded)
  *   bool movableByBackground;          // WM_NCHITTEST HTCAPTION toggle
  *   bool fullscreenButton;             // WS_MAXIMIZEBOX gate
  *   bool resizableEnabled;             // WS_THICKFRAME gate
@@ -123,7 +123,7 @@
  *   bool clickThrough;                 // WS_EX_TRANSPARENT toggle
  *   f32 opacity;                     // SetLayeredWindowAttributes alpha
  *   bool shadow;                       // DWM non-client-rendering policy
- *   int frameW, frameH;                // retained bitmap dimensions in px
+ *   i32 frameW, frameH;                // retained bitmap dimensions in px
  *   BITMAPINFO bmi;                    // retained bitmap header for StretchDIBits
  *   WindowResizeRenderFn resizeRenderFn;   // resize-cadence render hook
  *   any resizeRenderUserdata;        // hook userdata
@@ -303,7 +303,7 @@ static const u64 kTapThresholdNanos = 250000000ULL;
 // Virtual keycode -> KEY_* code. Indexed by the raw Windows virtual-key code
 // (0..255); -1 = unmapped. Physical layout maps letters/digits/function rows
 // 1:1 like the Cocoa Carbon table, and punctuation rides the OEM VK_ codes.
-static int winVkMap[256] = {
+static i32 winVkMap[256] = {
    // ASCII-printable codes carried by VK_ values < 0x60 already equal their
    // KEY_ value for ' '..'z' collateral — letters and digits are set below.
    [0x08] = KEY_BACKSPACE,   [0x09] = KEY_TAB,        [0x0D] = KEY_ENTER,
@@ -346,17 +346,17 @@ struct Window {
    u32 id;
    _Atomic bool shouldClose;
    _Atomic u64 sizeGeneration;
-   _Atomic int cachedWidth;
-   _Atomic int cachedHeight;
-   int cachedX;
-   int cachedY;
-   int cachedContentX;
-   int cachedContentY;
+   _Atomic i32 cachedWidth;
+   _Atomic i32 cachedHeight;
+   i32 cachedX;
+   i32 cachedY;
+   i32 cachedContentX;
+   i32 cachedContentY;
    _Atomic bool liveResizing;
    _Atomic bool miniaturizing;
 
    // Pure-state reflection words (no GPU calls in this file).
-   _Atomic int presentMode;
+   _Atomic i32 presentMode;
    _Atomic bool transparent;
    _Atomic u64 renderGeneration;
 
@@ -375,10 +375,10 @@ struct Window {
    bool decorated;
    bool fullscreen;
    RECT savedFrame;                 // normal (pre-fullscreen) outer frame
-   int minWidth;
-   int minHeight;
-   int maxWidth;
-   int maxHeight;
+   i32 minWidth;
+   i32 minHeight;
+   i32 maxWidth;
+   i32 maxHeight;
    bool movableByBackground;
    bool fullscreenButton;
    bool resizableEnabled;
@@ -386,9 +386,9 @@ struct Window {
    bool minimizeEnabled;
 
    // Software present path (mirror of the retired raster present).
-   unsigned char *framePixels;
-   int frameW;
-   int frameH;
+   u8 *framePixels;
+   i32 frameW;
+   i32 frameH;
    bool frameDirty;
 
    WindowResizeRenderFn resizeRenderFn;
@@ -513,7 +513,7 @@ static fn windowApplyMinMax(Window *window, MINMAXINFO *mmi) {
 // Resize reflection: the message already carries the new client size (cx/cy);
 // compare against the cache and bump sizegen + fire onResized + run the resize
 // hook only on an actual change. Thread 0 only.
-static fn windowRefreshSize(Window *window, int cw, int ch) {
+static fn windowRefreshSize(Window *window, i32 cw, i32 ch) {
    if (window == nullptr || (*window).hwnd == nullptr)
       return;
    if (cw != atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed)
@@ -589,7 +589,7 @@ static fn mousePoint(LPARAM lp, d64 *outX, d64 *outY) {
 }
 
 // Map a Win32 mouse message to the MOUSE_* button constant.
-static int winButton(UINT msg) {
+static i32 winButton(UINT msg) {
    if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)
       return MOUSE_LEFT;
    if (msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP)
@@ -644,12 +644,12 @@ static fn routeTouch(Window *window, WPARAM wp, LPARAM lp) {
          && (in[i].dwFlags & TOUCHEVENTF_UP) == 0
          && (in[i].dwFlags & TOUCHEVENTF_MOVE) == 0)
          continue;
-      int action = TOUCH_MOVE;
+      i32 action = TOUCH_MOVE;
       if ((in[i].dwFlags & TOUCHEVENTF_DOWN) != 0)
          action = TOUCH_DOWN;
       else if ((in[i].dwFlags & TOUCHEVENTF_UP) != 0)
          action = TOUCH_UP;
-      int slot = (int) (in[i].dwID % TOUCH_MAX);
+      i32 slot = (i32) (in[i].dwID % TOUCH_MAX);
       d64 x = (d64) in[i].x / 100.0;
       d64 y = (d64) in[i].y / 100.0;
       Touch_pushTouchEvent((*window).id, slot, action, x, y, 0.8, kTapThresholdNanos);
@@ -687,8 +687,8 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_SIZE: {
          if (window) {
-            int cw = (int) LOWORD(lp);
-            int ch = (int) HIWORD(lp);
+            i32 cw = (i32) LOWORD(lp);
+            i32 ch = (i32) HIWORD(lp);
             if (wp == SIZE_MINIMIZED) {
                atomic_store_explicit(&(*window).miniaturizing, true, memory_order_relaxed);
                WindowEvent_fireMinimized(&(*window).lifecycle, window);
@@ -707,12 +707,12 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
          if (window) {
             RECT rc = {0};
             GetWindowRect(hwnd, &rc);
-            (*window).cachedX = (int) rc.left;
-            (*window).cachedY = (int) rc.top;
+            (*window).cachedX = (i32) rc.left;
+            (*window).cachedY = (i32) rc.top;
             POINT origin = {0, 0};
             ClientToScreen(hwnd, &origin);
-            (*window).cachedContentX = (int) origin.x;
-            (*window).cachedContentY = (int) origin.y;
+            (*window).cachedContentX = (i32) origin.x;
+            (*window).cachedContentY = (i32) origin.y;
          }
          return 0;
       }
@@ -828,7 +828,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
          // the lParam (bit 24), the same physical distinction AppKit folds
          // into its NSEvent modifier flags.
          bool ext = ((lp & (1L << 24)) != 0);
-         int mod = -1;
+         i32 mod = -1;
          if (vk == VK_SHIFT)
             mod = ext ? KEY_RIGHT_SHIFT : KEY_LEFT_SHIFT;
          else if (vk == VK_CONTROL)
@@ -839,11 +839,11 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             Key_pushEvent(wid, mod, down ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
             break;
          }
-         int stdKey = (vk < 256) ? winVkMap[vk] : -1;
+         i32 stdKey = (vk < 256) ? winVkMap[vk] : -1;
          if (vk >= 'A' && vk <= 'Z')
-            stdKey = KEY_A + (int) (vk - 'A');
+            stdKey = KEY_A + (i32) (vk - 'A');
          else if (vk >= '0' && vk <= '9')
-            stdKey = KEY_NUM_0 + (int) (vk - '0');
+            stdKey = KEY_NUM_0 + (i32) (vk - '0');
          if (stdKey != -1)
             Key_pushEvent(wid, stdKey, down ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
          break;
@@ -879,9 +879,9 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                (*header).biCompression = BI_RGB;
                RECT client = {0};
                GetClientRect(hwnd, &client);
-               int cx = client.right - client.left;
-               int cy = client.bottom - client.top;
-               int mode = (SetStretchBltMode(dc, HALFTONE) != 0) ? HALFTONE : COLORONCOLOR;
+               i32 cx = client.right - client.left;
+               i32 cy = client.bottom - client.top;
+               i32 mode = (SetStretchBltMode(dc, HALFTONE) != 0) ? HALFTONE : COLORONCOLOR;
                StretchDIBits(dc, 0, 0, cx, cy, 0, 0,
                           (*window).frameW, (*window).frameH,
                           (*window).framePixels, &bi, DIB_RGB_COLORS, SRCCOPY);
@@ -962,13 +962,13 @@ enum { LIGHT_CLOSE = 0, LIGHT_MINI = 1, LIGHT_ZOOM = 2 };
 // Convert an outer-frame size to the content size the style will produce —
 // the mirror of frameRectForContentRect. Used so setters speak CONTENT px and
 // the OS gets the frame that matches.
-static fn frameForContent(Window *window, int cw, int ch, int *outX, int *outY) {
+static fn frameForContent(Window *window, i32 cw, i32 ch, i32 *outX, i32 *outY) {
    RECT rc = {0, 0, cw, ch};
    DWORD style = (DWORD) GetWindowLongPtr((*window).hwnd, GWL_STYLE);
    DWORD ex = (DWORD) GetWindowLongPtr((*window).hwnd, GWL_EXSTYLE);
    AdjustWindowRectEx(&rc, style, FALSE, ex);
-   *outX = (int) (rc.right - rc.left);
-   *outY = (int) (rc.bottom - rc.top);
+   *outX = (i32) (rc.right - rc.left);
+   *outY = (i32) (rc.bottom - rc.top);
 }
 
 // Bounded foreground claim: show first, then ask for the foreground grant. If
@@ -1013,19 +1013,19 @@ static fn windowApplyChrome(Window *window, bool decorated) {
    // Frame-changed: re-lay the window so the content keeps its size.
    RECT rc = {0};
    GetClientRect((*window).hwnd, &rc);
-   int cw = rc.right - rc.left;
-   int ch = rc.bottom - rc.top;
+   i32 cw = rc.right - rc.left;
+   i32 ch = rc.bottom - rc.top;
    frameForContent(window, cw, ch, &cw, &ch);
-   int x, y, w, h;
+   i32 x, y, w, h;
    GetWindowRect((*window).hwnd, &rc);
-   x = (int) rc.left;
-   y = (int) rc.top;
+   x = (i32) rc.left;
+   y = (i32) rc.top;
    w = cw;
    h = ch;
    AdjustWindowRectEx(&rc, (DWORD) next, FALSE,
                   (DWORD) GetWindowLongPtr((*window).hwnd, GWL_EXSTYLE));
    SetWindowPos((*window).hwnd, nullptr, x, y,
-             (int) (rc.right - rc.left), (int) (rc.bottom - rc.top),
+             (i32) (rc.right - rc.left), (i32) (rc.bottom - rc.top),
              SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -1053,26 +1053,26 @@ static Window *windowAlloc(const WindowDesc *desc) {
       sRegistered = true;
    }
 
-   int cw = (*desc).width;
-   int ch = (*desc).height;
-   int wid = cw;
-   int hei = ch;
+   i32 cw = (*desc).width;
+   i32 ch = (*desc).height;
+   i32 wid = cw;
+   i32 hei = ch;
    // Compute the FRAME (outer) rect from the requested CONTENT size.
    RECT rc = {0, 0, cw, ch};
    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, FALSE, 0);
-   wid = (int) (rc.right - rc.left);
-   hei = (int) (rc.bottom - rc.top);
+   wid = (i32) (rc.right - rc.left);
+   hei = (i32) (rc.bottom - rc.top);
 
-   int x = CW_USEDEFAULT;
-   int y = CW_USEDEFAULT;
+   i32 x = CW_USEDEFAULT;
+   i32 y = CW_USEDEFAULT;
    if ((*desc).centered) {
       HMONITOR hm = MonitorFromPoint((POINT){0, 0}, MONITOR_DEFAULTTOPRIMARY);
       MONITORINFO mi;
       mi.cbSize = sizeof(mi);
       GetMonitorInfoW(hm, &mi);
       RECT work = (*mi).rcWork;
-      int wx = (int) (work.right - work.left - wid) / 2;
-      int wy = (int) (work.bottom - work.top - hei) / 2;
+      i32 wx = (i32) (work.right - work.left - wid) / 2;
+      i32 wy = (i32) (work.bottom - work.top - hei) / 2;
       x = work.left + wx;
       y = work.top + wy;
    } else if ((*desc).x != 0 || (*desc).y != 0) {
@@ -1090,7 +1090,7 @@ static Window *windowAlloc(const WindowDesc *desc) {
    if (tn >= 256)
       tn = 255;
    for (bytes i = 0; i < tn; i++)
-      titleBuf[i] = (wchar_t) (unsigned char) t[i];
+      titleBuf[i] = (wchar_t) (u8) t[i];
    titleBuf[tn] = 0;
 
    (*w).hwnd = CreateWindowExW(
@@ -1111,12 +1111,12 @@ static Window *windowAlloc(const WindowDesc *desc) {
    atomic_store_explicit(&(*w).cachedHeight, ch, memory_order_relaxed);
    RECT fr = {0};
    GetWindowRect((*w).hwnd, &fr);
-   (*w).cachedX = (int) fr.left;
-   (*w).cachedY = (int) fr.top;
+   (*w).cachedX = (i32) fr.left;
+   (*w).cachedY = (i32) fr.top;
    POINT origin = {0, 0};
    ClientToScreen((*w).hwnd, &origin);
-   (*w).cachedContentX = (int) origin.x;
-   (*w).cachedContentY = (int) origin.y;
+   (*w).cachedContentX = (i32) origin.x;
+   (*w).cachedContentY = (i32) origin.y;
    atomic_store_explicit(&(*w).presentMode, WINDOW_PRESENT_FIFO, memory_order_relaxed);
    atomic_store_explicit(&(*w).transparent, false, memory_order_relaxed);
    atomic_store_explicit(&(*w).renderGeneration, 0, memory_order_relaxed);
@@ -1179,7 +1179,7 @@ Window *Window_1(const char *title) {
 }
 
 // Construct a window descriptor with explicit title and client dimensions.
-Window *Window_3(const char *title, int width, int height) {
+Window *Window_3(const char *title, i32 width, i32 height) {
    return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -1196,7 +1196,7 @@ Window *Window_new(const WindowDesc *desc) {
 }
 
 // Preserve the legacy constructor spelling by forwarding to Window_new.
-Window *Window_create(const char *title, int width, int height) {
+Window *Window_create(const char *title, i32 width, i32 height) {
    return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -1240,16 +1240,16 @@ fn Window_close(Window *window) {
 
 // --- Present policy (pure state; a future render path consumes it) ----------
 
-fn Window_setPresentMode(Window *window, int mode) {
+fn Window_setPresentMode(Window *window, i32 mode) {
    if (window == nullptr)
       return;
-   int prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
+   i32 prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
    if (prev != mode)
       atomic_fetch_add_explicit(&(*window).renderGeneration, 1, memory_order_release);
 }
 
 // Read the stored present policy, defaulting to FIFO for a null handle.
-int Window_getPresentMode(const Window *window) {
+i32 Window_getPresentMode(const Window *window) {
    if (window == nullptr)
       return WINDOW_PRESENT_FIFO;
    return atomic_load_explicit(&(*window).presentMode, memory_order_relaxed);
@@ -1322,7 +1322,7 @@ any Window_getTopLayer(const Window *window) {
 // ;;INTENTION("Pane/board compositing is inert on the lean window (the same
 // slice the Cocoa backend keeps inert); pane work migrates to the render
 // personal' own pass. Retires together with the composite seam.")
-bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
+bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -1331,7 +1331,7 @@ bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
 }
 
 // Retain the retired pane API as an inert failure on the lean window backend.
-bool Window_resizePanes(Window *window, Panel *panel, int width, int height) {
+bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -1378,20 +1378,20 @@ fn Window_setTitle(Window *window, const char *title) {
    if (tn >= 256)
       tn = 255;
    for (bytes i = 0; i < tn; i++)
-      titleBuf[i] = (wchar_t) (unsigned char) title[i];
+      titleBuf[i] = (wchar_t) (u8) title[i];
    titleBuf[tn] = 0;
    SetWindowTextW((*window).hwnd, titleBuf);
 }
 
 // Read the cached client width in native pixels.
-int Window_width(Window *window) {
+i32 Window_width(Window *window) {
    if (window == nullptr)
       return 0;
    return atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
 }
 
 // Read the cached client height in native pixels.
-int Window_height(Window *window) {
+i32 Window_height(Window *window) {
    if (window == nullptr)
       return 0;
    return atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
@@ -1410,7 +1410,7 @@ fn Window_revalidate(Window *window) {
 
 // Convert compatibility point dimensions to the integer client-size request.
 fn Window_setSizePoints(Window *window, f32 width, f32 height) {
-   Window_setSize(window, (int) width, (int) height);
+   Window_setSize(window, (i32) width, (i32) height);
 }
 
 // Return cached client dimensions through the points compatibility outputs.
@@ -1430,12 +1430,12 @@ f32 Window_heightPoints(const Window *window) {
 }
 
 // Alias the client width as the rendering viewport width.
-int Window_viewportWidth(const Window *window) {
+i32 Window_viewportWidth(const Window *window) {
    return Window_width((Window*) window);
 }
 
 // Alias the client height as the rendering viewport height.
-int Window_viewportHeight(const Window *window) {
+i32 Window_viewportHeight(const Window *window) {
    return Window_height((Window*) window);
 }
 
@@ -1450,12 +1450,12 @@ f32 Window_viewportHeightPoints(const Window *window) {
 }
 
 // Return the full outer-window width in physical pixels.
-int Window_windowWidth(const Window *window) {
+i32 Window_windowWidth(const Window *window) {
    return Window_width((Window*) window);
 }
 
 // Return the full outer-window height in physical pixels.
-int Window_windowHeight(const Window *window) {
+i32 Window_windowHeight(const Window *window) {
    return Window_height((Window*) window);
 }
 
@@ -1470,10 +1470,10 @@ f32 Window_windowHeightPoints(const Window *window) {
 }
 
 // Resize the HWND so its client area matches the requested physical dimensions.
-fn Window_setSize(Window *window, int width, int height) {
+fn Window_setSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
-   int wid, hei;
+   i32 wid, hei;
    frameForContent(window, width, height, &wid, &hei);
    RECT rc = {0};
    GetWindowRect((*window).hwnd, &rc);
@@ -1482,18 +1482,18 @@ fn Window_setSize(Window *window, int width, int height) {
 }
 
 // Move the native window to the requested top-left screen pixel coordinates.
-fn Window_setLocation(Window *window, int x, int y) {
+fn Window_setLocation(Window *window, i32 x, i32 y) {
    if (window == nullptr)
       return;
    RECT rc = {0};
    GetWindowRect((*window).hwnd, &rc);
    SetWindowPos((*window).hwnd, nullptr, x, y,
-             (int) (rc.right - rc.left), (int) (rc.bottom - rc.top),
+             (i32) (rc.right - rc.left), (i32) (rc.bottom - rc.top),
              SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 // Return the cached outer-window top-left coordinates through optional outputs.
-fn Window_getLocation(const Window *window, int *outX, int *outY) {
+fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
    if (outX)
       *outX = window ? (*window).cachedX : 0;
    if (outY)
@@ -1501,7 +1501,7 @@ fn Window_getLocation(const Window *window, int *outX, int *outY) {
 }
 
 // Return the cached client-area screen origin through optional outputs.
-fn Window_getContentOrigin(const Window *window, int *outX, int *outY) {
+fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
    if (outX)
       *outX = window ? (*window).cachedContentX : 0;
    if (outY)
@@ -1518,11 +1518,11 @@ fn Window_center(Window *window) {
    GetMonitorInfoW(hm, &mi);
    RECT rc = {0};
    GetWindowRect((*window).hwnd, &rc);
-   int wid = (int) (rc.right - rc.left);
-   int hei = (int) (rc.bottom - rc.top);
+   i32 wid = (i32) (rc.right - rc.left);
+   i32 hei = (i32) (rc.bottom - rc.top);
    RECT work = (*mi).rcWork;
-   int x = work.left + (work.right - work.left - wid) / 2;
-   int y = work.top + (work.bottom - work.top - hei) / 2;
+   i32 x = work.left + (work.right - work.left - wid) / 2;
+   i32 y = work.top + (work.bottom - work.top - hei) / 2;
    SetWindowPos((*window).hwnd, nullptr, x, y, 0, 0,
              SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
@@ -1624,7 +1624,7 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
 // Cocoa mask swap — BORDERLESS = zero chrome, NAKED = transparent titlebar
 // with the resize affordance kept, DECORATED = standard chrome. DECORATED
 // strips any active blur so a frosted caption never renders (the blur ban).
-fn Window_setUndecorated(Window *window, int mode) {
+fn Window_setUndecorated(Window *window, i32 mode) {
    if (window == nullptr)
       return;
    if ((*window).fullscreen)
@@ -1691,7 +1691,7 @@ fn Window_setFloatingTrafficLights(Window *window, bool f32ing) {
 }
 
 // Map a public traffic-light enum value to its native button slot, if any.
-static int lightIndex(WindowTrafficLight light) {
+static i32 lightIndex(WindowTrafficLight light) {
    if (light == WINDOW_TRAFFIC_LIGHT_CLOSE)
       return LIGHT_CLOSE;
    if (light == WINDOW_TRAFFIC_LIGHT_MINIMIZE)
@@ -1741,7 +1741,7 @@ fn Window_setOpacity(Window *window, f32 opacity) {
       return;
    LONG_PTR ex = GetWindowLongPtr((*window).hwnd, GWL_EXSTYLE);
    SetWindowLongPtr((*window).hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
-   BYTE alpha = (BYTE) (int) (opacity * 255.0f + 0.5f);
+   BYTE alpha = (BYTE) (i32) (opacity * 255.0f + 0.5f);
    SetLayeredWindowAttributes((*window).hwnd, 0, alpha, LWA_ALPHA);
 }
 
@@ -1871,8 +1871,8 @@ fn Window_setFullscreen(Window *window, bool fullscreen) {
       RECT monitor = (*mi).rcMonitor;
       SetWindowPos(hwnd, HWND_TOPMOST,
                 monitor.left, monitor.top,
-                (int) (monitor.right - monitor.left),
-                (int) (monitor.bottom - monitor.top),
+                (i32) (monitor.right - monitor.left),
+                (i32) (monitor.bottom - monitor.top),
                 SWP_FRAMECHANGED | SWP_NOACTIVATE);
    } else {
       LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
@@ -1880,9 +1880,9 @@ fn Window_setFullscreen(Window *window, bool fullscreen) {
       RECT saved = (*window).savedFrame;
       (*window).fullscreen = false;
       SetWindowPos(hwnd, HWND_NOTOPMOST,
-                (int) saved.left, (int) saved.top,
-                (int) (saved.right - saved.left),
-                (int) (saved.bottom - saved.top),
+                (i32) saved.left, (i32) saved.top,
+                (i32) (saved.right - saved.left),
+                (i32) (saved.bottom - saved.top),
                 SWP_FRAMECHANGED | SWP_NOACTIVATE);
       WindowEvent_fireRestored(&(*window).lifecycle, window);
    }
@@ -1906,7 +1906,7 @@ fn Window_setDRM(Window *window, bool enabled) {
 
 // --- Size constraints ---
 
-fn Window_setMinSize(Window *window, int width, int height) {
+fn Window_setMinSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
    (*window).minWidth = width;
@@ -1914,7 +1914,7 @@ fn Window_setMinSize(Window *window, int width, int height) {
 }
 
 // Store the maximum client dimensions consumed by WM_GETMINMAXINFO.
-fn Window_setMaxSize(Window *window, int width, int height) {
+fn Window_setMaxSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
    (*window).maxWidth = width;
@@ -2023,24 +2023,24 @@ bool Window_present(Window *window, const Buffer *frame) {
       return false;
    // Reuse the staging slot when the frame dimensions are unchanged; grow it
    // otherwise (never in a hot path — present is demand-driven).
-   if ((*window).frameW != (int) fw || (*window).frameH != (int) fh) {
-      unsigned char *grown = (unsigned char*) realloc((*window).framePixels, Bytes);
+   if ((*window).frameW != (i32) fw || (*window).frameH != (i32) fh) {
+      u8 *grown = (u8*) realloc((*window).framePixels, Bytes);
       if (grown == nullptr)
          return false;
       (*window).framePixels = grown;
-      (*window).frameW = (int) fw;
-      (*window).frameH = (int) fh;
+      (*window).frameW = (i32) fw;
+      (*window).frameH = (i32) fh;
    }
    const u64 *data = (*frame).data;
-   unsigned char *dst = (*window).framePixels;
+   u8 *dst = (*window).framePixels;
    for (u32 y = 0; y < fh; y++) {
       for (u32 x = 0; x < fw; x++) {
          bytes i = (bytes) y * fw + x;
          u64 px = data[i];
-         dst[4 * i + 0] = (unsigned char) ((px >> 16) & 0xFFu); // R (ColorBuffer order)
-         dst[4 * i + 1] = (unsigned char) ((px >> 8) & 0xFFu);  // G
-         dst[4 * i + 2] = (unsigned char) ((px >> 0) & 0xFFu);  // B
-         dst[4 * i + 3] = (unsigned char) ((px >> 24) & 0xFFu); // A
+         dst[4 * i + 0] = (u8) ((px >> 16) & 0xFFu); // R (ColorBuffer order)
+         dst[4 * i + 1] = (u8) ((px >> 8) & 0xFFu);  // G
+         dst[4 * i + 2] = (u8) ((px >> 0) & 0xFFu);  // B
+         dst[4 * i + 3] = (u8) ((px >> 24) & 0xFFu); // A
       }
    }
    (*window).frameDirty = true;
@@ -2303,10 +2303,10 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   u32 id;                       // engine window id (1..N, 0 = broadcast)
  *   _Atomic bool shouldClose;          // true once close requested
  *   _Atomic u64 sizeGeneration;   // resize-reflection counter
- *   _Atomic int cachedWidth;           // surface width at last configure
- *   _Atomic int cachedHeight;          // surface height at last configure
+ *   _Atomic i32 cachedWidth;           // surface width at last configure
+ *   _Atomic i32 cachedHeight;          // surface height at last configure
  *   _Atomic bool liveResizing;         // set during interactive configure flurries
- *   _Atomic int presentMode;           // present pacing (FIFO/IMMEDIATE), stored
+ *   _Atomic i32 presentMode;           // present pacing (FIFO/IMMEDIATE), stored
  *   _Atomic bool transparent;          // composite transparency request, stored
  *   _Atomic u64 renderGeneration; // policy-reflection counter
  *   _Atomic(any) topLayer;           // content board handle
@@ -2318,8 +2318,8 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   bool decorated;                    // chrome mode (decoration is SSD-owned)
  *   bool fullscreen;                   // xdg toplevel fullscreen state
  *   bool minimized;                    // last set_minimized request
- *   int minWidth, minHeight;           // xdg_toplevel_set_min_size (0 = unset)
- *   int maxWidth, maxHeight;           // xdg_toplevel_set_max_size (0 = unbounded)
+ *   i32 minWidth, minHeight;           // xdg_toplevel_set_min_size (0 = unset)
+ *   i32 maxWidth, maxHeight;           // xdg_toplevel_set_max_size (0 = unbounded)
  *   bool movableByBackground;          // stored; no base protocol (;;INTENTION)
  *   bool fullscreenButton;             // stored chrome gate (SSD-owned)
  *   bool resizableEnabled;             // stored chrome gate (SSD-owned)
@@ -2328,7 +2328,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
  *   bool clickThrough;                 // empty input region when true
  *   f32 opacity;                     // stored; no base protocol (;;INTENTION)
  *   bool shadow;                       // stored; SSD-owned (;;INTENTION)
- *   int frameW, frameH;                // retained shm staging size in px
+ *   i32 frameW, frameH;                // retained shm staging size in px
  *   struct wl_buffer *shmBuffer;       // retained staging buffer (rebuilt on size)
  *   any shmMap;                      // retained pool mapping (the staging target)
  *   bytes shmSize;                    // current pool capacity in Bytes
@@ -2547,7 +2547,7 @@ static struct wl_cursor_theme *sCursorTheme = nullptr;
 static struct wl_surface *sCursorSurface = nullptr;
 
 // Window count drives connection teardown: the LAST Window_destroy disconnects.
-static int gWindowCount = 0;
+static i32 gWindowCount = 0;
 
 // The opaque handle handed back to C. Holds the native surface chain plus
 // every C-visible reflection word — the mirror of the Cocoa struct Window.
@@ -2563,12 +2563,12 @@ struct Window {
    u32 id;
    _Atomic bool shouldClose;
    _Atomic u64 sizeGeneration;
-   _Atomic int cachedWidth;
-   _Atomic int cachedHeight;
+   _Atomic i32 cachedWidth;
+   _Atomic i32 cachedHeight;
    _Atomic bool liveResizing;
 
    // Pure-state reflection words (no GPU calls in this file).
-   _Atomic int presentMode;
+   _Atomic i32 presentMode;
    _Atomic bool transparent;
    _Atomic u64 renderGeneration;
 
@@ -2587,10 +2587,10 @@ struct Window {
    bool decorated;
    bool fullscreen;
    bool minimized;
-   int minWidth;
-   int minHeight;
-   int maxWidth;
-   int maxHeight;
+   i32 minWidth;
+   i32 minHeight;
+   i32 maxWidth;
+   i32 maxHeight;
    bool movableByBackground;
    bool fullscreenButton;
    bool resizableEnabled;
@@ -2602,8 +2602,8 @@ struct Window {
 
    // Software present path (retained wl_shm staging, mirror of the retired
    // raster present).
-   int frameW;
-   int frameH;
+   i32 frameW;
+   i32 frameH;
    struct wl_buffer *shmBuffer;
    any shmMap;
    bytes shmSize;
@@ -2714,7 +2714,7 @@ static u32 waylandOutputIdFor(struct wl_output *output) {
 // Resize reflection: the configure carries the new surface size (px); compare
 // against the cache and bump sizegen + fire onResized + run the resize hook
 // only on an actual change. Thread 0 only.
-static fn windowRefreshSize(Window *window, int cw, int ch) {
+static fn windowRefreshSize(Window *window, i32 cw, i32 ch) {
    if (window == nullptr)
       return;
    if (cw != atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed)
@@ -2805,7 +2805,7 @@ static fn toplevelConfigure(any data, struct xdg_toplevel *topLevel, i32 width,
       WindowEvent_fireRestored(&(*window).lifecycle, window);
    }
    if (width > 0 && height > 0)
-      windowRefreshSize(window, (int) width, (int) height);
+      windowRefreshSize(window, (i32) width, (i32) height);
 }
 
 // Honor the vetoable quit callback and latch close only when it permits.
@@ -2841,7 +2841,7 @@ static const struct xdg_wm_base_listener sWmBaseListener = {
 // xkb keycode = evdev scan code + 8. Map evdev codes onto GLFW-style KEY_*
 // values. The table answers the physical key; -1 = unmapped (rare keys fall
 // back to a keysym lookup below).
-static int sEvdevMap[256] = {
+static i32 sEvdevMap[256] = {
    [0 ... 255] = -1,
    [1] = KEY_ESCAPE,
    [2] = KEY_NUM_1, [3] = KEY_NUM_2, [4] = KEY_NUM_3, [5] = KEY_NUM_4,
@@ -2875,17 +2875,17 @@ static int sEvdevMap[256] = {
 // Fallback path for keys the evdev table does not cover: fold an xkb keysym
 // into the ASCII-aligned KEY_* slots (the a-z and punctuation rows all sit at
 // their ASCII values by construction).
-static int keyFromSym(xkb_keysym_t sym) {
+static i32 keyFromSym(xkb_keysym_t sym) {
    if (sym >= XKB_KEY_a && sym <= XKB_KEY_z)
-      return (int) (KEY_A + (sym - XKB_KEY_a));
+      return (i32) (KEY_A + (sym - XKB_KEY_a));
    if (sym >= XKB_KEY_A && sym <= XKB_KEY_Z)
-      return (int) (KEY_A + (sym - XKB_KEY_A));
+      return (i32) (KEY_A + (sym - XKB_KEY_A));
    if (sym == XKB_KEY_0)
       return KEY_NUM_0;
    if (sym >= XKB_KEY_1 && sym <= XKB_KEY_9)
-      return (int) (KEY_NUM_1 + (sym - XKB_KEY_1));
+      return (i32) (KEY_NUM_1 + (sym - XKB_KEY_1));
    if (sym >= 0x20 && sym <= 0x7e) {
-      int c = (int) sym;
+      i32 c = (i32) sym;
       if (c == KEY_APOSTROPHE || c == KEY_COMMA || c == KEY_MINUS
          || c == KEY_PERIOD || c == KEY_SLASH || c == KEY_SEMICOLON
          || c == KEY_EQUAL || c == KEY_LEFT_BRACKET || c == KEY_BACKSLASH
@@ -2979,8 +2979,8 @@ static fn keyboardKey(any data, struct wl_keyboard *keyboard, u32 serial,
    if (window == nullptr || gXkbState == nullptr)
       return;
    u32 wid = (*window).id;
-   int evdev = (int) key - 8;
-   int code = (evdev >= 0 && evdev < 256) ? sEvdevMap[evdev] : -1;
+   i32 evdev = (i32) key - 8;
+   i32 code = (evdev >= 0 && evdev < 256) ? sEvdevMap[evdev] : -1;
    if (code == -1) {
       xkb_keysym_t sym = xkb_state_key_get_one_sym(gXkbState, key);
       code = keyFromSym(sym);
@@ -2994,10 +2994,10 @@ static fn keyboardKey(any data, struct wl_keyboard *keyboard, u32 serial,
       Key_pushEvent(wid, code, down ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
    if (down) {
       char utf[8] = {0};
-      int n = xkb_state_key_get_utf8(gXkbState, key, utf, (bytes) sizeof(utf) - 1);
+      i32 n = xkb_state_key_get_utf8(gXkbState, key, utf, (bytes) sizeof(utf) - 1);
       if (n > 0)
-         for (int i = 0; i < n; i++)
-            Key_pushCharEvent(wid, (u32) (unsigned char) utf[i]);
+         for (i32 i = 0; i < n; i++)
+            Key_pushCharEvent(wid, (u32) (u8) utf[i]);
    }
    xkb_state_update_key(gXkbState, key, down ? XKB_KEY_DOWN : XKB_KEY_UP);
    mirrorModifiers(window);
@@ -3077,9 +3077,9 @@ static fn pointerSetCursorFor(u32 serial, WindowCursorType type) {
    if (sCursorSurface == nullptr)
       return;
    wl_surface_attach(sCursorSurface, (*img).buffer, 0, 0);
-   wl_surface_damage(sCursorSurface, 0, 0, (int) (*img).width, (int) (*img).height);
+   wl_surface_damage(sCursorSurface, 0, 0, (i32) (*img).width, (i32) (*img).height);
    wl_surface_commit(sCursorSurface);
-   wl_pointer_set_cursor(gPointer, serial, sCursorSurface, (int) (*img).hotspot_x, (int) (*img).hotspot_y);
+   wl_pointer_set_cursor(gPointer, serial, sCursorSurface, (i32) (*img).hotspot_x, (i32) (*img).hotspot_y);
 }
 
 static fn pointerEnter(any data, struct wl_pointer *pointer, u32 serial,
@@ -3137,7 +3137,7 @@ static fn pointerButton(any data, struct wl_pointer *pointer, u32 serial,
    Window *win = windowHandleOf(sPointerSurface);
    if (win == nullptr || !atomic_load_explicit(&(*win).enabled, memory_order_relaxed))
       return;
-   int mbutton = -1;
+   i32 mbutton = -1;
    if (button == BTN_LEFT)
       mbutton = MOUSE_LEFT;
    else if (button == BTN_RIGHT)
@@ -3196,7 +3196,7 @@ static fn touchDown(any data, struct wl_touch *touch, u32 serial,
    Window *win = windowHandleOf(surface);
    if (win == nullptr || !atomic_load_explicit(&(*win).enabled, memory_order_relaxed))
       return;
-   int slot = (int) (id % TOUCH_MAX);
+   i32 slot = (i32) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_DOWN,
       wl_fixed_to_f64(sx), wl_fixed_to_f64(sy), 1.0, kTapThresholdNanos);
 }
@@ -3210,7 +3210,7 @@ static fn touchUp(any data, struct wl_touch *touch, u32 serial, u32 time,
    Window *win = windowHandleOf(wl_touch_get_surface(touch));
    if (win == nullptr)
       return;
-   int slot = (int) (id % TOUCH_MAX);
+   i32 slot = (i32) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_UP, 0.0, 0.0, 0.0, kTapThresholdNanos);
 }
 
@@ -3222,7 +3222,7 @@ static fn touchMotion(any data, struct wl_touch *touch, u32 time, i32 id,
    Window *win = windowHandleOf(wl_touch_get_surface(touch));
    if (win == nullptr)
       return;
-   int slot = (int) (id % TOUCH_MAX);
+   i32 slot = (i32) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_MOVE,
       wl_fixed_to_f64(sx), wl_fixed_to_f64(sy), 1.0, kTapThresholdNanos);
 }
@@ -3236,7 +3236,7 @@ static fn touchCancel(any data, struct wl_touch *touch, u32 serial, u32 time,
    Window *win = windowHandleOf(wl_touch_get_surface(touch));
    if (win == nullptr)
       return;
-   int slot = (int) (id % TOUCH_MAX);
+   i32 slot = (i32) (id % TOUCH_MAX);
    Touch_pushTouchEvent((*win).id, slot, TOUCH_CANCEL, 0.0, 0.0, 0.0, kTapThresholdNanos);
 }
 
@@ -3492,7 +3492,7 @@ static u32 sShmNameSeq = 0;
 // fresh pool is created when the size grows so the compositor can still be
 // holding the old buffer; the pool object dies right after the buffer is
 // created (the buffer keeps the pool's memory alive server-side).
-static bool windowEnsureShm(Window *window, int w, int h) {
+static bool windowEnsureShm(Window *window, i32 w, i32 h) {
    bytes Bytes = (bytes) w * (bytes) h * 4u;
    if ((*window).shmBuffer && (*window).frameW == w && (*window).frameH == h)
       return (*window).shmMap != nullptr;
@@ -3510,7 +3510,7 @@ static bool windowEnsureShm(Window *window, int w, int h) {
 
    char name[64];
    snprintf(name, sizeof(name), "/vexgraph-shm-%u", sShmNameSeq++);
-   int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, 0600);
+   i32 fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, 0600);
    if (fd == -1)
       fd = shm_open(name, O_RDWR | O_CREAT, 0600);
    if (fd == -1)
@@ -3525,7 +3525,7 @@ static bool windowEnsureShm(Window *window, int w, int h) {
       close(fd);
       return false;
    }
-   struct wl_shm_pool *pool = wl_shm_create_pool(gShm, fd, (int) Bytes);
+   struct wl_shm_pool *pool = wl_shm_create_pool(gShm, fd, (i32) Bytes);
    (*window).shmBuffer = wl_shm_pool_create_buffer(pool, 0,
       w, h, w * 4, WL_SHM_FORMAT_ARGB8888);
    wl_shm_pool_destroy(pool); // keep only the buffer alive
@@ -3639,7 +3639,7 @@ Window *Window_1(const char *title) {
 }
 
 // Construct a Wayland window with a title and explicit pixel dimensions.
-Window *Window_3(const char *title, int width, int height) {
+Window *Window_3(const char *title, i32 width, i32 height) {
    return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -3655,7 +3655,7 @@ Window *Window_new(const WindowDesc *desc) {
 }
 
 // Preserve the legacy constructor spelling by forwarding to Window_new.
-Window *Window_create(const char *title, int width, int height) {
+Window *Window_create(const char *title, i32 width, i32 height) {
    return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -3724,16 +3724,16 @@ bool Window_pollEventStep() {
 
 // --- Present policy (pure state; a future render path consumes it) ----------
 
-fn Window_setPresentMode(Window *window, int mode) {
+fn Window_setPresentMode(Window *window, i32 mode) {
    if (window == nullptr)
       return;
-   int prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
+   i32 prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
    if (prev != mode)
       atomic_fetch_add_explicit(&(*window).renderGeneration, 1, memory_order_release);
 }
 
 // Return the stored presentation policy, defaulting to FIFO for a null handle.
-int Window_getPresentMode(const Window *window) {
+i32 Window_getPresentMode(const Window *window) {
    if (window == nullptr)
       return WINDOW_PRESENT_FIFO;
    return atomic_load_explicit(&(*window).presentMode, memory_order_relaxed);
@@ -3796,7 +3796,7 @@ any Window_getTopLayer(const Window *window) {
 // ;;INTENTION("Pane/board compositing is inert on the lean window (the same
 // slice the Cocoa backend keeps inert); pane work migrates to the render
 // personal' own pass. Retires together with the composite seam.")
-bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
+bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -3805,7 +3805,7 @@ bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
 }
 
 // Retain the legacy pane API as an inert failure on the lean window backend.
-bool Window_resizePanes(Window *window, Panel *panel, int width, int height) {
+bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -3835,12 +3835,12 @@ fn Window_setTitle(Window *window, const char *title) {
 }
 
 // Read the most recently configured client width in physical pixels.
-int Window_width(Window *window) {
+i32 Window_width(Window *window) {
    return window ? atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed) : 0;
 }
 
 // Read the most recently configured client height in physical pixels.
-int Window_height(Window *window) {
+i32 Window_height(Window *window) {
    return window ? atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed) : 0;
 }
 
@@ -3857,7 +3857,7 @@ fn Window_revalidate(Window *window) {
 
 // Forward logical-size requests to the integer pixel sizing seam.
 fn Window_setSizePoints(Window *window, f32 width, f32 height) {
-   Window_setSize(window, (int) width, (int) height);
+   Window_setSize(window, (i32) width, (i32) height);
 }
 
 // Project cached pixel dimensions into the compatibility points outputs.
@@ -3877,12 +3877,12 @@ f32 Window_heightPoints(const Window *window) {
 }
 
 // Alias the client width as the viewport width.
-int Window_viewportWidth(const Window *window) {
+i32 Window_viewportWidth(const Window *window) {
    return Window_width(window);
 }
 
 // Alias the client height as the viewport height.
-int Window_viewportHeight(const Window *window) {
+i32 Window_viewportHeight(const Window *window) {
    return Window_height(window);
 }
 
@@ -3897,12 +3897,12 @@ f32 Window_viewportHeightPoints(const Window *window) {
 }
 
 // Alias the client width as the outer-window width in this backend.
-int Window_windowWidth(const Window *window) {
+i32 Window_windowWidth(const Window *window) {
    return Window_width(window);
 }
 
 // Alias the client height as the outer-window height in this backend.
-int Window_windowHeight(const Window *window) {
+i32 Window_windowHeight(const Window *window) {
    return Window_height(window);
 }
 
@@ -3919,7 +3919,7 @@ f32 Window_windowHeightPoints(const Window *window) {
 // The compositor owns geometry on Wayland; setSize only nudges the configure
 // cycle. There is no client-side set_size request on xdg-shell — the toplevel
 // configure frames carry the truth and bump sizeGeneration via reflection.
-fn Window_setSize(Window *window, int width, int height) {
+fn Window_setSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
    (discard) width;
@@ -3928,14 +3928,14 @@ fn Window_setSize(Window *window, int width, int height) {
 }
 
 // Accept the placement request; xdg-shell leaves positioning to the compositor.
-fn Window_setLocation(Window *window, int x, int y) {
+fn Window_setLocation(Window *window, i32 x, i32 y) {
    (discard) window;
    (discard) x;
    (discard) y;
 }
 
 // Return zero because Wayland does not expose client-readable toplevel position.
-fn Window_getLocation(const Window *window, int *outX, int *outY) {
+fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
    if (outX != nullptr)
       *outX = 0;
    if (outY != nullptr)
@@ -3944,7 +3944,7 @@ fn Window_getLocation(const Window *window, int *outX, int *outY) {
 }
 
 // Return zero content origin because compositor placement is not exposed here.
-fn Window_getContentOrigin(const Window *window, int *outX, int *outY) {
+fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
    if (outX != nullptr)
       *outX = 0;
    if (outY != nullptr)
@@ -4049,7 +4049,7 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
 }
 
 // Store the requested chrome mode; the compositor owns server-side decorations.
-fn Window_setUndecorated(Window *window, int type) {
+fn Window_setUndecorated(Window *window, i32 type) {
    if (window == nullptr)
       return;
    (*window).decorated = (type == WINDOW_DECORATED);
@@ -4268,7 +4268,7 @@ fn Window_setDRM(Window *window, bool enabled) {
 
 // --- Size constraints --------------------------------------------------------
 
-fn Window_setMinSize(Window *window, int width, int height) {
+fn Window_setMinSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
    (*window).minWidth = width;
@@ -4277,7 +4277,7 @@ fn Window_setMinSize(Window *window, int width, int height) {
 }
 
 // Store and publish maximum toplevel dimensions to the compositor.
-fn Window_setMaxSize(Window *window, int width, int height) {
+fn Window_setMaxSize(Window *window, i32 width, i32 height) {
    if (window == nullptr)
       return;
    (*window).maxWidth = width;
@@ -4352,29 +4352,29 @@ bool Window_present(Window *window, const Buffer *frame) {
    const u32 ch = (*frame).channels;
    if (fw == 0 || fh == 0 || ch == 0 || ch > 4)
       return false;
-   if (!windowEnsureShm(window, (int) fw, (int) fh))
+   if (!windowEnsureShm(window, (i32) fw, (i32) fh))
       return false;
 
    // Stamp the Buffer payload (Bytes straight off the uint64 element array)
    // into the mapped ARGB8888 pool. Straight alpha: the compositor blends it
    // against the desktop — the transparent-swapchain ask, honored for free.
-   const unsigned char *src = (const unsigned char*) (*frame).data;
+   const u8 *src = (const u8*) (*frame).data;
    bytes srcStride = (bytes) fw * ch;
    u32 *dst = (u32*) (*window).shmMap;
    for (u32 y = 0; y < fh; y++) {
-      const unsigned char *row = src + (bytes) y * srcStride;
+      const u8 *row = src + (bytes) y * srcStride;
       for (u32 x = 0; x < fw; x++) {
-         unsigned char b = row[x * ch + 0];
-         unsigned char g = (ch > 1) ? row[x * ch + 1] : 0u;
-         unsigned char r = (ch > 2) ? row[x * ch + 2] : 0u;
-         unsigned char a = (ch > 3) ? row[x * ch + 3] : 255u;
+         u8 b = row[x * ch + 0];
+         u8 g = (ch > 1) ? row[x * ch + 1] : 0u;
+         u8 r = (ch > 2) ? row[x * ch + 2] : 0u;
+         u8 a = (ch > 3) ? row[x * ch + 3] : 255u;
          dst[(bytes) y * fw + x] = ((u32) a << 24)
             | ((u32) r << 16) | ((u32) g << 8) | (u32) b;
       }
    }
 
    wl_surface_attach((*window).surface, (*window).shmBuffer, 0, 0);
-   wl_surface_damage_buffer((*window).surface, 0, 0, (int) fw, (int) fh);
+   wl_surface_damage_buffer((*window).surface, 0, 0, (i32) fw, (i32) fh);
    wl_surface_commit((*window).surface);
    return true;
 }
@@ -4676,7 +4676,7 @@ WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
 
 ;;;;INCOMPLETE // CreateWindowEx; returns nullptr until implemented.
 /** Windows draft stub: returns nullptr until native window creation is implemented. */
-Window *Window_create(const char *title, int width, int height) {
+Window *Window_create(const char *title, i32 width, i32 height) {
    (discard) title;
    (discard) width;
    (discard) height;
@@ -4722,14 +4722,14 @@ bool Window_pollEventStep() {
 
 ;;INCOMPLETE // DXGI swap interval; no-op until implemented.
 /** Windows draft stub: ignores presentation mode changes. */
-fn Window_setPresentMode(Window *window, int mode) {
+fn Window_setPresentMode(Window *window, i32 mode) {
    (discard) window;
    (discard) mode;
 }
 
 // Return FIFO as the safe present-mode default for the unimplemented backend.
 /** Returns FIFO because this backend does not implement presentation modes. */
-int Window_getPresentMode(const Window *window) {
+i32 Window_getPresentMode(const Window *window) {
    (discard) window;
    return WINDOW_PRESENT_FIFO;
 }
@@ -4778,7 +4778,7 @@ fn Window_setTitle(Window *window, const char *title) {
 
 ;;INCOMPLETE // SetWindowPos; no-op until implemented.
 /** Windows draft stub: ignores pixel-size changes. */
-fn Window_setSize(Window *window, int width, int height) {
+fn Window_setSize(Window *window, i32 width, i32 height) {
    (discard) window;
    (discard) width;
    (discard) height;
@@ -4829,27 +4829,27 @@ f32 Window_heightPoints(const Window *window) {
 
 // Return zero width because this stub backend has no physical display window.
 /** Returns zero client width because geometry is not tracked. */
-int Window_width(Window *window) {
+i32 Window_width(Window *window) {
    (discard) window;
    return 0;
 }
 
 // Return zero height because this stub backend has no physical display window.
 /** Returns zero client height because geometry is not tracked. */
-int Window_height(Window *window) {
+i32 Window_height(Window *window) {
    (discard) window;
    return 0;
 }
 
 // Expose the window width through the viewport compatibility accessor.
 /** Returns the window pixel width through the shared accessor. */
-int Window_viewportWidth(const Window *window) {
+i32 Window_viewportWidth(const Window *window) {
    return Window_width((Window*) window);
 }
 
 // Expose the window height through the viewport compatibility accessor.
 /** Returns the window pixel height through the shared accessor. */
-int Window_viewportHeight(const Window *window) {
+i32 Window_viewportHeight(const Window *window) {
    return Window_height((Window*) window);
 }
 
@@ -4867,13 +4867,13 @@ f32 Window_viewportHeightPoints(const Window *window) {
 
 // Alias the client width as the full window width in this stub.
 /** Returns the window pixel width through the shared accessor. */
-int Window_windowWidth(const Window *window) {
+i32 Window_windowWidth(const Window *window) {
    return Window_width((Window*) window);
 }
 
 // Alias the client height as the full window height in this stub.
 /** Returns the window pixel height through the shared accessor. */
-int Window_windowHeight(const Window *window) {
+i32 Window_windowHeight(const Window *window) {
    return Window_height((Window*) window);
 }
 
@@ -4891,7 +4891,7 @@ f32 Window_windowHeightPoints(const Window *window) {
 
 ;;INCOMPLETE // SetWindowPos; no-op until implemented.
 /** Windows draft stub: ignores location changes. */
-fn Window_setLocation(Window *window, int x, int y) {
+fn Window_setLocation(Window *window, i32 x, i32 y) {
    (discard) window;
    (discard) x;
    (discard) y;
@@ -4899,7 +4899,7 @@ fn Window_setLocation(Window *window, int x, int y) {
 
 // Return zero content-origin coordinates for the unimplemented backend.
 /** Writes zero content-origin coordinates to supplied outputs. */
-fn Window_getContentOrigin(const Window *window, int *outX, int *outY) {
+fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
    (discard) window;
    if (outX) *outX = 0;
    if (outY) *outY = 0;
@@ -4929,7 +4929,7 @@ u32 Window_getMonitorId(const Window *window) {
 
 ;;INCOMPLETE // GetWindowRect top-left; zeros until implemented.
 /** Writes zero location coordinates to supplied outputs. */
-fn Window_getLocation(const Window *window, int *outX, int *outY) {
+fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
    (discard) window;
    if (outX) *outX = 0;
    if (outY) *outY = 0;
@@ -4999,7 +4999,7 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
 
 ;;INCOMPLETE // Fullscreen/borderless chrome switch; no-op until implemented.
 /** Windows draft stub: ignores decoration-mode changes. */
-fn Window_setUndecorated(Window *window, int mode) {
+fn Window_setUndecorated(Window *window, i32 mode) {
    (discard) window;
    (discard) mode;
 }
@@ -5149,7 +5149,7 @@ fn Window_setDRM(Window *window, bool enabled) {
 
 ;;INCOMPLETE // AdjustWindowRectEx + GetWindowRect; no-op until implemented.
 /** Windows draft stub: ignores minimum-size constraints. */
-fn Window_setMinSize(Window *window, int width, int height) {
+fn Window_setMinSize(Window *window, i32 width, i32 height) {
    (discard) window;
    (discard) width;
    (discard) height;
@@ -5157,7 +5157,7 @@ fn Window_setMinSize(Window *window, int width, int height) {
 
 ;;INCOMPLETE // AdjustWindowRectEx + GetWindowRect; no-op until implemented.
 /** Windows draft stub: ignores maximum-size constraints. */
-fn Window_setMaxSize(Window *window, int width, int height) {
+fn Window_setMaxSize(Window *window, i32 width, i32 height) {
    (discard) window;
    (discard) width;
    (discard) height;
@@ -5208,7 +5208,7 @@ Window *Window_1(const char *title) {
    return nullptr;
 }
 
-Window *Window_3(const char *title, int width, int height) {
+Window *Window_3(const char *title, i32 width, i32 height) {
    (discard) title;
    (discard) width;
    (discard) height;
@@ -5266,7 +5266,7 @@ fn Window_close(Window *window) {
    Window_setShouldClose(window, true);
 }
 
-fn Window_waitEvents(Window *window, int timeoutMs) {
+fn Window_waitEvents(Window *window, i32 timeoutMs) {
    (discard) window;
    (discard) timeoutMs;
 }
@@ -5358,7 +5358,7 @@ fn Window_orderLayers(Window *window) {
    (discard) window;
 }
 
-bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
+bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -5366,7 +5366,7 @@ bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
    return false;
 }
 
-bool Window_resizePanes(Window *window, Panel *panel, int width, int height) {
+bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
    (discard) window;
    (discard) panel;
    (discard) width;
@@ -5428,7 +5428,7 @@ bool Window_present(Window *window, const Buffer *frame) {
    return false;
 }
 
-fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width, int height) {
+fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width, i32 height) {
    (discard) window;
    (discard) pixels;
    (discard) stride;
@@ -5436,7 +5436,7 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width,
    (discard) height;
 }
 
-any Window_createPresentSurface(Window *window, int widthPx, int heightPx) {
+any Window_createPresentSurface(Window *window, i32 widthPx, i32 heightPx) {
    (discard) window;
    (discard) widthPx;
    (discard) heightPx;
@@ -5466,7 +5466,7 @@ bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes 
    return false;
 }
 
-bool Window_writePNG(const_any pixels, bytes stride, int width, int height, const char *path) {
+bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, const char *path) {
    (discard) pixels;
    (discard) stride;
    (discard) width;
@@ -5529,14 +5529,14 @@ fn TrafficLight_refresh(TrafficLight *self) {
 
 /** Fallback stub: sets button visibility. */
 fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, bool visible) {
-   if (self == nullptr || (int) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
+   if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
       return;
    (*self).lightVisible[button] = visible;
 }
 
 /** Fallback stub: reports button visibility. */
 bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton button) {
-   if (self == nullptr || (int) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
+   if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
       return false;
    return (*self).lightVisible[button];
 }

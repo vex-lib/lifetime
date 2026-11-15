@@ -14,7 +14,7 @@
  * PRIVATE HELPERS: TestCall stores process, rendezvous flags and worker results.
  * FUNCTIONS: original, replacement, reentrant, waitFor, heldEntry, worker, main.
  */
-static int failures;
+static i32 failures;
 #define CHECK(label, condition) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s (line %d)\n", label, __LINE__); \
@@ -28,23 +28,23 @@ typedef struct TestCall {
     atomic_bool release;
     pthread_t thread;
     ProcessResult result;
-    int exitStatus;
+    i32 exitStatus;
 } TestCall;
 
 /** Returns the original entry's context value or its null-context sentinel. */
-static int original(any context) {
-    return context ? *(int*) context : 11;
+static i32 original(any context) {
+    return context ? *(i32*) context : 11;
 }
 
 /** Returns the replacement entry's offset value or its null-context sentinel. */
-static int replacement(any context) {
-    return context ? *(int*) context + 100 : 22;
+static i32 replacement(any context) {
+    return context ? *(i32*) context + 100 : 22;
 }
 
 /** Verifies nested invocation and mutation are refused while the process runs. */
-static int reentrant(any context) {
+static i32 reentrant(any context) {
     Process *process = (Process*) context;
-    int result = 123;
+    i32 result = 123;
     CHECK("running", Process_isRunning(process));
     CHECK("reentrant run busy", Process_run(process, &result) == PROCESS_BUSY);
     CHECK("busy output untouched", result == 123);
@@ -69,7 +69,7 @@ static bool waitFor(atomic_bool *flag) {
 }
 
 /** Holds a process invocation until the test releases its bounded rendezvous. */
-static int heldEntry(any context) {
+static i32 heldEntry(any context) {
     TestCall *call = (TestCall*) context;
     (*call).thread = pthread_self();
     atomic_store_explicit(&(*call).entered, true, memory_order_release);
@@ -85,11 +85,11 @@ static any worker(any context) {
     return nullptr;
 }
 
-int main() {
-    int result = 123;
-    int oldContext = -1;
-    int newContext = 7;
-    int association = 0;
+i32 main() {
+    i32 result = 123;
+    i32 oldContext = -1;
+    i32 newContext = 7;
+    i32 association = 0;
     CHECK("null constructor", Process(nullptr) == nullptr);
     CHECK("null run", Process_run(nullptr, &result) == PROCESS_INVALID && result == 123);
     CHECK("null replace", Process_replace(nullptr, original, nullptr, nullptr) == PROCESS_INVALID);

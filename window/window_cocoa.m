@@ -84,8 +84,8 @@
  *   u32 id;                  // engine window id (1..N, 0 = FOCUS_BROADCAST)
  *   _Atomic bool shouldClose;     // true once close requested (Thread 0 writes, loop reads)
  *   _Atomic u64 sizeGeneration; // resize-reflection counter (thread 0 bumps)
- *   _Atomic int cachedWidth;      // content width in physical pixels at last thread-0 event (any thread reads)
- *   _Atomic int cachedHeight;     // content height in physical pixels at last thread-0 event
+ *   _Atomic i32 cachedWidth;      // content width in physical pixels at last thread-0 event (any thread reads)
+ *   _Atomic i32 cachedHeight;     // content height in physical pixels at last thread-0 event
  *   d64 cachedScale;           // active backing scale factor
  *   d64 cachedX;               // top-left screen X at last thread-0 event
  *   d64 cachedY;               // top-left screen Y at last thread-0 event
@@ -93,7 +93,7 @@
  *   d64 cachedContentY;        // CONTENT top-left Y (below title bar)
  *   _Atomic bool liveResizing;    // thread 0 during NSViewLiveResize; renderer consumes
  *   _Atomic bool miniaturizing;   // thread 0 during genie minimize; suppress merge
- *   _Atomic int presentMode;      // present pacing (FIFO/IMMEDIATE), pure state
+ *   _Atomic i32 presentMode;      // present pacing (FIFO/IMMEDIATE), pure state
  *   _Atomic bool transparent;     // composite transparency request, pure state
  *   _Atomic u64 renderGeneration; // policy-reflection counter (rebuild ticket)
  *   _Atomic bool enabled;         // false mutes ALL OS input for this window
@@ -269,7 +269,7 @@ static const u64 kTapThresholdNanos = 250000000ULL;
 
 // Carbon virtual keycode -> KEY_* code. -1 = unmapped. Same table the legacy
 // macOSWindow built (physical F1-F12, not Fn-f64d media keys).
-static int macKeyMap[128] = {
+static i32 macKeyMap[128] = {
     [0] = KEY_A,                   [1] = KEY_S,
     [2] = KEY_D,                   [3] = KEY_F,
     [4] = KEY_H,                   [5] = KEY_G,
@@ -331,8 +331,8 @@ struct Window {
     u32 id;
     _Atomic bool shouldClose;
     _Atomic u64 sizeGeneration;
-    _Atomic int cachedWidth;
-    _Atomic int cachedHeight;
+    _Atomic i32 cachedWidth;
+    _Atomic i32 cachedHeight;
     d64 cachedScale;
     d64 cachedX;
     d64 cachedY;
@@ -342,7 +342,7 @@ struct Window {
     _Atomic bool miniaturizing;
 
     // Pure-state reflection words (no GPU calls in this file).
-    _Atomic int presentMode;
+    _Atomic i32 presentMode;
     _Atomic bool transparent;
     _Atomic u64 renderGeneration;
 
@@ -368,7 +368,7 @@ struct Window {
     WindowResizeRenderFn resizeRenderFn;
     any resizeRenderUserdata;
 
-    int undecoratedMode;     // WINDOW_DECORATED, WINDOW_UNDECORATED_NAKED, WINDOW_UNDECORATED_BORDERLESS
+    i32 undecoratedMode;     // WINDOW_DECORATED, WINDOW_UNDECORATED_NAKED, WINDOW_UNDECORATED_BORDERLESS
     bool viewportFlushToTop; // true when decorated window has viewport flushed into top bar
 };
 
@@ -736,18 +736,18 @@ static fn windowRefreshSize(Window *window) {
         CGFloat scale = windowBackingScale(window);
         (*window).cachedScale = (d64) scale;
 
-        int cw, ch;
+        i32 cw, ch;
         if (cv != nil) {
             NSRect backing = [cv convertRectToBacking:content];
-            cw = (int) lround(backing.size.width);
-            ch = (int) lround(backing.size.height);
+            cw = (i32) lround(backing.size.width);
+            ch = (i32) lround(backing.size.height);
         } else {
-            cw = (int) lround(content.size.width * scale);
-            ch = (int) lround(content.size.height * scale);
+            cw = (i32) lround(content.size.width * scale);
+            ch = (i32) lround(content.size.height * scale);
         }
 
-        int lastW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
-        int lastH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
+        i32 lastW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
+        i32 lastH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
         if (cw != lastW || ch != lastH) {
             atomic_store_explicit(&(*window).cachedWidth, cw, memory_order_relaxed);
             atomic_store_explicit(&(*window).cachedHeight, ch, memory_order_relaxed);
@@ -795,7 +795,7 @@ static fn windowRefreshOrigin(Window *window) {
         if (tx != (*window).cachedX || ty != (*window).cachedY) {
             (*window).cachedX = tx;
             (*window).cachedY = ty;
-            WindowEvent_fireMoved(&(*window).lifecycle, window, (int) tx, (int) ty);
+            WindowEvent_fireMoved(&(*window).lifecycle, window, (i32) tx, (i32) ty);
         }
     }
 }
@@ -868,7 +868,7 @@ static fn mouseLocation(NSEvent *event, d64 *outX, d64 *outY) {
 }
 
 // Map an NSTouch phase onto the Touch_* action codes.
-static int touchAction(NSTouchPhase phase) {
+static i32 touchAction(NSTouchPhase phase) {
     if (phase & NSTouchPhaseBegan)
         return TOUCH_DOWN;
     if (phase & (NSTouchPhaseMoved | NSTouchPhaseStationary))
@@ -903,7 +903,7 @@ static fn dispatchTouches(NSEvent *event, u32 wid) {
         d64 posX = norm.x * winW;
         d64 posY = (1.0 - norm.y) * winH;
         d64 pressure = [touch isResting] ? 0.2 : 0.8;
-        Touch_pushTouchEvent(wid, (int) slot, touchAction([touch phase]),
+        Touch_pushTouchEvent(wid, (i32) slot, touchAction([touch phase]),
                              posX, posY, pressure, kTapThresholdNanos);
     }
 }
@@ -923,9 +923,9 @@ static fn routeEvent(NSEvent *event) {
 
     switch (type) {
         case NSEventTypeFlagsChanged: {
-            short macCode = [event keyCode];
+            i16 macCode = [event keyCode];
             NSEventModifierFlags flags = [event modifierFlags];
-            int stdKey = (macCode >= 0 && macCode < 128) ? macKeyMap[macCode] : -1;
+            i32 stdKey = (macCode >= 0 && macCode < 128) ? macKeyMap[macCode] : -1;
             if (stdKey != -1) {
                 bool isDown = false;
                 if (macCode == 54 || macCode == 55) {
@@ -965,9 +965,9 @@ static fn routeEvent(NSEvent *event) {
             if (shift != (Key_isDown(KEY_LEFT_SHIFT) || Key_isDown(KEY_RIGHT_SHIFT))) {
                 Key_pushEvent(wid, KEY_LEFT_SHIFT, shift ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
             }
-            short macCode = [event keyCode];
+            i16 macCode = [event keyCode];
             if (macCode >= 0 && macCode < 128) {
-                int stdKey = macKeyMap[macCode];
+                i32 stdKey = macKeyMap[macCode];
                 if (stdKey != -1)
                     Key_pushEvent(wid, stdKey,
                                   type == NSEventTypeKeyDown ? KEY_ACTION_DOWN : KEY_ACTION_UP,
@@ -975,7 +975,7 @@ static fn routeEvent(NSEvent *event) {
                 if (type == NSEventTypeKeyDown && stdKey != -1) {
                     NSString *chars = [event characters];
                     if (chars.length > 0) {
-                        unsigned char c0 = (unsigned char) [chars characterAtIndex:0];
+                        u8 c0 = (u8) [chars characterAtIndex:0];
                         if (c0 > 0)
                             Key_pushCharEvent(wid, c0);
                     }
@@ -1002,9 +1002,9 @@ static fn routeEvent(NSEvent *event) {
         case NSEventTypeLeftMouseDown:
         case NSEventTypeRightMouseDown:
         case NSEventTypeOtherMouseDown: {
-            int button = (type == NSEventTypeLeftMouseDown) ? MOUSE_LEFT
+            i32 button = (type == NSEventTypeLeftMouseDown) ? MOUSE_LEFT
                        : ((type == NSEventTypeRightMouseDown) ? MOUSE_RIGHT
-                                                              : (int) [event buttonNumber]);
+                                                              : (i32) [event buttonNumber]);
             d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
@@ -1017,9 +1017,9 @@ static fn routeEvent(NSEvent *event) {
         case NSEventTypeLeftMouseUp:
         case NSEventTypeRightMouseUp:
         case NSEventTypeOtherMouseUp: {
-            int button = (type == NSEventTypeLeftMouseUp) ? MOUSE_LEFT
+            i32 button = (type == NSEventTypeLeftMouseUp) ? MOUSE_LEFT
                        : ((type == NSEventTypeRightMouseUp) ? MOUSE_RIGHT
-                                                             : (int) [event buttonNumber]);
+                                                             : (i32) [event buttonNumber]);
             d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
@@ -1043,9 +1043,9 @@ static fn routeEvent(NSEvent *event) {
             if (type == NSEventTypeMouseMoved) {
                 Mouse_pushMoveEvent(wid, x, y);
             } else {
-                int button = (type == NSEventTypeLeftMouseDragged) ? MOUSE_LEFT
+                i32 button = (type == NSEventTypeLeftMouseDragged) ? MOUSE_LEFT
                            : ((type == NSEventTypeRightMouseDragged) ? MOUSE_RIGHT
-                                                                      : (int) [event buttonNumber]);
+                                                                      : (i32) [event buttonNumber]);
                 Mouse_pushDragEvent(wid, button, x, y);
             }
             break;
@@ -1140,7 +1140,7 @@ bool Window_pollEventStep() {
 }
 
 // Wait for one process-wide AppKit event for the requested bounded interval.
-fn Window_waitEvents(Window *window, int timeoutMs) {
+fn Window_waitEvents(Window *window, i32 timeoutMs) {
     (discard) window;   // the AppKit event pump is process-wide
     @autoreleasepool {
         NSDate *until = timeoutMs > 0
@@ -1320,8 +1320,8 @@ static Window *windowAlloc(const WindowDesc *desc) {
             winScale = scale;
         (*w).cachedScale = (d64) winScale;
         NSRect initialContent = [window contentRectForFrameRect:[window frame]];
-        int initPxW = (int) lround(initialContent.size.width * winScale);
-        int initPxH = (int) lround(initialContent.size.height * winScale);
+        i32 initPxW = (i32) lround(initialContent.size.width * winScale);
+        i32 initPxH = (i32) lround(initialContent.size.height * winScale);
         atomic_store_explicit(&(*w).cachedWidth, initPxW, memory_order_relaxed);
         atomic_store_explicit(&(*w).cachedHeight, initPxH, memory_order_relaxed);
         NSRect initialFrame = [window frame];
@@ -1390,7 +1390,7 @@ Window *Window_1(const char *title) {
 }
 
 // Construct a window descriptor with a title and explicit content dimensions.
-Window *Window_3(const char *title, int width, int height) {
+Window *Window_3(const char *title, i32 width, i32 height) {
     return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -1410,7 +1410,7 @@ Window *Window_new(const WindowDesc *desc) {
 }
 
 // Preserve the legacy constructor spelling by forwarding to Window_new.
-Window *Window_create(const char *title, int width, int height) {
+Window *Window_create(const char *title, i32 width, i32 height) {
     return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
@@ -1466,16 +1466,16 @@ fn Window_close(Window *window) {
 
 // --- Present policy (pure state; a future render path consumes it) ----------
 
-fn Window_setPresentMode(Window *window, int mode) {
+fn Window_setPresentMode(Window *window, i32 mode) {
     if (window == nullptr)
         return;
-    int prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
+    i32 prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
     if (prev != mode)
         atomic_fetch_add_explicit(&(*window).renderGeneration, 1, memory_order_release);
 }
 
 // Read the stored present policy, defaulting to FIFO for a null handle.
-int Window_getPresentMode(const Window *window) {
+i32 Window_getPresentMode(const Window *window) {
     if (window == nullptr)
         return WINDOW_PRESENT_FIFO;
     return atomic_load_explicit(&(*window).presentMode, memory_order_relaxed);
@@ -1532,7 +1532,7 @@ any Window_getTopLayer(const Window *window) {
 }
 
 // ;;INTENTION("Pane/board compositing was the GPU-era shim's job; on this window it is inert (still-unmigrated darling compositor retains the call). Pane work migrates to the render personal' own pass; retires together with the composite seam.")
-bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
+bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
     (discard) window;
     (discard) panel;
     (discard) width;
@@ -1541,7 +1541,7 @@ bool Window_attachPanes(Window *window, Panel *panel, int width, int height) {
 }
 
 // Retain the retired pane API as an inert failure on the lean window backend.
-bool Window_resizePanes(Window *window, Panel *panel, int width, int height) {
+bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
     (discard) window;
     (discard) panel;
     (discard) width;
@@ -1637,21 +1637,21 @@ fn Window_setTitle(Window *window, const char *title) {
 }
 
 // Read the cached content width in native physical pixels.
-int Window_width(Window *window) {
+i32 Window_width(Window *window) {
     if (window == nullptr)
         return 0;
     return atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
 }
 
 // Read the cached content height in native physical pixels.
-int Window_height(Window *window) {
+i32 Window_height(Window *window) {
     if (window == nullptr)
         return 0;
     return atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
 }
 
 // Convert requested physical dimensions to AppKit points and resize the content.
-fn Window_setSize(Window *window, int width, int height) {
+fn Window_setSize(Window *window, i32 width, i32 height) {
     if (window == nullptr || width <= 0 || height <= 0)
         return;
     @autoreleasepool {
@@ -1680,8 +1680,8 @@ fn Window_revalidate(Window *window) {
 
         // If the scale factor changed (e.g. dragged from 2.0x Retina to 1.0x external monitor),
         // adjust the points content size so the target physical pixel size is preserved.
-        int targetPxW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
-        int targetPxH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
+        i32 targetPxW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
+        i32 targetPxH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
         if (curScale != prevScale && targetPxW > 0 && targetPxH > 0) {
             CGFloat newPtW = (CGFloat) targetPxW / curScale;
             CGFloat newPtH = (CGFloat) targetPxH / curScale;
@@ -1737,12 +1737,12 @@ f32 Window_heightPoints(const Window *window) {
 }
 
 // Alias the physical content width as the viewport width.
-int Window_viewportWidth(const Window *window) {
+i32 Window_viewportWidth(const Window *window) {
     return Window_width((Window*) window);
 }
 
 // Alias the physical content height as the viewport height.
-int Window_viewportHeight(const Window *window) {
+i32 Window_viewportHeight(const Window *window) {
     return Window_height((Window*) window);
 }
 
@@ -1757,24 +1757,24 @@ f32 Window_viewportHeightPoints(const Window *window) {
 }
 
 // Return the outer NSWindow frame width in native pixels.
-int Window_windowWidth(const Window *window) {
+i32 Window_windowWidth(const Window *window) {
     if (window == nullptr || (*window).nsWindow == nil)
         return 0;
     @autoreleasepool {
         NSRect frame = [(*window).nsWindow frame];
         CGFloat scale = windowBackingScale(window);
-        return (int) lround(frame.size.width * scale);
+        return (i32) lround(frame.size.width * scale);
     }
 }
 
 // Return the outer NSWindow frame height in native pixels.
-int Window_windowHeight(const Window *window) {
+i32 Window_windowHeight(const Window *window) {
     if (window == nullptr || (*window).nsWindow == nil)
         return 0;
     @autoreleasepool {
         NSRect frame = [(*window).nsWindow frame];
         CGFloat scale = windowBackingScale(window);
-        return (int) lround(frame.size.height * scale);
+        return (i32) lround(frame.size.height * scale);
     }
 }
 
@@ -1797,7 +1797,7 @@ f32 Window_windowHeightPoints(const Window *window) {
 }
 
 // Place the window by its top-left screen coordinate in the public pixel space.
-fn Window_setLocation(Window *window, int x, int y) {
+fn Window_setLocation(Window *window, i32 x, i32 y) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -1807,19 +1807,19 @@ fn Window_setLocation(Window *window, int x, int y) {
 }
 
 // Return the cached top-left screen origin through optional output pointers.
-fn Window_getLocation(const Window *window, int *outX, int *outY) {
+fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
-        *outX = window ? (int) (*window).cachedX : 0;
+        *outX = window ? (i32) (*window).cachedX : 0;
     if (outY)
-        *outY = window ? (int) (*window).cachedY : 0;
+        *outY = window ? (i32) (*window).cachedY : 0;
 }
 
 // Return the cached content-view screen origin through optional outputs.
-fn Window_getContentOrigin(const Window *window, int *outX, int *outY) {
+fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
-        *outX = window ? (int) (*window).cachedContentX : 0;
+        *outX = window ? (i32) (*window).cachedContentX : 0;
     if (outY)
-        *outY = window ? (int) (*window).cachedContentY : 0;
+        *outY = window ? (i32) (*window).cachedContentY : 0;
 }
 
 // Center the window in the main display's usable visible frame.
@@ -1966,7 +1966,7 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
 }
 
 // Apply the requested native chrome mode and refresh traffic-light geometry.
-fn Window_setUndecorated(Window *window, int mode) {
+fn Window_setUndecorated(Window *window, i32 mode) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -2092,7 +2092,7 @@ fn Window_setFloatingTrafficLights(Window *window, bool f32ing) {
 
 // Map the public WindowTrafficLight enum onto the TrafficLight class's button
 // index (the values coincide: close=0, miniaturize=1, zoom=2). -1 = unknown.
-static int lightIndex(WindowTrafficLight light) {
+static i32 lightIndex(WindowTrafficLight light) {
     if (light == WINDOW_TRAFFIC_LIGHT_CLOSE)
         return TRAFFIC_LIGHT_CLOSE;
     if (light == WINDOW_TRAFFIC_LIGHT_MINIMIZE)
@@ -2106,7 +2106,7 @@ static int lightIndex(WindowTrafficLight light) {
 fn Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLight light, bool visible) {
     if (window == nullptr)
         return;
-    int i = lightIndex(light);
+    i32 i = lightIndex(light);
     if (i < 0)
         return;
     @autoreleasepool {
@@ -2116,7 +2116,7 @@ fn Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLight 
 
 // Query configured visibility for a valid native traffic-light button.
 bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTrafficLight light) {
-    int i = lightIndex(light);
+    i32 i = lightIndex(light);
     if (window == nullptr || i < 0)
         return false;
     return TrafficLight_isButtonVisible((*window).trafficLights, (TrafficLightButton) i);
@@ -2266,7 +2266,7 @@ fn Window_setAlwaysOnTop(Window *window, bool onTop) {
 }
 
 // Publish caller-owned RGBA pixels as layer contents without copying the buffer.
-fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width, int height) {
+fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width, i32 height) {
     if (window == nullptr || pixels == nullptr || width <= 0 || height <= 0)
         return;
     @autoreleasepool {
@@ -2307,13 +2307,13 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width,
 // The window's draw view already wantsLayer; we hand the layer an IOSurface as
 // its contents. The render repo draws straight into the IOSurface on the GPU,
 // so publishing is a pointer swap, not a pixel copy.
-any Window_createPresentSurface(Window *window, int widthPx, int heightPx) {
+any Window_createPresentSurface(Window *window, i32 widthPx, i32 heightPx) {
     if (window == nullptr || widthPx <= 0 || heightPx <= 0)
         return nullptr;
     @autoreleasepool {
         // Row Bytes must be aligned for Metal to build a texture from the
         // IOSurface (an unaligned width*4 aborts in _mtlValidateStrideTextureParameters).
-        int rowBytes = ((widthPx * 4) + 63) & ~63;
+        i32 rowBytes = ((widthPx * 4) + 63) & ~63;
         NSDictionary *props = @{
             (__bridge id) kIOSurfaceWidth: @(widthPx),
             (__bridge id) kIOSurfaceHeight: @(heightPx),
@@ -2392,7 +2392,7 @@ bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes 
 
 // Write a tightly packed RGBA8 buffer to a PNG file. The screenshot/CAPTURE
 // path for tests and agents; ImageIO does the encoding.
-bool Window_writePNG(const_any pixels, bytes stride, int width, int height, const char *path) {
+bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, const char *path) {
     if (pixels == nullptr || width <= 0 || height <= 0 || path == nullptr)
         return false;
     bool ok = false;
@@ -2545,7 +2545,7 @@ fn Window_setDRM(Window *window, bool enabled) {
 
 // --- Size constraints ---
 
-fn Window_setMinSize(Window *window, int width, int height) {
+fn Window_setMinSize(Window *window, i32 width, i32 height) {
     if (window == nullptr)
         return;
     @autoreleasepool {
@@ -2557,7 +2557,7 @@ fn Window_setMinSize(Window *window, int width, int height) {
 }
 
 // Convert maximum content dimensions from physical pixels and set AppKit limits.
-fn Window_setMaxSize(Window *window, int width, int height) {
+fn Window_setMaxSize(Window *window, i32 width, i32 height) {
     if (window == nullptr)
         return;
     @autoreleasepool {

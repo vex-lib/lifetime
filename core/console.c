@@ -45,7 +45,7 @@
  *   ConsoleIo io;                           // injectable execution seam
  *   _Atomic bool cancel;                    // cancel flag (the Bounded Wait Law)
  *   bool running;                           // session active
- *   int exitStatus;                         // exit code of last session
+ *   i32 exitStatus;                         // exit code of last session
  *
  * PRIVATE HELPERS:
  * ----------------------------------------------------------------------------
@@ -212,7 +212,7 @@ bool Console_isRunning(const Console *self) {
 }
 
 /** Returns the last session exit status, or -1 for a null console. */
-int Console_getExitStatus(const Console *self) {
+i32 Console_getExitStatus(const Console *self) {
     if (!self)
         return -1;
     return (*self).exitStatus;

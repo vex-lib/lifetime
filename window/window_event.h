@@ -34,8 +34,8 @@ typedef struct Window Window;
 
 // Slot signatures (function-pointer typedefs: types, not classes).
 typedef bool (*WindowQuitRequestedFn)(any self, Window *window);
-typedef fn (*WindowResizedFn)(any self, Window *window, int width, int height);
-typedef fn (*WindowMovedFn)(any self, Window *window, int x, int y);
+typedef fn (*WindowResizedFn)(any self, Window *window, i32 width, i32 height);
+typedef fn (*WindowMovedFn)(any self, Window *window, i32 x, i32 y);
 typedef fn (*WindowNoArgFn)(any self, Window *window);
 typedef fn (*WindowOcclusionFn)(any self, Window *window, bool visible);
 
@@ -65,8 +65,8 @@ bool WindowEvent_init(WindowEvent *self);
 // returns true (may quit); false when the app declines.
 bool WindowEvent_fireQuitRequested(WindowEvent *self, Window *window);
 fn WindowEvent_fireAfterQuit(WindowEvent *self, Window *window);
-fn WindowEvent_fireResized(WindowEvent *self, Window *window, int width, int height);
-fn WindowEvent_fireMoved(WindowEvent *self, Window *window, int x, int y);
+fn WindowEvent_fireResized(WindowEvent *self, Window *window, i32 width, i32 height);
+fn WindowEvent_fireMoved(WindowEvent *self, Window *window, i32 x, i32 y);
 fn WindowEvent_fireFullscreen(WindowEvent *self, Window *window);
 fn WindowEvent_fireMinimized(WindowEvent *self, Window *window);
 fn WindowEvent_fireRestored(WindowEvent *self, Window *window);

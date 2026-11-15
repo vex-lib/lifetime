@@ -114,12 +114,12 @@ fn TrafficLight_refresh(TrafficLight *self) {
         buttons[TRAFFIC_LIGHT_ZOOM] = [nsw standardWindowButton:NSWindowZoomButton];
 
         if (!(*self).lightBaseSet) {
-            for (int i = 0; i < TRAFFIC_LIGHT_COUNT; i++)
+            for (i32 i = 0; i < TRAFFIC_LIGHT_COUNT; i++)
                 (*self).lightBase[i] = buttons[i] ? [buttons[i] frame] : NSZeroRect;
             (*self).lightBaseSet = true;
         }
 
-        for (int i = 0; i < TRAFFIC_LIGHT_COUNT; i++) {
+        for (i32 i = 0; i < TRAFFIC_LIGHT_COUNT; i++) {
             if (buttons[i] == nil)
                 continue;
             [buttons[i] setHidden:(*self).lightVisible[i] ? NO : YES];
@@ -135,7 +135,7 @@ fn TrafficLight_refresh(TrafficLight *self) {
 
 /** Shows or hides the selected native traffic-light button. */
 fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, bool visible) {
-    if (self == nullptr || (int) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
+    if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
         return;
     (*self).lightVisible[button] = visible;
     TrafficLight_refresh(self);
@@ -143,7 +143,7 @@ fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, 
 
 /** Reports whether the selected button is configured as visible. */
 bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton button) {
-    if (self == nullptr || (int) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
+    if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
         return false;
     return (*self).lightVisible[button];
 }

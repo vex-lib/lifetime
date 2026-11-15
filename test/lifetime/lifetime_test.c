@@ -33,14 +33,14 @@ typedef struct MemoryHeader {
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(name, cond) do { \
     if (cond) { printf("[lifetime_test] PASS %s\n", name); } \
     else { printf("[lifetime_test] FAIL %s\n", name); g_failures++; } \
 } while (0)
 
-int main() {
+i32 main() {
     printf("=== Running Lifetime & Spoke Test Suite ===\n");
 
     // #1 Pointer Legitimacy verification (Lifetime_isLegit)

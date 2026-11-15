@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-int main() {
+i32 main() {
     u64 n1 = Clock_nowNanos();
     u64 n2 = Clock_nowNanos();
     assert(n2 >= n1);
@@ -31,6 +31,6 @@ int main() {
     assert(m2 >= m1);
 
     printf("clock_test: PASS nanos=%llu millis=%llu seconds=%.3f\n",
-           (unsigned long long) n2, (unsigned long long) m2, s);
+           (u64) n2, (u64) m2, s);
     return 0;
 }

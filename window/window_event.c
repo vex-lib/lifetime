@@ -171,7 +171,7 @@ fn WindowEvent_fireAfterQuit(WindowEvent *self, Window *window) {
 }
 
 /** Notifies the owner of the window's new content dimensions. */
-fn WindowEvent_fireResized(WindowEvent *self, Window *window, int width, int height) {
+fn WindowEvent_fireResized(WindowEvent *self, Window *window, i32 width, i32 height) {
     if(self == nullptr)
         return;
     if((*self).onResized == nullptr)
@@ -180,7 +180,7 @@ fn WindowEvent_fireResized(WindowEvent *self, Window *window, int width, int hei
 }
 
 /** Notifies the owner that the window origin changed. */
-fn WindowEvent_fireMoved(WindowEvent *self, Window *window, int x, int y) {
+fn WindowEvent_fireMoved(WindowEvent *self, Window *window, i32 x, i32 y) {
     if(self == nullptr)
         return;
     if((*self).onMoved == nullptr)

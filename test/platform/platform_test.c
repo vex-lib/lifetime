@@ -64,7 +64,7 @@
 #error "platform_test: x86_64 did not resolve to VEX_ARCH_X86_64"
 #endif
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -74,7 +74,7 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main()
+i32 main()
 {
     // Every axis and both names must resolve to something non-empty.
     CHECK(VEX_PLATFORM_NAME[0] != '\0');

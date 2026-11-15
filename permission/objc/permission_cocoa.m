@@ -106,7 +106,7 @@ static PermissionStatus mapCN(CNAuthorizationStatus status) {
 /** Maps an EventKit authorization value to the portable permission status. */
 static PermissionStatus mapEK(EKAuthorizationStatus status) {
     // Named via if-chain: EKAuthorizationStatusAuthorized is deprecated (mac 14)
-    // in favor of FullAccess/WriteOnly, so we never name it — anything short of
+    // in favor of FullAccess/WriteOnly, so we never name it — anything i16 of
     // denied/restricted/undetermined is a grant.
     if (status == EKAuthorizationStatusDenied)
         return PERMISSION_DENIED;
@@ -363,7 +363,7 @@ bool permissionBackendOpenSettings(PermissionKind kind) {
         default:                        return false;
     }
     char url[192];
-    int n = snprintf(url, sizeof url,
+    i32 n = snprintf(url, sizeof url,
                      "x-apple.systempreferences:com.apple.preference.security?%s", pane);
     if (n <= 0 || (bytes) n >= sizeof url)
         return false;

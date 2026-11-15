@@ -56,10 +56,10 @@ typedef struct Panel Panel;
 // what it wants to change. Zero it for pure defaults.
 typedef struct WindowDesc {
     const char *title;   // default "vex"
-    int width;           // physical display pixels, default 800 (Native Pixel Law)
-    int height;          // physical display pixels, default 600 (Native Pixel Law)
-    int x;               // top-left, default 0 (only honored when non-zero)
-    int y;               // default 0 (only honored when non-zero)
+    i32 width;           // physical display pixels, default 800 (Native Pixel Law)
+    i32 height;          // physical display pixels, default 600 (Native Pixel Law)
+    i32 x;               // top-left, default 0 (only honored when non-zero)
+    i32 y;               // default 0 (only honored when non-zero)
     bool centered;       // default true — the window lands centered on the _main
                          // screen's visible frame; only a non-zero x/y defeats it
     bool shown;          // default false — construct hidden, show() when ready
@@ -80,7 +80,7 @@ typedef struct WindowDesc {
 
 Window *Window_0();
 Window *Window_1(const char *title);
-Window *Window_3(const char *title, int width, int height);
+Window *Window_3(const char *title, i32 width, i32 height);
 
 #define WINDOW_CHOOSER(_0, _1, _2, _3, NAME, ...) NAME
 
@@ -95,7 +95,7 @@ Window *Window_3(const char *title, int width, int height);
 Window *Window_new(const WindowDesc *desc);
 
 // Legacy-style convenience constructor: titled, sized, created hidden.
-Window *Window_create(const char *title, int width, int height);
+Window *Window_create(const char *title, i32 width, i32 height);
 
 // Close the window and free the handle. Safe if already closed.
 fn Window_destroy(Window *window);
@@ -121,20 +121,20 @@ bool Window_pollEventStep();
 // The park half of poll-then-park: pair with Window_pollEventStep — drain while
 // events are queued, wait when they are not, so an idle window costs no CPU.
 // timeoutMs <= 0 waits indefinitely. Thread 0 (the app thread) only.
-fn Window_waitEvents(Window *window, int timeoutMs);
+fn Window_waitEvents(Window *window, i32 timeoutMs);
 
 // --- Title / size / position (Native Pixel Law: width/height speak in native physical pixels) ---
 fn Window_setTitle(Window *window, const char *title);
-int  Window_width(Window *window);  // content width in native physical display pixels
-int  Window_height(Window *window); // content height in native physical display pixels
-fn Window_setSize(Window *window, int width, int height); // physical display pixels
-fn Window_setLocation(Window *window, int x, int y);
+i32  Window_width(Window *window);  // content width in native physical display pixels
+i32  Window_height(Window *window); // content height in native physical display pixels
+fn Window_setSize(Window *window, i32 width, i32 height); // physical display pixels
+fn Window_setLocation(Window *window, i32 x, i32 y);
 // Top-left corner in global desktop points (the space setLocation speaks).
-fn Window_getLocation(const Window *window, int *outX, int *outY);
+fn Window_getLocation(const Window *window, i32 *outX, i32 *outY);
 // Top-left of the CONTENT area (below the title bar) in desktop points —
 // the space darling layouts and GPU caches speak. This is what renderers
 // should join against, not getLocation (the frame includes chrome).
-fn Window_getContentOrigin(const Window *window, int *outX, int *outY);
+fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY);
 fn Window_center(Window *window);
 fn Window_show(Window *window);
 fn Window_hide(Window *window);
@@ -151,12 +151,12 @@ f32 Window_heightPoints(const Window *window);
 // --- Viewport of content vs Window frame (Anchoring Law) --------------------
 // The content viewport is the visible canvas for content that UI panels anchor against.
 // The window size is the supplementary OS container.
-int   Window_viewportWidth(const Window *window);
-int   Window_viewportHeight(const Window *window);
+i32   Window_viewportWidth(const Window *window);
+i32   Window_viewportHeight(const Window *window);
 f32 Window_viewportWidthPoints(const Window *window);
 f32 Window_viewportHeightPoints(const Window *window);
-int   Window_windowWidth(const Window *window);
-int   Window_windowHeight(const Window *window);
+i32   Window_windowWidth(const Window *window);
+i32   Window_windowHeight(const Window *window);
 f32 Window_windowWidthPoints(const Window *window);
 f32 Window_windowHeightPoints(const Window *window);
 
@@ -182,8 +182,8 @@ fn   Window_orderLayers(Window *window);
 //
 // Retired pane calls remain inert until their archived callers are removed.
 
-bool Window_attachPanes(Window *window, Panel *panel, int width, int height);
-bool Window_resizePanes(Window *window, Panel *panel, int width, int height);
+bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height);
+bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height);
 fn Window_compositePanes(Window *window, Panel *contentPanel);
 fn Window_compositeBoards(Window *window);
 
@@ -197,8 +197,8 @@ fn Window_compositeBoards(Window *window);
 // renderer clears its monitor cache to that panel's color. Unset panel
 // color (PANEL_COLOR_CLEAR) means transparent across the board.
 
-fn     Window_setPresentMode(Window *window, int mode);
-int      Window_getPresentMode(const Window *window);
+fn     Window_setPresentMode(Window *window, i32 mode);
+i32      Window_getPresentMode(const Window *window);
 
 // Window transparency policy; the renderer selects the matching Metal format.
 fn Window_setTransparent(Window *window, bool transparent);
@@ -208,7 +208,7 @@ bool Window_isTransparent(const Window *window);
 // R,G,B,A; native px; top-left origin, Y-down) into the window's content view.
 // `stride` is the row pitch in Bytes (>= width*4). Thread 0 only. The buffer is
 // referenced, not copied, so it must stay valid until the next present.
-fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width, int height);
+fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width, i32 height);
 
 // ── Zero-copy present surface (Apple; capability-gated) ─────────────────────
 // An IOSurface the window's draw view (a CALayer) displays directly. The render
@@ -221,7 +221,7 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, int width,
 // resize the publish commits synchronously inside the resize transaction so the
 // frame tracks the drag; at rest it commits asynchronously and lets Core
 // Animation composite.
-any Window_createPresentSurface(Window *window, int widthPx, int heightPx);
+any Window_createPresentSurface(Window *window, i32 widthPx, i32 heightPx);
 fn  Window_destroyPresentSurface(Window *window, any surface);
 fn  Window_presentSurface(Window *window, any surface);
 any Window_presentSurfaceContents(const Window *window);   // what the layer shows
@@ -233,7 +233,7 @@ bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes 
 // Screenshot: write a tightly packed RGBA8 buffer (same layout as
 // Window_presentRGBA) to a PNG file. The CAPTURE() path for tests/agents.
 // Apple-only (ImageIO). Returns true on success.
-bool Window_writePNG(const_any pixels, bytes stride, int width, int height, const char *path);
+bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, const char *path);
 
 // Monotonic counter bumped by thread 0 whenever presentation policy changes.
 u64 Window_renderGeneration(const Window *window);
@@ -264,7 +264,7 @@ fn Window_setMiniaturizable(Window *window, bool miniaturizable);
 fn Window_setFullscreenButton(Window *window, bool enabled);
 
 // Switch window chrome at runtime: one of WINDOW_UNDECORATED_*.
-fn Window_setUndecorated(Window *window, int type);
+fn Window_setUndecorated(Window *window, i32 type);
 fn Window_setDecorated(Window *window, bool decorated);
 bool Window_isDecorated(const Window *window);
 fn Window_setNaked(Window *window, bool naked);
@@ -317,7 +317,7 @@ fn Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f
 
 typedef struct WindowLiquidGlassDesc {
     bool enabled;        // false = remove the glass (restore the plain backdrop)
-    int style;           // WINDOW_LIQUID_GLASS_STYLE_*
+    i32 style;           // WINDOW_LIQUID_GLASS_STYLE_*
     f32 cornerRadius;  // native px
     u32 tintColor;  // RGBA8; 0 = no tint
 } WindowLiquidGlassDesc;
@@ -357,8 +357,8 @@ fn Window_toggleFullscreen(Window *window);
 fn Window_setDRM(Window *window, bool enabled);
 
 // --- Size constraints ---
-fn Window_setMinSize(Window *window, int width, int height);
-fn Window_setMaxSize(Window *window, int width, int height);
+fn Window_setMinSize(Window *window, i32 width, i32 height);
+fn Window_setMaxSize(Window *window, i32 width, i32 height);
 
 // --- Cursor control ---
 typedef enum WindowCursorType {

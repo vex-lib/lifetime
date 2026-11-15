@@ -23,7 +23,7 @@ static fn reap(ProcessSpawn *owner) {
 }
 
 /* Proves spawn, capacity, reap/reuse, cancellation, and null-safe accessors. */
-int main() {
+i32 main() {
     ProcessSpawn *a = ProcessSpawn();
     ProcessSpawn *b = ProcessSpawn(20);
     assert(a && b && ProcessSpawn_getTimeoutMs(b) == 20);
@@ -48,13 +48,13 @@ int main() {
     assert(!ProcessSpawn_spawn(args, 0, nullptr));
     assert(!ProcessSpawn_spawn(invalid, 0, a));
     assert(ProcessSpawn_getPid(a) == 7 && ProcessSpawn_getCount(a) == 0);
-    for (unsigned i = 0; i < PROCESS_SPAWN_JOBS_MAX; ++i)
+    for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; ++i)
         assert(ProcessSpawn_spawn(args, 0, a));
     assert(!ProcessSpawn_spawn(args, 0, a));
     assert(ProcessSpawn_getCount(a) == PROCESS_SPAWN_JOBS_MAX);
     reap(a);
     assert(ProcessSpawn_getCount(a) == 0);
-    for (unsigned i = 0; i < PROCESS_SPAWN_JOBS_MAX; ++i) {
+    for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; ++i) {
         assert(ProcessSpawn_isJobDone(a, i));
         assert(ProcessSpawn_getJobPid(a, i) > 0);
         assert(ProcessSpawn_getJobExitCode(a, i) == 0);

@@ -37,7 +37,7 @@ typedef struct Application Application;
 
 typedef fn (*AppHotReloadFn)(Application *self, u32 loaded, any userdata);
 typedef fn (*ApplicationEventFn)(Application *self, any userdata);
-typedef int (*AppHotPollFn)(any hot, u32 *loaded);
+typedef i32 (*AppHotPollFn)(any hot, u32 *loaded);
 #define APP_MAX_EVENTS 16
 
 // One lifecycle, one word. The legal transitions are listed here and enforced

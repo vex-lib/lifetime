@@ -18,7 +18,7 @@
 #include "core/application.h"
 #include "window/window.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -61,13 +61,13 @@ static fn gateOpen(StartGate *gate) {
     pthread_mutex_unlock(&(*gate).lock);
 }
 
-static long elapsedMs(const struct timespec *from, const struct timespec *to) {
+static i64 elapsedMs(const struct timespec *from, const struct timespec *to) {
     return (to->tv_sec - from->tv_sec) * 1000L
          + (to->tv_nsec - from->tv_nsec) / 1000000L;
 }
 
 /** Bounded wait (never an unbounded spin) for a phase; false on timeout. */
-static bool waitPhase(Application *app, AppPhase want, long timeoutMs) {
+static bool waitPhase(Application *app, AppPhase want, i64 timeoutMs) {
     struct timespec start, now;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (;;) {
@@ -82,7 +82,7 @@ static bool waitPhase(Application *app, AppPhase want, long timeoutMs) {
 }
 
 /** Bounded wait for a counter to reach `want`; false on timeout. */
-static bool waitCounter(atomic_int *counter, int want, long timeoutMs) {
+static bool waitCounter(atomic_int *counter, i32 want, i64 timeoutMs) {
     struct timespec start, now;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (;;) {
@@ -96,7 +96,7 @@ static bool waitCounter(atomic_int *counter, int want, long timeoutMs) {
     }
 }
 
-int main() {
+i32 main() {
     // Constructors + defaults.
     Application *a = Application();
     CHECK(a != nullptr);
@@ -144,7 +144,7 @@ int main() {
     CHECK(!Application_isActive(p));
     CHECK(!Application_isRunning(p));
     CHECK(Application_isFinished(p));
-    for (int i = 0; i < (int) APP_PHASE_COUNT; i++)
+    for (i32 i = 0; i < (i32) APP_PHASE_COUNT; i++)
         CHECK(Application_getPhaseName((AppPhase) i)[0] != '\0');
     CHECK(strcmp(Application_getPhaseName(APP_PHASE_CLOSING), "APP_PHASE_CLOSING") == 0);
     CHECK(Application_getPhaseName((AppPhase) 999)[0] != '\0');

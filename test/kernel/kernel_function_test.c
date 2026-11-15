@@ -30,7 +30,7 @@
  * ============================================================================
  */
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(name, cond) do { \
     if (cond) { printf("[kernel_function_test] PASS %s\n", name); } \
@@ -38,7 +38,7 @@ static int g_failures = 0;
 } while (0)
 
 typedef struct TestRunContext {
-    _Atomic int counter;
+    _Atomic i32 counter;
     _Atomic bool threadRan;
     pthread_t threadId;
 } TestRunContext;
@@ -48,7 +48,7 @@ static fn sampleRunFunction(any userdata) {
     TestRunContext *ctx = (TestRunContext*) userdata;
     (*ctx).threadId = pthread_self();
     atomic_store_explicit(&(*ctx).threadRan, true, memory_order_relaxed);
-    for (int i = 0; i < 5; i++) {
+    for (i32 i = 0; i < 5; i++) {
         atomic_fetch_add_explicit(&(*ctx).counter, 1, memory_order_relaxed);
         struct timespec ts = {0, 10000000L}; // 10ms
         nanosleep(&ts, nullptr);
@@ -56,7 +56,7 @@ static fn sampleRunFunction(any userdata) {
 }
 
 typedef struct TestEndContext {
-    _Atomic int endCalls;
+    _Atomic i32 endCalls;
     Kernel *receivedKernel;
 } TestEndContext;
 
@@ -67,7 +67,7 @@ static fn sampleEndFunction(Kernel *kernel, any userdata) {
     atomic_fetch_add_explicit(&(*ctx).endCalls, 1, memory_order_relaxed);
 }
 
-int main() {
+i32 main() {
     printf("=== Running Kernel Run/End Function Test Suite ===\n");
 
     // Test 1: Count getters and initial state
@@ -89,7 +89,7 @@ int main() {
 
         // Test 2: Execution in Kernel_run
         pthread_t mainThread = pthread_self();
-        int rc = Kernel_run(k);
+        i32 rc = Kernel_run(k);
         CHECK("run returns OK", rc == KERNEL_EXIT_OK);
 
         CHECK("run fn 1 executed", atomic_load_explicit(&runCtx1.threadRan, memory_order_relaxed));
@@ -134,7 +134,7 @@ int main() {
         bool allRunAdded = true;
         bool allEndAdded = true;
 
-        for (int i = 0; i < 10; i++) {
+        for (i32 i = 0; i < 10; i++) {
             if (!Kernel_addRunFunction(k, sampleRunFunction, &manyRun[i]))
                 allRunAdded = false;
             if (!Kernel_addEndFunction(k, sampleEndFunction, &manyEnd[i]))

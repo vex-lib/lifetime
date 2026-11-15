@@ -507,7 +507,7 @@ static fn kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
         case KERNEL_DEFERRED_PROCESS: {
             Process *p = (Process*) ptr;
             if (kernelAddProcessInternal(self, p)) {
-                int exitStatus = 0;
+                i32 exitStatus = 0;
                 (discard) Process_run(p, &exitStatus);
             }
             break;
@@ -626,7 +626,7 @@ static fn kernelStartApplication(Kernel *self, Application *a) {
 // done or Kernel_stop() lands.
 
 /** Arms supervision, dispatches registered work, services it, then joins workers. */
-int Kernel_runAll(Kernel *self) {
+i32 Kernel_runAll(Kernel *self) {
     if (!self)
         return KERNEL_EXIT_NO_APPS;
     if ((*self).applicationCount == 0 && (*self).processCount == 0 && (*self).consoleCount == 0
@@ -646,13 +646,13 @@ int Kernel_runAll(Kernel *self) {
     atomic_store_explicit(&(*self).running, true, memory_order_relaxed);
     atomic_store_explicit(&(*self).runThreadId, (pointer) pthread_self(), memory_order_relaxed);
 
-    int rc = KERNEL_EXIT_OK;
+    i32 rc = KERNEL_EXIT_OK;
 
     // One-shot invokables: run to completion on the arming thread.
     for (u32 i = 0; i < (*self).processCount; i++) {
         Process *p = (*self).processes[i];
         if (p) {
-            int r = 0;
+            i32 r = 0;
             if (Process_run(p, &r) != PROCESS_OK)
                 r = KERNEL_EXIT_PROCESS_FAILED;
             if (r != 0 && rc == KERNEL_EXIT_OK)
@@ -775,11 +775,11 @@ int Kernel_runAll(Kernel *self) {
 }
 
 /** Forwards one process invocation and returns its callback status or kernel error. */
-int Kernel_runProcess(Kernel *self, Process *p) {
+i32 Kernel_runProcess(Kernel *self, Process *p) {
     (discard) self;
     if (!p)
         return KERNEL_EXIT_NO_APPS;
-    int exitStatus = 0;
+    i32 exitStatus = 0;
     if (Process_run(p, &exitStatus) != PROCESS_OK)
         return KERNEL_EXIT_PROCESS_FAILED;
     return exitStatus;
@@ -795,7 +795,7 @@ bool Kernel_runConsole(Kernel *self, Console *c) {
 // CommandLine loop to completion on the calling thread. The 1-arity Kernel_run
 // reactor drives the same CommandLine with CommandLine_tick instead.
 /** Runs one CommandLine terminal-application loop; returns its exit code. */
-int Kernel_runCommandLine(Kernel *self, CommandLine *c) {
+i32 Kernel_runCommandLine(Kernel *self, CommandLine *c) {
     (discard) self;
     if (!c)
         return KERNEL_EXIT_NO_APPS;
@@ -851,7 +851,7 @@ static bool kernelGfxPump() {
 }
 
 /** Starts one application through the installed graphics runner or parked loop. */
-int Kernel_runApplication(Kernel *self, Application *a) {
+i32 Kernel_runApplication(Kernel *self, Application *a) {
     if (!self || !a)
         return KERNEL_EXIT_NO_APPS;
     kernelStartApplication(self, a);
@@ -863,7 +863,7 @@ int Kernel_runApplication(Kernel *self, Application *a) {
     // Otherwise, fall back to hotcwap's parked loop.
     if ((*self).gfxAppRun != nullptr) {
         s_kernelLifetime = &(*self).lifetime;
-        int result = (*self).gfxAppRun(a, kernelGfxAppContinues, kernelGfxPump);
+        i32 result = (*self).gfxAppRun(a, kernelGfxAppContinues, kernelGfxPump);
         s_kernelLifetime = nullptr;
         Application_finish(a);
         return result;
@@ -1105,7 +1105,7 @@ u32 Kernel_getApplications(const Kernel *self, Application **out, u32 cap) {
 
 ;;SETTER
 /** Installs or clears the optional graphics application runner callback. */
-fn Kernel_setGfxAppRunner(Kernel *self, int (*fn)(any context, bool (*continueFn)(any), bool (*pollFn)())) {
+fn Kernel_setGfxAppRunner(Kernel *self, i32 (*fn)(any context, bool (*continueFn)(any), bool (*pollFn)())) {
     if (!self)
         return;
     (*self).gfxAppRun = fn;
@@ -1113,7 +1113,7 @@ fn Kernel_setGfxAppRunner(Kernel *self, int (*fn)(any context, bool (*continueFn
 
 ;;GETTER
 /** Returns the configured graphics runner, or nullptr for null self. */
-int (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)()) {
+i32 (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)()) {
     if (!self)
         return nullptr;
     return (*self).gfxAppRun;

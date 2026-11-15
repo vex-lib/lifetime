@@ -17,14 +17,14 @@
 #include "core/kernel.h"
 
 typedef struct Fake {
-    int opens, closes, presents, mouse, polls;
+    i32 opens, closes, presents, mouse, polls;
     bytes w, h;
     bool pending;
     CommandLineEvent next;
 } Fake;
 
 typedef struct FakeApp {
-    int draws, inputs;
+    i32 draws, inputs;
     bool stopOnInput;
 } FakeApp;
 
@@ -41,7 +41,7 @@ static bool fPresent(any ctx, const char *cells, bytes w, bytes h) {
     (*f).presents++;
     return true;
 }
-static bool fPoll(any ctx, int timeoutMs, CommandLineEvent *out) {
+static bool fPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     Fake *f = (Fake*) ctx;
     (discard) timeoutMs;
     (*f).polls++;
@@ -85,8 +85,8 @@ static CommandLineIo fakeIo(Fake *f) {
     return io;
 }
 
-int main() {
-    int failures = 0;
+i32 main() {
+    i32 failures = 0;
 #define CHECK(cond, msg) do { if (!(cond)) { printf("FAIL: %s\n", msg); failures++; } } while (0)
 
     // Null safety / projections.
@@ -143,7 +143,7 @@ int main() {
 
     // THE resize surface: geometry change grows the grid and repaints once.
     fake.w = 120; fake.h = 40;
-    int drawsBefore = app.draws, presentsBefore = fake.presents;
+    i32 drawsBefore = app.draws, presentsBefore = fake.presents;
     CHECK(CommandLine_revalidate(named), "revalidate grow");
     CHECK(CommandLine_getWidth(named) == 120 && CommandLine_getHeight(named) == 40, "geometry grew");
     CHECK(CommandLine_getCapacity(named) >= 120 * 40, "grid grew");
@@ -185,11 +185,11 @@ int main() {
     // A stop requested while IDLE is discarded, never pre-cancelling the run.
     CommandLine_stop(named);
     CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_IDLE, "idle stop discarded");
-    int pollsAtRunStart = fake.polls;
+    i32 pollsAtRunStart = fake.polls;
     app.stopOnInput = true;
     fake.pending = true;
     fake.next = (CommandLineEvent) { .kind = COMMANDLINE_EVENT_KEY, .key = 3 };
-    int rc = CommandLine_run(named);
+    i32 rc = CommandLine_run(named);
     CHECK(rc == 0 && CommandLine_isCancelled(named), "run exits on app stop");
     CHECK(CommandLine_getRunPhase(named) == COMMANDLINE_RUN_CANCELLED, "cancelled phase after stop");
     CHECK(!CommandLine_isRunning(named), "not running after exit");

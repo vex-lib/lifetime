@@ -303,7 +303,7 @@ bool CommandLine_tick(CommandLine *self) {
     return CommandLine_present(self);
 }
 
-int CommandLine_run(CommandLine *self) {
+i32 CommandLine_run(CommandLine *self) {
     if (self == nullptr || !(*self).opened || (*self).app.draw == nullptr) {
         THROW("CommandLine run: not open or no app");
         return 1;
@@ -317,7 +317,7 @@ int CommandLine_run(CommandLine *self) {
             THROW("CommandLine run: loop already active");
         return 1;
     }
-    int rc = 0;
+    i32 rc = 0;
     CommandLineApp app = (*self).app;
     while (atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_RUNNING) {
         CommandLineEvent ev;
@@ -384,7 +384,7 @@ bool CommandLine_clear(CommandLine *self) {
     return true;
 }
 
-bool CommandLine_poll(CommandLine *self, int timeoutMs, CommandLineEvent *out) {
+bool CommandLine_poll(CommandLine *self, i32 timeoutMs, CommandLineEvent *out) {
     if (out != nullptr)
         *out = (CommandLineEvent) { .kind = COMMANDLINE_EVENT_NONE };
     if (self == nullptr || out == nullptr || !(*self).opened)
@@ -433,10 +433,10 @@ bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *
         THROW("CommandLine projection: missing destination");
         return false;
     }
-    int n = self ? snprintf(dest, cap, "CommandLine{title=\"%s\",%zux%zu,capacity=%zu,generation=%llu,refusalCount=%zu,run=%u,opened=%d,active=%d,hasApp=%d}",
+    i32 n = self ? snprintf(dest, cap, "CommandLine{title=\"%s\",%zux%zu,capacity=%zu,generation=%llu,refusalCount=%zu,run=%u,opened=%d,active=%d,hasApp=%d}",
         (*self).title, (*self).width, (*self).height, (*self).capacity,
-        (unsigned long long) (*self).generation, (*self).refusalCount,
-        (unsigned) atomic_load_explicit(&(*self).run, memory_order_acquire),
+        (u64) (*self).generation, (*self).refusalCount,
+        (u32) atomic_load_explicit(&(*self).run, memory_order_acquire),
         (*self).opened, (*self).active, (*self).app.draw != nullptr)
         : snprintf(dest, cap, "nullptr");
     bool cut = n < 0 || (bytes) n >= cap;

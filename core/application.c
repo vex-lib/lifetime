@@ -243,7 +243,7 @@ static bool appAllWindowsClosed(const Application *self) {
     return true;
 }
 
-/** Services window/input work on the owner thread, then parks for one short slice.
+/** Services window/input work on the owner thread, then parks for one i16 slice.
  * Closes each pass by resetting the host transient arena: scratch borrowed
  * during this pass dies here, never across frames or swaps. */
 static fn appParkSlice(Application *self) {
@@ -502,7 +502,7 @@ bool Application_isFinished(const Application *self) {
 // — no graphvex, no present, no GfxLoop: hotcwap manages the Windows and ends
 // the Application when they are all gone. The Window pumps its own events; the
 // app only ASKS "any window still open?" at the 250ms cadence. So
-// Kernel_run(kernel, app) blocks: the app stays alive exactly as long as a
+// Kernel_run(kernel, app) blocks: the app stays alive exactly as i64 as a
 // window is open.
 /** Parks and services the application until stopped or all registered windows close. */
 fn Application_run(Application *self) {
@@ -559,7 +559,7 @@ fn Application_pollHot(Application *self) {
     if (!self || !(*self).hot || !(*self).hotPoll)
         return;
     u32 loaded = 0;
-    int r = (*self).hotPoll((*self).hot, &loaded);
+    i32 r = (*self).hotPoll((*self).hot, &loaded);
     if (r == 0 && loaded > 0 && (*self).hotReloadFn)
         (*self).hotReloadFn(self, loaded, (*self).hotReloadUserdata);
 }

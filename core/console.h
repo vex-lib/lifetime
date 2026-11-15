@@ -43,7 +43,7 @@ struct Console {
     ConsoleIo io;                           // injectable execution seam
     _Atomic bool cancel;                    // cancel flag (the Bounded Wait Law)
     bool running;                           // session active
-    int exitStatus;                         // exit code of last session
+    i32 exitStatus;                         // exit code of last session
 };
 
 // --- Overloaded constructors ---
@@ -85,7 +85,7 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen);
 fn Console_cancel(Console *self);
 
 bool     Console_isRunning(const Console *self);
-int      Console_getExitStatus(const Console *self);
+i32      Console_getExitStatus(const Console *self);
 
 // --- Setters / Getters (the Symmetric Getter/Setter Completeness Law) ---
 // Clamp policy (the Cold-Strict, Hot-Minimal Validation Law): strings that exceed CONSOLE_MAX_SHELL or

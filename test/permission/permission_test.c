@@ -13,7 +13,7 @@
 
 #include "permission/permission.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -23,10 +23,10 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main() {
+i32 main() {
     // Every kind has a non-empty name and a valid status, and checking a status
     // never prompts.
-    for (int k = 0; k < PERMISSION_COUNT; k++) {
+    for (i32 k = 0; k < PERMISSION_COUNT; k++) {
         PermissionKind kind = (PermissionKind) k;
         CHECK(Permission_kindName(kind) != nullptr);
         CHECK(Permission_kindName(kind)[0] != '\0');

@@ -15,7 +15,7 @@
  * worker fn, observer end fn, in-run registrar, run-thread body.
  * FUNCTIONS: slowWorker, observerHook, registrar, runner, main.
  */
-static int failures;
+static i32 failures;
 #define CHECK(label, condition) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s (line %d)\n", label, __LINE__); \
@@ -62,10 +62,10 @@ static fn registrar(any context) {
 
 /** Calls Kernel_run on a separate thread for lifecycle-order assertions. */
 static any runner(any context) {
-    return (any) (intptr_t) Kernel_run((Kernel*) context);
+    return (any) (pointer) Kernel_run((Kernel*) context);
 }
 
-int main() {
+i32 main() {
     // 1. External stop: hooks fire once, after worker quiescence, in DRAINING.
     Kernel *kernel = Kernel();
     DrainProbe probe = {0};

@@ -7,7 +7,7 @@
 // are borrowed; code and data must remain live while referenced. No module
 // pin, thread or cancellation mechanism is created here. Before free,
 // deregister and externally exclude ALL concurrent API callers.
-typedef int (*ProcessEntry)(any context);
+typedef i32 (*ProcessEntry)(any context);
 
 typedef enum ProcessResult {
     PROCESS_OK = 0,
@@ -35,7 +35,7 @@ Process *Process_3(const char *name, ProcessEntry entry, any context);
 
 // Admission status is separate from callback result (Dest-Last Law).
 // exitStatus is required and untouched on failure. No waiting or allocation.
-ProcessResult Process_run(Process *self, int *exitStatus);
+ProcessResult Process_run(Process *self, i32 *exitStatus);
 
 // Replace the entire binding between calls; hot may be null for unmanaged code.
 // Busy/invalid leaves the old binding intact. Does not free data or unload code.

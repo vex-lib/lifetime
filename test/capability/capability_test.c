@@ -18,7 +18,7 @@
 
 #include "capability/capability.h"
 
-static int g_failures = 0;
+static i32 g_failures = 0;
 
 #define CHECK(cond)                                                        \
     do {                                                                   \
@@ -28,10 +28,10 @@ static int g_failures = 0;
         }                                                                  \
     } while (0)
 
-int main() {
+i32 main() {
     // Every kind: non-empty name + a bool answer (no crash, no assumption).
     u64 before = 0;
-    for (int k = 0; k < CAPABILITY_COUNT; k++) {
+    for (i32 k = 0; k < CAPABILITY_COUNT; k++) {
         CapabilityKind kind = (CapabilityKind) k;
         CHECK(Capability_kindName(kind) != nullptr);
         CHECK(Capability_kindName(kind)[0] != '\0');
@@ -49,8 +49,8 @@ int main() {
     CHECK(!Capability_has((CapabilityKind) -1));
 
     // Idempotent: the probe is cold and cached, so repeats agree.
-    int again = 0;
-    for (int k = 0; k < CAPABILITY_COUNT; k++)
+    i32 again = 0;
+    for (i32 k = 0; k < CAPABILITY_COUNT; k++)
         if (Capability_has((CapabilityKind) k))
             again++;
     CHECK((u64) again == before);
@@ -67,7 +67,7 @@ int main() {
     CHECK((u64) again == before);
 
     printf("capability_test: os=%d, features set=%d of %d\n",
-           Capability_osMajor(), again, (int) CAPABILITY_COUNT);
+           Capability_osMajor(), again, (i32) CAPABILITY_COUNT);
 
     if (g_failures == 0) {
         printf("capability_test: all assertions held\n");

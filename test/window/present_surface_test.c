@@ -9,7 +9,7 @@
 
 #include "window/window.h"
 
-static int g_fail = 0;
+static i32 g_fail = 0;
 #define CHECK(cond)                                                        \
     do {                                                                   \
         if (!(cond)) {                                                     \
@@ -18,7 +18,7 @@ static int g_fail = 0;
         }                                                                  \
     } while (0)
 
-int main() {
+i32 main() {
     Window *w = Window_create("present surface", 320, 240);
     CHECK(w != nullptr);
 

@@ -111,7 +111,7 @@ Process *Process_3(const char *name, ProcessEntry entry, any context) {
 
 // CORE FUNCTIONS (PUBLIC & PRIVATE)
 /** Invokes the entry once if the process is idle and reports its exit status. */
-ProcessResult Process_run(Process *self, int *exitStatus) {
+ProcessResult Process_run(Process *self, i32 *exitStatus) {
     if (!self || !exitStatus)
         return PROCESS_INVALID;
     bool expected = false;
