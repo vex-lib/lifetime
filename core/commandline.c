@@ -254,12 +254,24 @@ bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app) {
     return true;
 }
 
+typedef bool (*CommandLine_DrawFn)(any ctx, CommandLine *line);
+
+;;GETTER
+static const CommandLineApp *CommandLine_app(const CommandLine *self) {
+    return &(*self).app;
+}
+
+;;GETTER
+static CommandLine_DrawFn CommandLineApp_draw(const CommandLineApp *app) {
+    return (*app).draw;
+}
+
 bool CommandLine_hasApp(const CommandLine *self) {
-    return self && (*self).app.draw != nullptr;
+    return self != nullptr && CommandLineApp_draw(CommandLine_app(self)) != nullptr;
 }
 
 bool CommandLine_detachApp(CommandLine *self) {
-    if (self == nullptr || (*self).app.draw == nullptr)
+    if (!CommandLine_hasApp(self))
         return false;
     CommandLineApp app = (*self).app;
     if (app.detach != nullptr)
@@ -276,7 +288,7 @@ static fn cmdRequestCancel(CommandLine *self) {
 }
 
 bool CommandLine_tick(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || (*self).app.draw == nullptr) {
+    if (self == nullptr || !(*self).opened || !CommandLine_hasApp(self)) {
         THROW("CommandLine tick: not open or no app");
         return false;
     }
@@ -304,7 +316,7 @@ bool CommandLine_tick(CommandLine *self) {
 }
 
 i32 CommandLine_run(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || (*self).app.draw == nullptr) {
+    if (self == nullptr || !(*self).opened || !CommandLine_hasApp(self)) {
         THROW("CommandLine run: not open or no app");
         return 1;
     }
@@ -437,7 +449,7 @@ bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *
         (*self).title, (*self).width, (*self).height, (*self).capacity,
         (u64) (*self).generation, (*self).refusalCount,
         (u32) atomic_load_explicit(&(*self).run, memory_order_acquire),
-        (*self).opened, (*self).active, (*self).app.draw != nullptr)
+        (*self).opened, (*self).active, CommandLine_hasApp(self))
         : snprintf(dest, cap, "nullptr");
     bool cut = n < 0 || (bytes) n >= cap;
     if (outTruncated != nullptr)
