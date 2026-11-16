@@ -38,29 +38,57 @@ typedef struct {
     bytes lastFeedLen;
 } fake_io_t;
 
+;;GETTER
+static i32 FakeIo_spawns(const fake_io_t *f) { return (*f).spawns; }
+;;SETTER
+static fn FakeIo_setSpawns(fake_io_t *f, i32 v) { (*f).spawns = v; }
+;;GETTER
+static i32 FakeIo_feeds(const fake_io_t *f) { return (*f).feeds; }
+;;SETTER
+static fn FakeIo_setFeeds(fake_io_t *f, i32 v) { (*f).feeds = v; }
+;;GETTER
+static i32 FakeIo_reaps(const fake_io_t *f) { return (*f).reaps; }
+;;SETTER
+static fn FakeIo_setReaps(fake_io_t *f, i32 v) { (*f).reaps = v; }
+;;GETTER
+static i32 FakeIo_cancels(const fake_io_t *f) { return (*f).cancels; }
+;;SETTER
+static fn FakeIo_setCancels(fake_io_t *f, i32 v) { (*f).cancels = v; }
+;;GETTER
+static bool FakeIo_joined(const fake_io_t *f) { return (*f).joined; }
+;;GETTER
+static char *FakeIo_lastFeedMut(fake_io_t *f) { return (*f).lastFeed; }
+;;SETTER
+static fn FakeIo_setLastFeedLen(fake_io_t *f, bytes v) { (*f).lastFeedLen = v; }
+
+;;GETTER
+static any ConsoleIo_spawn(const ConsoleIo *io) { return (any) (*io).spawn; }
+
 /** Records a successful fake launch using the configured shell and directory. */
 static bool fakeSpawn(any ctx, const char *shell, const char *workDir) {
     (discard) shell; (discard) workDir;
     fake_io_t *f = ctx;
-    (*f).spawns++;
+    FakeIo_setSpawns(f, FakeIo_spawns(f) + 1);
     return true;
 }
 
 /** Records input bytes delivered to the console's injected IO seam. */
 static bool fakeFeed(any ctx, const char *Bytes, bytes len) {
     fake_io_t *f = ctx;
-    (*f).feeds++;
-    bytes n = len < sizeof((*f).lastFeed) - 1 ? len : sizeof((*f).lastFeed) - 1;
-    memcpy((*f).lastFeed, Bytes, n);
-    (*f).lastFeed[n] = '\0';
-    (*f).lastFeedLen = len;
+    FakeIo_setFeeds(f, FakeIo_feeds(f) + 1);
+    bytes cap = sizeof(((fake_io_t) {0}).lastFeed);
+    bytes n = len < cap - 1 ? len : cap - 1;
+    char *lastFeed = FakeIo_lastFeedMut(f);
+    memcpy(lastFeed, Bytes, n);
+    lastFeed[n] = '\0';
+    FakeIo_setLastFeedLen(f, len);
     return true;
 }
 
 /** Supplies deterministic child output and its bounded byte count. */
 static bool fakeReap(any ctx, char *out, bytes outCap, bytes *outLen) {
     fake_io_t *f = ctx;
-    (*f).reaps++;
+    FakeIo_setReaps(f, FakeIo_reaps(f) + 1);
     const char *msg = "out";
     bytes n = 3 < outCap ? 3 : outCap;
     if (out && outCap > 0)
@@ -73,13 +101,13 @@ static bool fakeReap(any ctx, char *out, bytes outCap, bytes *outLen) {
 /** Counts cancellation requests made through the fake IO seam. */
 static fn fakeCancel(any ctx) {
     fake_io_t *f = ctx;
-    (*f).cancels++;
+    FakeIo_setCancels(f, FakeIo_cancels(f) + 1);
 }
 
 /** Returns the fixture's child-joined state for Console polling. */
 static bool fakeJoined(const_any ctx) {
     const fake_io_t *f = ctx;
-    return (*f).joined;
+    return FakeIo_joined(f);
 }
 
 i32 main() {
@@ -112,7 +140,7 @@ i32 main() {
     Console_setIo(c, &io, &f);
     const ConsoleIo *got = Console_getIo(c);
     CHECK(got != nullptr);
-    CHECK((*got).spawn == fakeSpawn);
+    CHECK(ConsoleIo_spawn(got) == (any) fakeSpawn);
 
     // Run: spawn fires once; a second run while running is refused.
     CHECK(Console_run(c));

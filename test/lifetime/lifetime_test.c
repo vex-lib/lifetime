@@ -3,6 +3,16 @@
 
 #include "lifetime/lifetime.h"
 
+;;GETTER
+static u64 MemoryHeader_typeId(const MemoryHeader *h) {
+    return (*h).typeId;
+}
+
+;;GETTER
+static bytes MemoryHeader_length(const MemoryHeader *h) {
+    return (*h).length;
+}
+
 ;;OVERVIEW
 /**
  * ============================================================================
@@ -93,10 +103,10 @@ i32 main() {
     // #6 32-byte MemoryHeader introspection (O(1) negative pointer recovery)
     MemoryHeader *h1 = ((MemoryHeader*) p1) - 1;
     MemoryHeader *h2 = ((MemoryHeader*) p2) - 1;
-    CHECK("p1 header typeId", (*h1).typeId == 100);
-    CHECK("p1 header length", (*h1).length == 64);
-    CHECK("p2 header typeId", (*h2).typeId == 101);
-    CHECK("p2 header length", (*h2).length == 128);
+    CHECK("p1 header typeId", MemoryHeader_typeId(h1) == 100);
+    CHECK("p1 header length", MemoryHeader_length(h1) == 64);
+    CHECK("p2 header typeId", MemoryHeader_typeId(h2) == 101);
+    CHECK("p2 header length", MemoryHeader_length(h2) == 128);
 
     // #7 Transient arena reset (scratchpad reset each tick)
     Lifetime_resetTransient(&lt);

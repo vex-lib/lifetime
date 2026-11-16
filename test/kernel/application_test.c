@@ -43,27 +43,45 @@ typedef struct StartGate {
     atomic_int calls;
 } StartGate;
 
+;;GETTER
+static atomic_int *StartGate_enteredMut(StartGate *gate) { return &(*gate).entered; }
+;;GETTER
+static atomic_int *StartGate_callsMut(StartGate *gate) { return &(*gate).calls; }
+;;GETTER
+static pthread_mutex_t *StartGate_lockMut(StartGate *gate) { return &(*gate).lock; }
+;;GETTER
+static pthread_cond_t *StartGate_readyMut(StartGate *gate) { return &(*gate).ready; }
+;;GETTER
+static bool StartGate_open(const StartGate *gate) { return (*gate).open; }
+;;SETTER
+static fn StartGate_setOpen(StartGate *gate, bool open) { (*gate).open = open; }
+
+;;GETTER
+static i64 Timespec_tvSec(const struct timespec *ts) { return (*ts).tv_sec; }
+;;GETTER
+static i64 Timespec_tvNsec(const struct timespec *ts) { return (*ts).tv_nsec; }
+
 static fn gatedStart(Application *self, any userdata) {
     (discard) self;
     StartGate *gate = userdata;
-    atomic_fetch_add_explicit(&(*gate).entered, 1, memory_order_release);
-    pthread_mutex_lock(&(*gate).lock);
-    while (!(*gate).open)
-        pthread_cond_wait(&(*gate).ready, &(*gate).lock);
-    pthread_mutex_unlock(&(*gate).lock);
-    atomic_fetch_add_explicit(&(*gate).calls, 1, memory_order_release);
+    atomic_fetch_add_explicit(StartGate_enteredMut(gate), 1, memory_order_release);
+    pthread_mutex_lock(StartGate_lockMut(gate));
+    while (!StartGate_open(gate))
+        pthread_cond_wait(StartGate_readyMut(gate), StartGate_lockMut(gate));
+    pthread_mutex_unlock(StartGate_lockMut(gate));
+    atomic_fetch_add_explicit(StartGate_callsMut(gate), 1, memory_order_release);
 }
 
 static fn gateOpen(StartGate *gate) {
-    pthread_mutex_lock(&(*gate).lock);
-    (*gate).open = true;
-    pthread_cond_broadcast(&(*gate).ready);
-    pthread_mutex_unlock(&(*gate).lock);
+    pthread_mutex_lock(StartGate_lockMut(gate));
+    StartGate_setOpen(gate, true);
+    pthread_cond_broadcast(StartGate_readyMut(gate));
+    pthread_mutex_unlock(StartGate_lockMut(gate));
 }
 
 static i64 elapsedMs(const struct timespec *from, const struct timespec *to) {
-    return ((*to).tv_sec - (*from).tv_sec) * 1000L
-         + ((*to).tv_nsec - (*from).tv_nsec) / 1000000L;
+    return (Timespec_tvSec(to) - Timespec_tvSec(from)) * 1000L
+         + (Timespec_tvNsec(to) - Timespec_tvNsec(from)) / 1000000L;
 }
 
 /** Bounded wait (never an unbounded spin) for a phase; false on timeout. */

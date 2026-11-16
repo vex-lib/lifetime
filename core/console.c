@@ -113,17 +113,51 @@ Console *Console_0() {
     return Console_1("/bin/sh");
 }
 
+;;GETTER
+static char *Console_shellMut(Console *self) { return (*self).shell; }
+;;GETTER
+static char *Console_workDirMut(Console *self) { return (*self).workDir; }
+;;GETTER
+static ConsoleIo *Console_ioMut(Console *self) { return &(*self).io; }
+;;GETTER
+static const ConsoleIo *Console_ioPtr(const Console *self) { return &(*self).io; }
+;;GETTER
+static atomic_bool *Console_cancelMut(Console *self) { return &(*self).cancel; }
+;;GETTER
+static bool Console_running(const Console *self) { return (*self).running; }
+;;SETTER
+static fn Console_setRunning(Console *self, bool v) { (*self).running = v; }
+;;GETTER
+static i32 Console_exitStatus(const Console *self) { return (*self).exitStatus; }
+;;SETTER
+static fn Console_setExitStatus(Console *self, i32 v) { (*self).exitStatus = v; }
+
+;;GETTER
+static any ConsoleIo_ctx(const ConsoleIo *io) { return (*io).ctx; }
+;;SETTER
+static fn ConsoleIo_setCtx(ConsoleIo *io, any ctx) { (*io).ctx = ctx; }
+;;GETTER
+static bool (*ConsoleIo_spawn(const ConsoleIo *io))(any, const char*, const char*) { return (*io).spawn; }
+;;GETTER
+static bool (*ConsoleIo_feed(const ConsoleIo *io))(any, const char*, bytes) { return (*io).feed; }
+;;GETTER
+static bool (*ConsoleIo_reap(const ConsoleIo *io))(any, char*, bytes, bytes*) { return (*io).reap; }
+;;GETTER
+static fn (*ConsoleIo_cancel(const ConsoleIo *io))(any) { return (*io).cancel; }
+;;GETTER
+static bool (*ConsoleIo_joined(const ConsoleIo *io))(const_any) { return (*io).joined; }
+
 /** Allocates a stopped console and copies the supplied shell name. */
 Console *Console_1(const char *shell) {
     Console *self = (Console*) calloc(1, sizeof(Console));
     if (!self)
         return nullptr;
-    console_clamp_copy((*self).shell, CONSOLE_MAX_SHELL, shell);
-    (*self).workDir[0] = '\0';
-    memset(&(*self).io, 0, sizeof(ConsoleIo));
-    atomic_init(&(*self).cancel, false);
-    (*self).running = false;
-    (*self).exitStatus = 0;
+    console_clamp_copy(Console_shellMut(self), CONSOLE_MAX_SHELL, shell);
+    Console_workDirMut(self)[0] = '\0';
+    memset(Console_ioMut(self), 0, sizeof(ConsoleIo));
+    atomic_init(Console_cancelMut(self), false);
+    Console_setRunning(self, false);
+    Console_setExitStatus(self, 0);
     return self;
 }
 
@@ -132,16 +166,17 @@ Console *Console_1(const char *shell) {
 bool Console_run(Console *self) {
     if (!self)
         return false;
-    if ((*self).running)
+    if (Console_running(self))
         return false;
-    ConsoleIo *io = &(*self).io;
-    if (!(*io).spawn)
+    ConsoleIo *io = Console_ioMut(self);
+    bool (*spawnFn)(any, const char*, const char*) = ConsoleIo_spawn(io);
+    if (!spawnFn)
         return false;
 
-    atomic_store_explicit(&(*self).cancel, false, memory_order_relaxed);
-    (*self).exitStatus = 0;
-    bool ok = (*io).spawn((*io).ctx, (*self).shell, (*self).workDir);
-    (*self).running = ok;
+    atomic_store_explicit(Console_cancelMut(self), false, memory_order_relaxed);
+    Console_setExitStatus(self, 0);
+    bool ok = spawnFn(ConsoleIo_ctx(io), Console_shellMut(self), Console_workDirMut(self));
+    Console_setRunning(self, ok);
     return ok;
 }
 
@@ -149,12 +184,13 @@ bool Console_run(Console *self) {
 bool Console_writeInput(Console *self, const char *line, bytes len) {
     if (!self)
         return false;
-    if (!(*self).running)
+    if (!Console_running(self))
         return false;
-    ConsoleIo *io = &(*self).io;
-    if (!(*io).feed)
+    ConsoleIo *io = Console_ioMut(self);
+    bool (*feedFn)(any, const char*, bytes) = ConsoleIo_feed(io);
+    if (!feedFn)
         return false;
-    return (*io).feed((*io).ctx, line, len);
+    return feedFn(ConsoleIo_ctx(io), line, len);
 }
 
 /** Drains one output slice and clears running state when the seam reports joined. */
@@ -163,23 +199,25 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
         return false;
     if (outLen)
         *outLen = 0;
-    if (!(*self).running) {
+    if (!Console_running(self)) {
         if (out && outCap > 0)
             out[0] = '\0';
         return true;
     }
-    ConsoleIo *io = &(*self).io;
-    if (!(*io).reap) {
+    ConsoleIo *io = Console_ioMut(self);
+    bool (*reapFn)(any, char*, bytes, bytes*) = ConsoleIo_reap(io);
+    if (!reapFn) {
         if (out && outCap > 0)
             out[0] = '\0';
         return true;
     }
     bytes n = 0;
-    bool ok = (*io).reap((*io).ctx, out, outCap, &n);
+    bool ok = reapFn(ConsoleIo_ctx(io), out, outCap, &n);
     if (outLen)
         *outLen = n;
-    if ((*io).joined && (*io).joined((*io).ctx)) {
-        (*self).running = false;
+    bool (*joinedFn)(const_any) = ConsoleIo_joined(io);
+    if (joinedFn && joinedFn(ConsoleIo_ctx(io))) {
+        Console_setRunning(self, false);
     }
     return ok;
 }
@@ -188,19 +226,20 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
 fn Console_cancel(Console *self) {
     if (!self)
         return;
-    atomic_store_explicit(&(*self).cancel, true, memory_order_relaxed);
-    ConsoleIo *io = &(*self).io;
-    if ((*io).cancel)
-        (*io).cancel((*io).ctx);
+    atomic_store_explicit(Console_cancelMut(self), true, memory_order_relaxed);
+    ConsoleIo *io = Console_ioMut(self);
+    fn (*cancelFn)(any) = ConsoleIo_cancel(io);
+    if (cancelFn)
+        cancelFn(ConsoleIo_ctx(io));
 }
 
 /** Requests cancellation if active, clears the borrowed IO table, and frees self. */
 fn Console_free(Console *self) {
     if (!self)
         return;
-    if ((*self).running)
+    if (Console_running(self))
         Console_cancel(self);
-    memset(&(*self).io, 0, sizeof(ConsoleIo));
+    memset(Console_ioMut(self), 0, sizeof(ConsoleIo));
     free(self);
 }
 
@@ -208,14 +247,14 @@ fn Console_free(Console *self) {
 bool Console_isRunning(const Console *self) {
     if (!self)
         return false;
-    return (*self).running;
+    return Console_running(self);
 }
 
 /** Returns the last session exit status, or -1 for a null console. */
 i32 Console_getExitStatus(const Console *self) {
     if (!self)
         return -1;
-    return (*self).exitStatus;
+    return Console_exitStatus(self);
 }
 
 // SETTERS (PUBLIC & PRIVATE)
@@ -224,7 +263,7 @@ i32 Console_getExitStatus(const Console *self) {
 fn Console_setShell(Console *self, const char *shell) {
     if (!self)
         return;
-    console_clamp_copy((*self).shell, CONSOLE_MAX_SHELL, shell);
+    console_clamp_copy(Console_shellMut(self), CONSOLE_MAX_SHELL, shell);
 }
 
 ;;SETTER
@@ -232,7 +271,7 @@ fn Console_setShell(Console *self, const char *shell) {
 fn Console_setWorkDir(Console *self, const char *workDir) {
     if (!self)
         return;
-    console_clamp_copy((*self).workDir, CONSOLE_MAX_WORKDIR, workDir);
+    console_clamp_copy(Console_workDirMut(self), CONSOLE_MAX_WORKDIR, workDir);
 }
 
 ;;SETTER
@@ -241,12 +280,12 @@ fn Console_setIo(Console *self, const ConsoleIo *io, any ioCtx) {
     if (!self)
         return;
     if (!io) {
-        memset(&(*self).io, 0, sizeof(ConsoleIo));
+        memset(Console_ioMut(self), 0, sizeof(ConsoleIo));
         return;
     }
-    ConsoleIo *slot = &(*self).io;
+    ConsoleIo *slot = Console_ioMut(self);
     (*slot) = *io;
-    (*slot).ctx = ioCtx;
+    ConsoleIo_setCtx(slot, ioCtx);
 }
 
 // GETTERS (PUBLIC & PRIVATE)
@@ -271,6 +310,6 @@ const char *Console_getWorkDir(const Console *self) {
 const ConsoleIo *Console_getIo(const Console *self) {
     if (!self)
         return nullptr;
-    const ConsoleIo *slot = &(*self).io;
-    return (*slot).ctx ? slot : nullptr;
+    const ConsoleIo *slot = Console_ioPtr(self);
+    return ConsoleIo_ctx(slot) ? slot : nullptr;
 }

@@ -185,6 +185,107 @@
 
 
 // CONSTRUCTORS
+;;GETTER
+static Lifetime *Kernel_lifetimeMut(Kernel *self) { return &(*self).lifetime; }
+;;SETTER
+static fn Kernel_setLifetime(Kernel *self, Lifetime lt) { (*self).lifetime = lt; }
+;;SETTER
+static fn Kernel_setArena(Kernel *self, any arena) { (*self).arena = arena; }
+;;SETTER
+static fn Kernel_setArenaType(Kernel *self, u64 t) { (*self).arenaType = t; }
+;;SETTER
+static fn Kernel_setTransientArena(Kernel *self, any arena) { (*self).transientArena = arena; }
+;;SETTER
+static fn Kernel_setTransientArenaType(Kernel *self, u64 t) { (*self).transientArenaType = t; }
+;;SETTER
+static fn Kernel_setApplicationCount(Kernel *self, u32 v) { (*self).applicationCount = v; }
+;;SETTER
+static fn Kernel_setProcessCount(Kernel *self, u32 v) { (*self).processCount = v; }
+;;SETTER
+static fn Kernel_setConsoleCount(Kernel *self, u32 v) { (*self).consoleCount = v; }
+;;SETTER
+static fn Kernel_setCommandlineCount(Kernel *self, u32 v) { (*self).commandlineCount = v; }
+;;SETTER
+static fn Kernel_setApplicationAt(Kernel *self, u32 i, Application *a) { (*self).applications[i] = a; }
+;;SETTER
+static fn Kernel_setProcessAt(Kernel *self, u32 i, Process *p) { (*self).processes[i] = p; }
+;;SETTER
+static fn Kernel_setConsoleAt(Kernel *self, u32 i, Console *c) { (*self).consoles[i] = c; }
+;;SETTER
+static fn Kernel_setCommandlineAt(Kernel *self, u32 i, CommandLine *cl) { (*self).commandlines[i] = cl; }
+;;GETTER
+static KernelRunSlot *Kernel_runSlots(const Kernel *self) { return (*self).runSlots; }
+;;SETTER
+static fn Kernel_setRunSlots(Kernel *self, KernelRunSlot *s) { (*self).runSlots = s; }
+;;SETTER
+static fn Kernel_setRunCount(Kernel *self, u32 v) { (*self).runCount = v; }
+;;GETTER
+static u32 Kernel_runCap(const Kernel *self) { return (*self).runCap; }
+;;SETTER
+static fn Kernel_setRunCap(Kernel *self, u32 v) { (*self).runCap = v; }
+;;GETTER
+static KernelEndSlot *Kernel_endSlots(const Kernel *self) { return (*self).endSlots; }
+;;SETTER
+static fn Kernel_setEndSlots(Kernel *self, KernelEndSlot *s) { (*self).endSlots = s; }
+;;SETTER
+static fn Kernel_setEndCount(Kernel *self, u32 v) { (*self).endCount = v; }
+;;GETTER
+static u32 Kernel_endCap(const Kernel *self) { return (*self).endCap; }
+;;SETTER
+static fn Kernel_setEndCap(Kernel *self, u32 v) { (*self).endCap = v; }
+;;GETTER
+static _Atomic bool *Kernel_endHooksFiredMut(Kernel *self) { return &(*self).endHooksFired; }
+;;GETTER
+static atomic_uint *Kernel_phaseMut(Kernel *self) { return &(*self).phase; }
+;;GETTER
+static const atomic_uint *Kernel_phasePtr(const Kernel *self) { return &(*self).phase; }
+;;GETTER
+static atomic_bool *Kernel_runningMut(Kernel *self) { return &(*self).running; }
+;;GETTER
+static const atomic_bool *Kernel_runningPtr(const Kernel *self) { return &(*self).running; }
+;;GETTER
+static atomic_uintptr_t *Kernel_runThreadIdMut(Kernel *self) { return &(*self).runThreadId; }
+;;GETTER
+static pthread_mutex_t *Kernel_addLockMut(Kernel *self) { return &(*self).addLock; }
+;;GETTER
+static KernelDeferred *Kernel_deferred(const Kernel *self) { return (*self).deferred; }
+;;SETTER
+static fn Kernel_setDeferred(Kernel *self, KernelDeferred *d) { (*self).deferred = d; }
+;;GETTER
+static bytes Kernel_deferredCount(const Kernel *self) { return (*self).deferredCount; }
+;;SETTER
+static fn Kernel_setDeferredCount(Kernel *self, bytes v) { (*self).deferredCount = v; }
+;;GETTER
+static bytes Kernel_deferredCap(const Kernel *self) { return (*self).deferredCap; }
+;;SETTER
+static fn Kernel_setDeferredCap(Kernel *self, bytes v) { (*self).deferredCap = v; }
+;;GETTER
+static _Atomic bool *KernelRunSlot_threadLaunchedMut(KernelRunSlot *s) { return &(*s).threadLaunched; }
+;;GETTER
+static pthread_t KernelRunSlot_thread(const KernelRunSlot *s) { return (*s).thread; }
+;;GETTER
+static pthread_t *KernelRunSlot_threadMut(KernelRunSlot *s) { return &(*s).thread; }
+;;GETTER
+static _Atomic bool *KernelRunSlot_doneMut(KernelRunSlot *s) { return &(*s).done; }
+;;GETTER
+static const _Atomic bool *KernelRunSlot_donePtr(const KernelRunSlot *s) { return &(*s).done; }
+;;GETTER
+static KernelRunFn KernelRunSlot_fn(const KernelRunSlot *s) { return (*s).fn; }
+;;SETTER
+static fn KernelRunSlot_setFn(KernelRunSlot *s, KernelRunFn f) { (*s).fn = f; }
+;;GETTER
+static any KernelRunSlot_userdata(const KernelRunSlot *s) { return (*s).userdata; }
+;;SETTER
+static fn KernelRunSlot_setUserdata(KernelRunSlot *s, any u) { (*s).userdata = u; }
+;;GETTER
+static KernelEndFn KernelEndSlot_fn(const KernelEndSlot *s) { return (*s).fn; }
+;;SETTER
+static fn KernelEndSlot_setFn(KernelEndSlot *s, KernelEndFn f) { (*s).fn = f; }
+;;GETTER
+static any KernelEndSlot_userdata(const KernelEndSlot *s) { return (*s).userdata; }
+;;SETTER
+static fn KernelEndSlot_setUserdata(KernelEndSlot *s, any u) { (*s).userdata = u; }
+
 /** Creates a kernel with the named default persistent and transient arena sizes. */
 Kernel *Kernel_0() {
     return Kernel_2(KERNEL_ARENA_DEFAULT, KERNEL_TRANSIENT_DEFAULT);
@@ -207,29 +308,29 @@ Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes) {
         free(self);
         return nullptr;
     }
-    (*self).lifetime = lt;
-    (*self).arena = lt.persistentArena;
-    (*self).arenaType = lt.persistentType;
-    (*self).transientArena = lt.transientArena;
-    (*self).transientArenaType = lt.transientType;
-    (*self).applicationCount = 0;
-    (*self).processCount = 0;
-    (*self).consoleCount = 0;
-    (*self).commandlineCount = 0;
-    (*self).runSlots = nullptr;
-    (*self).runCount = 0;
-    (*self).runCap = 0;
-    (*self).endSlots = nullptr;
-    (*self).endCount = 0;
-    (*self).endCap = 0;
-    atomic_store_explicit(&(*self).endHooksFired, false, memory_order_relaxed);
-    atomic_store_explicit(&(*self).phase, KERNEL_PHASE_READY, memory_order_relaxed);
-    atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
-    atomic_store_explicit(&(*self).runThreadId, (pointer) 0, memory_order_relaxed);
-    pthread_mutex_init(&(*self).addLock, nullptr);
-    (*self).deferred = nullptr;
-    (*self).deferredCount = 0;
-    (*self).deferredCap = 0;
+    Kernel_setLifetime(self, lt);
+    Kernel_setArena(self, lt.persistentArena);
+    Kernel_setArenaType(self, lt.persistentType);
+    Kernel_setTransientArena(self, lt.transientArena);
+    Kernel_setTransientArenaType(self, lt.transientType);
+    Kernel_setApplicationCount(self, 0);
+    Kernel_setProcessCount(self, 0);
+    Kernel_setConsoleCount(self, 0);
+    Kernel_setCommandlineCount(self, 0);
+    Kernel_setRunSlots(self, nullptr);
+    Kernel_setRunCount(self, 0);
+    Kernel_setRunCap(self, 0);
+    Kernel_setEndSlots(self, nullptr);
+    Kernel_setEndCount(self, 0);
+    Kernel_setEndCap(self, 0);
+    atomic_store_explicit(Kernel_endHooksFiredMut(self), false, memory_order_relaxed);
+    atomic_store_explicit(Kernel_phaseMut(self), KERNEL_PHASE_READY, memory_order_relaxed);
+    atomic_store_explicit(Kernel_runningMut(self), false, memory_order_relaxed);
+    atomic_store_explicit(Kernel_runThreadIdMut(self), (pointer) 0, memory_order_relaxed);
+    pthread_mutex_init(Kernel_addLockMut(self), nullptr);
+    Kernel_setDeferred(self, nullptr);
+    Kernel_setDeferredCount(self, 0);
+    Kernel_setDeferredCap(self, 0);
     return self;
 }
 
@@ -242,16 +343,18 @@ static any kernelRunWorkerMain(any arg);
 bool Kernel_free(Kernel *self) {
     if (!self)
         return false;
-    if (atomic_load_explicit(&(*self).phase, memory_order_acquire) != KERNEL_PHASE_READY) {
+    if (atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) != KERNEL_PHASE_READY) {
         fprintf(stderr, "kernel: refusing free while a run is live or draining — stop and let it quiesce first\n");
         return false;
     }
-    if ((*self).applicationCount > 0 || (*self).processCount > 0 || (*self).consoleCount > 0
-        || (*self).commandlineCount > 0) {
+    u32 appCount = Kernel_getApplicationCount(self);
+    u32 procCount = Kernel_getProcessCount(self);
+    u32 conCount = Kernel_getConsoleCount(self);
+    u32 clCount = Kernel_getCommandLineCount(self);
+    if (appCount > 0 || procCount > 0 || conCount > 0 || clCount > 0) {
         fprintf(stderr,
                 "kernel: %u app(s), %u process(es), %u console(s), %u commandline(s) still registered; remove before free\n",
-                (*self).applicationCount, (*self).processCount, (*self).consoleCount,
-                (*self).commandlineCount);
+                appCount, procCount, conCount, clCount);
         return false;
     }
     // Fire end hooks BEFORE joining? No — AFTER: hooks release resources the
@@ -259,54 +362,56 @@ bool Kernel_free(Kernel *self) {
     // Order Law). In READY phase no workers exist; Kernel_stop already fired
     // the hooks in that path and the fire-once guard keeps this a no-op.
     // Join any run worker threads
-    for (u32 i = 0; i < (*self).runCount; i++) {
-        KernelRunSlot *slot = &(*self).runSlots[i];
-        if (atomic_load_explicit(&(*slot).threadLaunched, memory_order_relaxed)) {
-            pthread_join((*slot).thread, nullptr);
-            atomic_store_explicit(&(*slot).threadLaunched, false, memory_order_relaxed);
+    u32 runCount = Kernel_getRunFunctionCount(self);
+    KernelRunSlot *runSlots = Kernel_runSlots(self);
+    for (u32 i = 0; i < runCount; i++) {
+        KernelRunSlot *slot = &runSlots[i];
+        if (atomic_load_explicit(KernelRunSlot_threadLaunchedMut(slot), memory_order_relaxed)) {
+            pthread_join(KernelRunSlot_thread(slot), nullptr);
+            atomic_store_explicit(KernelRunSlot_threadLaunchedMut(slot), false, memory_order_relaxed);
         }
     }
     kernelFireEndHooks(self);
 
-    free((*self).runSlots);
-    (*self).runSlots = nullptr;
-    (*self).runCount = 0;
-    (*self).runCap = 0;
+    free(runSlots);
+    Kernel_setRunSlots(self, nullptr);
+    Kernel_setRunCount(self, 0);
+    Kernel_setRunCap(self, 0);
 
-    free((*self).endSlots);
-    (*self).endSlots = nullptr;
-    (*self).endCount = 0;
-    (*self).endCap = 0;
+    free(Kernel_endSlots(self));
+    Kernel_setEndSlots(self, nullptr);
+    Kernel_setEndCount(self, 0);
+    Kernel_setEndCap(self, 0);
 
     // No Vulkan teardown here: the device lifecycle (init/shutdown) is owned
     // entirely by graphvex and driven through its own registration path.
     // The Kernel never names Vk_* — see the Teardown Order Law: graphvex
     // tears its device down before the arenas free below, ordered by whoever
     // holds the GfxLoop registration, not by the supervisor.
-    pthread_mutex_destroy(&(*self).addLock);
-    free((*self).deferred);
-    (*self).deferred = nullptr;
-    (*self).deferredCount = 0;
-    (*self).deferredCap = 0;
+    pthread_mutex_destroy(Kernel_addLockMut(self));
+    free(Kernel_deferred(self));
+    Kernel_setDeferred(self, nullptr);
+    Kernel_setDeferredCount(self, 0);
+    Kernel_setDeferredCap(self, 0);
 
     for (u32 i = 0; i < KERNEL_MAX_APPS; i++)
-        (*self).applications[i] = nullptr;
-    (*self).applicationCount = 0;
+        Kernel_setApplicationAt(self, i, nullptr);
+    Kernel_setApplicationCount(self, 0);
     for (u32 i = 0; i < KERNEL_MAX_PROCS; i++)
-        (*self).processes[i] = nullptr;
-    (*self).processCount = 0;
+        Kernel_setProcessAt(self, i, nullptr);
+    Kernel_setProcessCount(self, 0);
     for (u32 i = 0; i < KERNEL_MAX_CONSOLES; i++)
-        (*self).consoles[i] = nullptr;
-    (*self).consoleCount = 0;
+        Kernel_setConsoleAt(self, i, nullptr);
+    Kernel_setConsoleCount(self, 0);
     for (u32 i = 0; i < KERNEL_MAX_COMMANDLINES; i++)
-        (*self).commandlines[i] = nullptr;
-    (*self).commandlineCount = 0;
+        Kernel_setCommandlineAt(self, i, nullptr);
+    Kernel_setCommandlineCount(self, 0);
 
-    (*self).transientArena = nullptr;
-    (*self).transientArenaType = 0;
-    (*self).arena = nullptr;
-    (*self).arenaType = 0;
-    Lifetime_destroy(&(*self).lifetime);
+    Kernel_setTransientArena(self, nullptr);
+    Kernel_setTransientArenaType(self, 0);
+    Kernel_setArena(self, nullptr);
+    Kernel_setArenaType(self, 0);
+    Lifetime_destroy(Kernel_lifetimeMut(self));
     free(self);
     return true;
 }
@@ -328,21 +433,24 @@ fn Kernel_stop(Kernel *self) {
     // epilogue — never here, because hooks may release resources the workers
     // still touch (the Teardown Order Law: quiescence precedes release).
     u32 expected = KERNEL_PHASE_RUNNING;
-    if (atomic_compare_exchange_strong_explicit(&(*self).phase, &expected, KERNEL_PHASE_DRAINING,
+    if (atomic_compare_exchange_strong_explicit(Kernel_phaseMut(self), &expected, KERNEL_PHASE_DRAINING,
                                                 memory_order_acq_rel, memory_order_acquire)) {
-        atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
-        for (u32 i = 0; i < (*self).applicationCount; i++) {
-            Application *app = (*self).applications[i];
+        atomic_store_explicit(Kernel_runningMut(self), false, memory_order_relaxed);
+        u32 appCount = Kernel_getApplicationCount(self);
+        for (u32 i = 0; i < appCount; i++) {
+            Application *app = Kernel_getApplication(self, i);
             if (app)
                 Application_stop(app);
         }
-        for (u32 i = 0; i < (*self).consoleCount; i++) {
-            Console *c = (*self).consoles[i];
+        u32 conCount = Kernel_getConsoleCount(self);
+        for (u32 i = 0; i < conCount; i++) {
+            Console *c = Kernel_getConsole(self, i);
             if (c)
                 Console_cancel(c);
         }
-        for (u32 i = 0; i < (*self).commandlineCount; i++) {
-            CommandLine *cl = (*self).commandlines[i];
+        u32 clCount = Kernel_getCommandLineCount(self);
+        for (u32 i = 0; i < clCount; i++) {
+            CommandLine *cl = Kernel_getCommandLine(self, i);
             if (cl)
                 CommandLine_stop(cl);
         }
@@ -361,14 +469,14 @@ fn Kernel_stop(Kernel *self) {
 KernelPhase Kernel_getPhase(const Kernel *self) {
     if (!self)
         return KERNEL_PHASE_READY;
-    return (KernelPhase) atomic_load_explicit(&(*self).phase, memory_order_acquire);
+    return (KernelPhase) atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire);
 }
 
 /** Returns the atomic run flag, or false for a null kernel. */
 bool Kernel_isRunning(const Kernel *self) {
     if (!self)
         return false;
-    return atomic_load_explicit(&(*self).running, memory_order_relaxed);
+    return atomic_load_explicit(Kernel_runningPtr(self), memory_order_relaxed);
 }
 
 /** Invokes registered end callbacks once, guarded against repeated teardown. */
@@ -376,23 +484,27 @@ static fn kernelFireEndHooks(Kernel *self) {
     if (!self)
         return;
     bool expected = false;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).endHooksFired, &expected, true, memory_order_relaxed, memory_order_relaxed))
+    if (!atomic_compare_exchange_strong_explicit(Kernel_endHooksFiredMut(self), &expected, true, memory_order_relaxed, memory_order_relaxed))
         return;
-    for (u32 i = 0; i < (*self).endCount; i++) {
-        KernelEndSlot *slot = &(*self).endSlots[i];
-        if ((*slot).fn)
-            (*slot).fn(self, (*slot).userdata);
+    u32 endCount = Kernel_getEndFunctionCount(self);
+    KernelEndSlot *endSlots = Kernel_endSlots(self);
+    for (u32 i = 0; i < endCount; i++) {
+        KernelEndSlot *slot = &endSlots[i];
+        KernelEndFn endFn = KernelEndSlot_fn(slot);
+        if (endFn)
+            endFn(self, KernelEndSlot_userdata(slot));
     }
 }
 
 /** Runs one registered worker callback and publishes its completion flag. */
 static any kernelRunWorkerMain(any arg) {
     KernelRunSlot *slot = (KernelRunSlot*) arg;
-    if (slot && (*slot).fn) {
-        (*slot).fn((*slot).userdata);
+    KernelRunFn runFn = slot ? KernelRunSlot_fn(slot) : nullptr;
+    if (slot && runFn) {
+        runFn(KernelRunSlot_userdata(slot));
     }
     if (slot) {
-        atomic_store_explicit(&(*slot).done, true, memory_order_relaxed);
+        atomic_store_explicit(KernelRunSlot_doneMut(slot), true, memory_order_relaxed);
     }
     return nullptr;
 }
@@ -407,7 +519,7 @@ static any kernelRunWorkerMain(any arg) {
 
 /** Reports whether the phase has left READY. */
 static bool kernelRunActive(const Kernel *self) {
-    return atomic_load_explicit(&(*self).phase, memory_order_acquire) != KERNEL_PHASE_READY;
+    return atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) != KERNEL_PHASE_READY;
 }
 
 // DRAINING is owned by the arming thread: no registration from any thread,
@@ -415,7 +527,7 @@ static bool kernelRunActive(const Kernel *self) {
 // into. Callers already warn on refusal.
 /** Reports whether the kernel is in its teardown-owned draining phase. */
 static bool kernelDraining(const Kernel *self) {
-    return atomic_load_explicit(&(*self).phase, memory_order_acquire) == KERNEL_PHASE_DRAINING;
+    return atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) == KERNEL_PHASE_DRAINING;
 }
 
 // Forward: start one app manifest non-blocking (defined below with the run
@@ -425,45 +537,53 @@ static fn kernelStartApplication(Kernel *self, Application *a);
 
 /** Adds an application to the single-threaded registry if unique and within capacity. */
 static bool kernelAddApplicationInternal(Kernel *self, Application *app) {
-    for (u32 i = 0; i < (*self).applicationCount; i++)
-        if ((*self).applications[i] == app)
+    u32 count = Kernel_getApplicationCount(self);
+    for (u32 i = 0; i < count; i++)
+        if (Kernel_getApplication(self, i) == app)
             return false;
-    if ((*self).applicationCount >= KERNEL_MAX_APPS)
+    if (count >= KERNEL_MAX_APPS)
         return false;
-    (*self).applications[(*self).applicationCount++] = app;
+    Kernel_setApplicationAt(self, count, app);
+    Kernel_setApplicationCount(self, count + 1);
     return true;
 }
 
 /** Adds a process to the single-threaded registry if unique and within capacity. */
 static bool kernelAddProcessInternal(Kernel *self, Process *p) {
-    for (u32 i = 0; i < (*self).processCount; i++)
-        if ((*self).processes[i] == p)
+    u32 count = Kernel_getProcessCount(self);
+    for (u32 i = 0; i < count; i++)
+        if (Kernel_getProcess(self, i) == p)
             return false;
-    if ((*self).processCount >= KERNEL_MAX_PROCS)
+    if (count >= KERNEL_MAX_PROCS)
         return false;
-    (*self).processes[(*self).processCount++] = p;
+    Kernel_setProcessAt(self, count, p);
+    Kernel_setProcessCount(self, count + 1);
     return true;
 }
 
 /** Adds a console to the single-threaded registry if unique and within capacity. */
 static bool kernelAddConsoleInternal(Kernel *self, Console *c) {
-    for (u32 i = 0; i < (*self).consoleCount; i++)
-        if ((*self).consoles[i] == c)
+    u32 count = Kernel_getConsoleCount(self);
+    for (u32 i = 0; i < count; i++)
+        if (Kernel_getConsole(self, i) == c)
             return false;
-    if ((*self).consoleCount >= KERNEL_MAX_CONSOLES)
+    if (count >= KERNEL_MAX_CONSOLES)
         return false;
-    (*self).consoles[(*self).consoleCount++] = c;
+    Kernel_setConsoleAt(self, count, c);
+    Kernel_setConsoleCount(self, count + 1);
     return true;
 }
 
 /** Adds a terminal application to the registry if unique and within capacity. */
 static bool kernelAddCommandLineInternal(Kernel *self, CommandLine *c) {
-    for (u32 i = 0; i < (*self).commandlineCount; i++)
-        if ((*self).commandlines[i] == c)
+    u32 count = Kernel_getCommandLineCount(self);
+    for (u32 i = 0; i < count; i++)
+        if (Kernel_getCommandLine(self, i) == c)
             return false;
-    if ((*self).commandlineCount >= KERNEL_MAX_COMMANDLINES)
+    if (count >= KERNEL_MAX_COMMANDLINES)
         return false;
-    (*self).commandlines[(*self).commandlineCount++] = c;
+    Kernel_setCommandlineAt(self, count, c);
+    Kernel_setCommandlineCount(self, count + 1);
     return true;
 }
 
@@ -472,22 +592,26 @@ static bool kernelAddCommandLineInternal(Kernel *self, CommandLine *c) {
 // one lock and re-owns the arrays for the rest of the pass.
 /** Queues a registration request in the mutex-protected deferred mailbox. */
 static bool kernelPostDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
-    pthread_mutex_lock(&(*self).addLock);
-    if ((*self).deferredCount == (*self).deferredCap) {
-        bytes cap = (*self).deferredCap ? (*self).deferredCap * 2 : 4;
-        KernelDeferred *nx = (KernelDeferred*) realloc((*self).deferred, cap * sizeof(KernelDeferred));
+    pthread_mutex_lock(Kernel_addLockMut(self));
+    bytes count = Kernel_deferredCount(self);
+    bytes defCap = Kernel_deferredCap(self);
+    KernelDeferred *def = Kernel_deferred(self);
+    if (count == defCap) {
+        bytes cap = defCap ? defCap * 2 : 4;
+        KernelDeferred *nx = (KernelDeferred*) realloc(def, cap * sizeof(KernelDeferred));
         if (!nx) {
-            pthread_mutex_unlock(&(*self).addLock);
+            pthread_mutex_unlock(Kernel_addLockMut(self));
             fprintf(stderr, "kernel: deferred-add mailbox grow failed (Kernel_add* dropped)\n");
             return false;
         }
-        (*self).deferred = nx;
-        (*self).deferredCap = cap;
+        def = nx;
+        Kernel_setDeferred(self, nx);
+        Kernel_setDeferredCap(self, cap);
     }
-    (*self).deferred[(*self).deferredCount].kind = kind;
-    (*self).deferred[(*self).deferredCount].ptr = ptr;
-    (*self).deferredCount++;
-    pthread_mutex_unlock(&(*self).addLock);
+    def[count].kind = kind;
+    def[count].ptr = ptr;
+    Kernel_setDeferredCount(self, count + 1);
+    pthread_mutex_unlock(Kernel_addLockMut(self));
     return true;
 }
 
@@ -534,13 +658,13 @@ static fn kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
 // the lock — the run loop keeps iterating its own registry, never the mailbox.
 /** Takes and applies the current deferred batch outside the mailbox lock. */
 static fn kernelDrainDeferred(Kernel *self) {
-    pthread_mutex_lock(&(*self).addLock);
-    KernelDeferred *batch = (*self).deferred;
-    bytes n = (*self).deferredCount;
-    (*self).deferred = nullptr;
-    (*self).deferredCount = 0;
-    (*self).deferredCap = 0;
-    pthread_mutex_unlock(&(*self).addLock);
+    pthread_mutex_lock(Kernel_addLockMut(self));
+    KernelDeferred *batch = Kernel_deferred(self);
+    bytes n = Kernel_deferredCount(self);
+    Kernel_setDeferred(self, nullptr);
+    Kernel_setDeferredCount(self, 0);
+    Kernel_setDeferredCap(self, 0);
+    pthread_mutex_unlock(Kernel_addLockMut(self));
 
     for (bytes i = 0; i < n; i++)
         kernelApplyDeferred(self, batch[i].kind, batch[i].ptr);
@@ -555,13 +679,13 @@ static fn kernelDrainDeferred(Kernel *self) {
 // left was queued while RUNNING and never admitted. One warn per drop batch.
 /** Discards pending additions after run completion and reports a dropped batch. */
 static fn kernelDropDeferred(Kernel *self) {
-    pthread_mutex_lock(&(*self).addLock);
-    KernelDeferred *batch = (*self).deferred;
-    bytes n = (*self).deferredCount;
-    (*self).deferred = nullptr;
-    (*self).deferredCount = 0;
-    (*self).deferredCap = 0;
-    pthread_mutex_unlock(&(*self).addLock);
+    pthread_mutex_lock(Kernel_addLockMut(self));
+    KernelDeferred *batch = Kernel_deferred(self);
+    bytes n = Kernel_deferredCount(self);
+    Kernel_setDeferred(self, nullptr);
+    Kernel_setDeferredCount(self, 0);
+    Kernel_setDeferredCap(self, 0);
+    pthread_mutex_unlock(Kernel_addLockMut(self));
 
     if (n > 0)
         fprintf(stderr, "kernel: dropped %zu deferred add(s) — the run ended before admission\n", n);
@@ -575,24 +699,29 @@ static fn kernelDropDeferred(Kernel *self) {
 // completion predicate (all windows closed or externally stopped).
 /** Checks application, console, and worker completion to decide reactor exit. */
 static bool kernelAllDone(const Kernel *self) {
-    for (u32 i = 0; i < (*self).applicationCount; i++) {
-        Application *a = (*self).applications[i];
+    u32 appCount = Kernel_getApplicationCount(self);
+    for (u32 i = 0; i < appCount; i++) {
+        Application *a = Kernel_getApplication(self, i);
         if (a && !Application_isFinished(a))
             return false;
     }
-    for (u32 i = 0; i < (*self).consoleCount; i++) {
-        Console *c = (*self).consoles[i];
+    u32 conCount = Kernel_getConsoleCount(self);
+    for (u32 i = 0; i < conCount; i++) {
+        Console *c = Kernel_getConsole(self, i);
         if (c && Console_isRunning(c))
             return false;
     }
-    for (u32 i = 0; i < (*self).commandlineCount; i++) {
-        CommandLine *cl = (*self).commandlines[i];
+    u32 clCount = Kernel_getCommandLineCount(self);
+    for (u32 i = 0; i < clCount; i++) {
+        CommandLine *cl = Kernel_getCommandLine(self, i);
         if (cl && CommandLine_isOpen(cl) && !CommandLine_isCancelled(cl))
             return false;
     }
-    for (u32 i = 0; i < (*self).runCount; i++) {
-        const KernelRunSlot *slot = &(*self).runSlots[i];
-        if (!atomic_load_explicit(&(*slot).done, memory_order_relaxed))
+    u32 runCount = Kernel_getRunFunctionCount(self);
+    const KernelRunSlot *runSlots = Kernel_runSlots(self);
+    for (u32 i = 0; i < runCount; i++) {
+        const KernelRunSlot *slot = &runSlots[i];
+        if (!atomic_load_explicit(KernelRunSlot_donePtr(slot), memory_order_relaxed))
             return false;
     }
     return true;
@@ -606,7 +735,7 @@ static fn kernelStartApplication(Kernel *self, Application *a) {
     if (!a)
         return;
     if (self)
-        Application_setHostLifetime(a, &(*self).lifetime);
+        Application_setHostLifetime(a, Kernel_getLifetime(self));
     (discard) Application_begin(a);
     u32 winCount = Application_getWindowCount(a);
     for (u32 i = 0; i < winCount; i++) {
@@ -629,8 +758,9 @@ static fn kernelStartApplication(Kernel *self, Application *a) {
 i32 Kernel_runAll(Kernel *self) {
     if (!self)
         return KERNEL_EXIT_NO_APPS;
-    if ((*self).applicationCount == 0 && (*self).processCount == 0 && (*self).consoleCount == 0
-        && (*self).commandlineCount == 0 && (*self).runCount == 0)
+    if (Kernel_getApplicationCount(self) == 0 && Kernel_getProcessCount(self) == 0
+        && Kernel_getConsoleCount(self) == 0 && Kernel_getCommandLineCount(self) == 0
+        && Kernel_getRunFunctionCount(self) == 0)
         return KERNEL_EXIT_NO_APPS;
 
     // TERMINAL-RUN ARM: claim the run (READY -> RUNNING). From here the
@@ -638,19 +768,20 @@ i32 Kernel_runAll(Kernel *self) {
     // are refused; other threads post into the deferred mailbox, drained on
     // the next pass below. A second concurrent runAll is refused (one warn).
     u32 readyPhase = KERNEL_PHASE_READY;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).phase, &readyPhase, KERNEL_PHASE_RUNNING,
+    if (!atomic_compare_exchange_strong_explicit(Kernel_phaseMut(self), &readyPhase, KERNEL_PHASE_RUNNING,
                                                  memory_order_acq_rel, memory_order_acquire)) {
         fprintf(stderr, "kernel: Kernel_run refused — a run is already live or draining\n");
         return KERNEL_EXIT_NO_APPS;
     }
-    atomic_store_explicit(&(*self).running, true, memory_order_relaxed);
-    atomic_store_explicit(&(*self).runThreadId, (pointer) pthread_self(), memory_order_relaxed);
+    atomic_store_explicit(Kernel_runningMut(self), true, memory_order_relaxed);
+    atomic_store_explicit(Kernel_runThreadIdMut(self), (pointer) pthread_self(), memory_order_relaxed);
 
     i32 rc = KERNEL_EXIT_OK;
 
     // One-shot invokables: run to completion on the arming thread.
-    for (u32 i = 0; i < (*self).processCount; i++) {
-        Process *p = (*self).processes[i];
+    u32 procCount = Kernel_getProcessCount(self);
+    for (u32 i = 0; i < procCount; i++) {
+        Process *p = Kernel_getProcess(self, i);
         if (p) {
             i32 r = 0;
             if (Process_run(p, &r) != PROCESS_OK)
@@ -661,31 +792,36 @@ i32 Kernel_runAll(Kernel *self) {
     }
 
     // Launch supervised run worker threads
-    for (u32 i = 0; i < (*self).runCount; i++) {
-        KernelRunSlot *slot = &(*self).runSlots[i];
-        atomic_store_explicit(&(*slot).done, false, memory_order_relaxed);
-        if (pthread_create(&(*slot).thread, nullptr, kernelRunWorkerMain, slot) == 0) {
-            atomic_store_explicit(&(*slot).threadLaunched, true, memory_order_relaxed);
+    u32 runCount = Kernel_getRunFunctionCount(self);
+    KernelRunSlot *runSlots = Kernel_runSlots(self);
+    for (u32 i = 0; i < runCount; i++) {
+        KernelRunSlot *slot = &runSlots[i];
+        atomic_store_explicit(KernelRunSlot_doneMut(slot), false, memory_order_relaxed);
+        if (pthread_create(KernelRunSlot_threadMut(slot), nullptr, kernelRunWorkerMain, slot) == 0) {
+            atomic_store_explicit(KernelRunSlot_threadLaunchedMut(slot), true, memory_order_relaxed);
         } else {
-            atomic_store_explicit(&(*slot).done, true, memory_order_relaxed);
+            atomic_store_explicit(KernelRunSlot_doneMut(slot), true, memory_order_relaxed);
         }
     }
 
     // Session pumps + windowed apps: start without blocking — the reactor
     // below supervises them to completion.
-    for (u32 i = 0; i < (*self).consoleCount; i++) {
-        Console *c = (*self).consoles[i];
+    u32 conCount = Kernel_getConsoleCount(self);
+    for (u32 i = 0; i < conCount; i++) {
+        Console *c = Kernel_getConsole(self, i);
         if (c)
             (discard) Console_run(c);
     }
     // Terminal applications: acquire the device, then drive it each pass below.
-    for (u32 i = 0; i < (*self).commandlineCount; i++) {
-        CommandLine *cl = (*self).commandlines[i];
+    u32 clCount = Kernel_getCommandLineCount(self);
+    for (u32 i = 0; i < clCount; i++) {
+        CommandLine *cl = Kernel_getCommandLine(self, i);
         if (cl && !CommandLine_isOpen(cl))
             (discard) CommandLine_open(cl);
     }
-    for (u32 i = 0; i < (*self).applicationCount; i++)
-        kernelStartApplication(self, (*self).applications[i]);
+    u32 appCount = Kernel_getApplicationCount(self);
+    for (u32 i = 0; i < appCount; i++)
+        kernelStartApplication(self, Kernel_getApplication(self, i));
 
     bridgeBespoke();
 
@@ -695,21 +831,23 @@ i32 Kernel_runAll(Kernel *self) {
     // busy spin.
     const struct timespec park = {0, 5000000L};
     u64 pass = 0;
-    while (atomic_load_explicit(&(*self).running, memory_order_relaxed) && !kernelAllDone(self)) {
+    while (atomic_load_explicit(Kernel_runningPtr(self), memory_order_relaxed) && !kernelAllDone(self)) {
         kernelDrainDeferred(self);
 
         Window_pollEvents();
-        for (u32 i = 0; i < (*self).applicationCount; i++)
-            Application_poll((*self).applications[i]);
+        u32 curAppCount = Kernel_getApplicationCount(self);
+        for (u32 i = 0; i < curAppCount; i++)
+            Application_poll(Kernel_getApplication(self, i));
         bridgeBespokeCheck();
         // Host-owned scratch dies at this frame boundary: module borrowers
         // are excluded (their pass ran above), so no transient pointer
         // survives into the next pass or across a swap.
-        Lifetime_resetTransient(&(*self).lifetime);
+        Lifetime_resetTransient(Kernel_getLifetime(self));
 
         char buf[4096];
-        for (u32 i = 0; i < (*self).consoleCount; i++) {
-            Console *c = (*self).consoles[i];
+        u32 curConCount = Kernel_getConsoleCount(self);
+        for (u32 i = 0; i < curConCount; i++) {
+            Console *c = Kernel_getConsole(self, i);
             if (!c || !Console_isRunning(c))
                 continue;
             bytes n = 0;
@@ -717,15 +855,16 @@ i32 Kernel_runAll(Kernel *self) {
                 (discard) fwrite(buf, 1, n, stdout);
         }
         // Terminal applications: one non-blocking draw/resize/input pass each.
-        for (u32 i = 0; i < (*self).commandlineCount; i++) {
-            CommandLine *cl = (*self).commandlines[i];
+        u32 curClCount = Kernel_getCommandLineCount(self);
+        for (u32 i = 0; i < curClCount; i++) {
+            CommandLine *cl = Kernel_getCommandLine(self, i);
             if (cl && CommandLine_isOpen(cl) && CommandLine_hasApp(cl) && !CommandLine_isCancelled(cl))
                 (discard) CommandLine_tick(cl);
         }
 
         if ((pass % 50) == 0) {
-            for (u32 i = 0; i < (*self).applicationCount; i++) {
-                Application *a = (*self).applications[i];
+            for (u32 i = 0; i < curAppCount; i++) {
+                Application *a = Kernel_getApplication(self, i);
                 if (!a)
                     continue;
                 Application_pollHot(a); // generation-driven hot swap, ~250ms
@@ -746,30 +885,34 @@ i32 Kernel_runAll(Kernel *self) {
     // can grow a registry a joining worker still points into. The final
     // drain is a best-effort straggler sweep; admitted adds run like the
     // initial pass would. Then the phase returns to READY.
-    for (u32 i = 0; i < (*self).applicationCount; i++) {
-        Application *a = (*self).applications[i];
+    appCount = Kernel_getApplicationCount(self);
+    for (u32 i = 0; i < appCount; i++) {
+        Application *a = Kernel_getApplication(self, i);
         if (a && Application_isRunning(a))
             Application_stop(a);
         Application_finish(a);
     }
-    for (u32 i = 0; i < (*self).commandlineCount; i++) {
-        CommandLine *cl = (*self).commandlines[i];
+    clCount = Kernel_getCommandLineCount(self);
+    for (u32 i = 0; i < clCount; i++) {
+        CommandLine *cl = Kernel_getCommandLine(self, i);
         if (cl)
             CommandLine_close(cl);   // restore the terminal before any join (the Teardown Order Law)
     }
-    for (u32 i = 0; i < (*self).runCount; i++) {
-        KernelRunSlot *slot = &(*self).runSlots[i];
-        if (atomic_load_explicit(&(*slot).threadLaunched, memory_order_relaxed)) {
-            pthread_join((*slot).thread, nullptr);
-            atomic_store_explicit(&(*slot).threadLaunched, false, memory_order_relaxed);
+    runCount = Kernel_getRunFunctionCount(self);
+    runSlots = Kernel_runSlots(self);
+    for (u32 i = 0; i < runCount; i++) {
+        KernelRunSlot *slot = &runSlots[i];
+        if (atomic_load_explicit(KernelRunSlot_threadLaunchedMut(slot), memory_order_relaxed)) {
+            pthread_join(KernelRunSlot_thread(slot), nullptr);
+            atomic_store_explicit(KernelRunSlot_threadLaunchedMut(slot), false, memory_order_relaxed);
         }
     }
     kernelFireEndHooks(self);
     kernelDropDeferred(self);
 
-    atomic_store_explicit(&(*self).runThreadId, (pointer) 0, memory_order_relaxed);
-    atomic_store_explicit(&(*self).running, false, memory_order_relaxed);
-    atomic_store_explicit(&(*self).phase, KERNEL_PHASE_READY, memory_order_release);
+    atomic_store_explicit(Kernel_runThreadIdMut(self), (pointer) 0, memory_order_relaxed);
+    atomic_store_explicit(Kernel_runningMut(self), false, memory_order_relaxed);
+    atomic_store_explicit(Kernel_phaseMut(self), KERNEL_PHASE_READY, memory_order_release);
 
     return rc;
 }
@@ -861,9 +1004,9 @@ i32 Kernel_runApplication(Kernel *self, Application *a) {
     // the demand-driven frame scheduler loop: completion + hot servicing stay
     // HERE (R1), the frame loop + Thread-0 event pump stay THERE (R3).
     // Otherwise, fall back to hotcwap's parked loop.
-    if ((*self).gfxAppRun != nullptr) {
-        s_kernelLifetime = &(*self).lifetime;
-        i32 result = (*self).gfxAppRun(a, kernelGfxAppContinues, kernelGfxPump);
+    if (Kernel_getGfxAppRunner(self) != nullptr) {
+        s_kernelLifetime = Kernel_getLifetime(self);
+        i32 result = Kernel_getGfxAppRunner(self)(a, kernelGfxAppContinues, kernelGfxPump);
         s_kernelLifetime = nullptr;
         Application_finish(a);
         return result;
@@ -887,7 +1030,7 @@ bool Kernel_addApplication(Kernel *self, Application *app) {
         return false;
     }
     if (kernelRunActive(self)) {
-        if ((pointer) pthread_self() == atomic_load_explicit(&(*self).runThreadId, memory_order_relaxed)) {
+        if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
             fprintf(stderr, "kernel: Kernel_addApplication refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
             return false;
         }
@@ -900,10 +1043,13 @@ bool Kernel_addApplication(Kernel *self, Application *app) {
 bool Kernel_removeApplication(Kernel *self, Application *app) {
     if (!self || !app)
         return false;
-    for (u32 i = 0; i < (*self).applicationCount; i++) {
-        if ((*self).applications[i] == app) {
-            (*self).applications[i] = (*self).applications[--(*self).applicationCount];
-            (*self).applications[(*self).applicationCount] = nullptr;
+    u32 count = Kernel_getApplicationCount(self);
+    for (u32 i = 0; i < count; i++) {
+        if (Kernel_getApplication(self, i) == app) {
+            u32 last = count - 1;
+            Kernel_setApplicationAt(self, i, Kernel_getApplication(self, last));
+            Kernel_setApplicationAt(self, last, nullptr);
+            Kernel_setApplicationCount(self, last);
             return true;
         }
     }
@@ -920,7 +1066,7 @@ bool Kernel_addProcess(Kernel *self, Process *p) {
         return false;
     }
     if (kernelRunActive(self)) {
-        if ((pointer) pthread_self() == atomic_load_explicit(&(*self).runThreadId, memory_order_relaxed)) {
+        if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
             fprintf(stderr, "kernel: Kernel_addProcess refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
             return false;
         }
@@ -933,10 +1079,13 @@ bool Kernel_addProcess(Kernel *self, Process *p) {
 bool Kernel_removeProcess(Kernel *self, Process *p) {
     if (!self || !p)
         return false;
-    for (u32 i = 0; i < (*self).processCount; i++) {
-        if ((*self).processes[i] == p) {
-            (*self).processes[i] = (*self).processes[--(*self).processCount];
-            (*self).processes[(*self).processCount] = nullptr;
+    u32 count = Kernel_getProcessCount(self);
+    for (u32 i = 0; i < count; i++) {
+        if (Kernel_getProcess(self, i) == p) {
+            u32 last = count - 1;
+            Kernel_setProcessAt(self, i, Kernel_getProcess(self, last));
+            Kernel_setProcessAt(self, last, nullptr);
+            Kernel_setProcessCount(self, last);
             return true;
         }
     }
@@ -953,7 +1102,7 @@ bool Kernel_addConsole(Kernel *self, Console *c) {
         return false;
     }
     if (kernelRunActive(self)) {
-        if ((pointer) pthread_self() == atomic_load_explicit(&(*self).runThreadId, memory_order_relaxed)) {
+        if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
             fprintf(stderr, "kernel: Kernel_addConsole refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
             return false;
         }
@@ -966,10 +1115,13 @@ bool Kernel_addConsole(Kernel *self, Console *c) {
 bool Kernel_removeConsole(Kernel *self, Console *c) {
     if (!self || !c)
         return false;
-    for (u32 i = 0; i < (*self).consoleCount; i++) {
-        if ((*self).consoles[i] == c) {
-            (*self).consoles[i] = (*self).consoles[--(*self).consoleCount];
-            (*self).consoles[(*self).consoleCount] = nullptr;
+    u32 count = Kernel_getConsoleCount(self);
+    for (u32 i = 0; i < count; i++) {
+        if (Kernel_getConsole(self, i) == c) {
+            u32 last = count - 1;
+            Kernel_setConsoleAt(self, i, Kernel_getConsole(self, last));
+            Kernel_setConsoleAt(self, last, nullptr);
+            Kernel_setConsoleCount(self, last);
             return true;
         }
     }
@@ -986,7 +1138,7 @@ bool Kernel_addCommandLine(Kernel *self, CommandLine *c) {
         return false;
     }
     if (kernelRunActive(self)) {
-        if ((pointer) pthread_self() == atomic_load_explicit(&(*self).runThreadId, memory_order_relaxed)) {
+        if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
             fprintf(stderr, "kernel: Kernel_addCommandLine refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
             return false;
         }
@@ -999,10 +1151,13 @@ bool Kernel_addCommandLine(Kernel *self, CommandLine *c) {
 bool Kernel_removeCommandLine(Kernel *self, CommandLine *c) {
     if (!self || !c)
         return false;
-    for (u32 i = 0; i < (*self).commandlineCount; i++) {
-        if ((*self).commandlines[i] == c) {
-            (*self).commandlines[i] = (*self).commandlines[--(*self).commandlineCount];
-            (*self).commandlines[(*self).commandlineCount] = nullptr;
+    u32 count = Kernel_getCommandLineCount(self);
+    for (u32 i = 0; i < count; i++) {
+        if (Kernel_getCommandLine(self, i) == c) {
+            u32 last = count - 1;
+            Kernel_setCommandlineAt(self, i, Kernel_getCommandLine(self, last));
+            Kernel_setCommandlineAt(self, last, nullptr);
+            Kernel_setCommandlineCount(self, last);
             return true;
         }
     }
@@ -1018,19 +1173,24 @@ bool Kernel_addRunFunction(Kernel *self, KernelRunFn fn, any userdata) {
         fprintf(stderr, "kernel: Kernel_addRunFunction refused while a run is live or draining — worker slots must never grow under a joined thread\n");
         return false;
     }
-    if ((*self).runCount >= (*self).runCap) {
-        u32 newCap = (*self).runCap ? (*self).runCap * 2 : 4;
-        KernelRunSlot *newSlots = (KernelRunSlot*) realloc((*self).runSlots, newCap * sizeof(KernelRunSlot));
+    u32 runCount = Kernel_getRunFunctionCount(self);
+    u32 runCap = Kernel_runCap(self);
+    KernelRunSlot *slots = Kernel_runSlots(self);
+    if (runCount >= runCap) {
+        u32 newCap = runCap ? runCap * 2 : 4;
+        KernelRunSlot *newSlots = (KernelRunSlot*) realloc(slots, newCap * sizeof(KernelRunSlot));
         if (!newSlots)
             return false;
-        (*self).runSlots = newSlots;
-        (*self).runCap = newCap;
+        slots = newSlots;
+        Kernel_setRunSlots(self, newSlots);
+        Kernel_setRunCap(self, newCap);
     }
-    KernelRunSlot *slot = &(*self).runSlots[(*self).runCount++];
-    (*slot).fn = fn;
-    (*slot).userdata = userdata;
-    atomic_store_explicit(&(*slot).threadLaunched, false, memory_order_relaxed);
-    atomic_store_explicit(&(*slot).done, false, memory_order_relaxed);
+    KernelRunSlot *slot = &slots[runCount];
+    Kernel_setRunCount(self, runCount + 1);
+    KernelRunSlot_setFn(slot, fn);
+    KernelRunSlot_setUserdata(slot, userdata);
+    atomic_store_explicit(KernelRunSlot_threadLaunchedMut(slot), false, memory_order_relaxed);
+    atomic_store_explicit(KernelRunSlot_doneMut(slot), false, memory_order_relaxed);
     return true;
 }
 
@@ -1042,17 +1202,22 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, any userdata) {
         fprintf(stderr, "kernel: Kernel_addEndFunction refused while a run is live or draining — end slots must never grow under a firing loop\n");
         return false;
     }
-    if ((*self).endCount >= (*self).endCap) {
-        u32 newCap = (*self).endCap ? (*self).endCap * 2 : 4;
-        KernelEndSlot *newSlots = (KernelEndSlot*) realloc((*self).endSlots, newCap * sizeof(KernelEndSlot));
+    u32 endCount = Kernel_getEndFunctionCount(self);
+    u32 endCap = Kernel_endCap(self);
+    KernelEndSlot *slots = Kernel_endSlots(self);
+    if (endCount >= endCap) {
+        u32 newCap = endCap ? endCap * 2 : 4;
+        KernelEndSlot *newSlots = (KernelEndSlot*) realloc(slots, newCap * sizeof(KernelEndSlot));
         if (!newSlots)
             return false;
-        (*self).endSlots = newSlots;
-        (*self).endCap = newCap;
+        slots = newSlots;
+        Kernel_setEndSlots(self, newSlots);
+        Kernel_setEndCap(self, newCap);
     }
-    KernelEndSlot *slot = &(*self).endSlots[(*self).endCount++];
-    (*slot).fn = fn;
-    (*slot).userdata = userdata;
+    KernelEndSlot *slot = &slots[endCount];
+    Kernel_setEndCount(self, endCount + 1);
+    KernelEndSlot_setFn(slot, fn);
+    KernelEndSlot_setUserdata(slot, userdata);
     return true;
 }
 
@@ -1111,9 +1276,11 @@ fn Kernel_setGfxAppRunner(Kernel *self, i32 (*fn)(any context, bool (*continueFn
     (*self).gfxAppRun = fn;
 }
 
+typedef i32 (*KernelGfxAppRunnerFn)(any context, bool (*continueFn)(any), bool (*pollFn)());
+
 ;;GETTER
 /** Returns the configured graphics runner, or nullptr for null self. */
-i32 (*Kernel_getGfxAppRunner(const Kernel *self))(any context, bool (*continueFn)(any), bool (*pollFn)()) {
+KernelGfxAppRunnerFn Kernel_getGfxAppRunner(const Kernel *self) {
     if (!self)
         return nullptr;
     return (*self).gfxAppRun;

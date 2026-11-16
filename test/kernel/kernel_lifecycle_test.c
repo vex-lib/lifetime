@@ -30,23 +30,43 @@ typedef struct DrainProbe {
     atomic_int hookCalls;
 } DrainProbe;
 
+;;GETTER
+static atomic_bool *DrainProbe_workerDoneMut(DrainProbe *probe) {
+    return &(*probe).workerDone;
+}
+
+;;GETTER
+static atomic_bool *DrainProbe_hookSawDoneMut(DrainProbe *probe) {
+    return &(*probe).hookSawDone;
+}
+
+;;GETTER
+static atomic_bool *DrainProbe_hookSawDrainingMut(DrainProbe *probe) {
+    return &(*probe).hookSawDraining;
+}
+
+;;GETTER
+static atomic_int *DrainProbe_hookCallsMut(DrainProbe *probe) {
+    return &(*probe).hookCalls;
+}
+
 /** Marks worker completion after its fixture work interval. */
 static fn slowWorker(any context) {
     DrainProbe *probe = (DrainProbe*) context;
     struct timespec ts = {0, 80000000L}; // 80ms of "work"
     nanosleep(&ts, nullptr);
-    atomic_store_explicit(&(*probe).workerDone, true, memory_order_release);
+    atomic_store_explicit(DrainProbe_workerDoneMut(probe), true, memory_order_release);
 }
 
 /** Captures worker quiescence and phase when the end hook runs. */
 static fn observerHook(Kernel *kernel, any userdata) {
     DrainProbe *probe = (DrainProbe*) userdata;
-    atomic_store_explicit(&(*probe).hookSawDone,
-                          atomic_load_explicit(&(*probe).workerDone, memory_order_acquire),
+    atomic_store_explicit(DrainProbe_hookSawDoneMut(probe),
+                          atomic_load_explicit(DrainProbe_workerDoneMut(probe), memory_order_acquire),
                           memory_order_release);
-    atomic_store_explicit(&(*probe).hookSawDraining,
+    atomic_store_explicit(DrainProbe_hookSawDrainingMut(probe),
                           Kernel_getPhase(kernel) == KERNEL_PHASE_DRAINING, memory_order_relaxed);
-    atomic_fetch_add_explicit(&(*probe).hookCalls, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(DrainProbe_hookCallsMut(probe), 1, memory_order_relaxed);
 }
 
 /** Checks live-phase registration rejection while keeping the run active. */

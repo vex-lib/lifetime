@@ -134,20 +134,20 @@
 bool WindowEvent_init(WindowEvent *self) {
     if(self == nullptr)
         return false;
-    (*self).self = nullptr;
-    (*self).onQuitRequested = nullptr;
-    (*self).onAfterQuit = nullptr;
-    (*self).onResized = nullptr;
-    (*self).onMoved = nullptr;
-    (*self).onFullscreen = nullptr;
-    (*self).onMinimized = nullptr;
-    (*self).onRestored = nullptr;
-    (*self).onPressed = nullptr;
-    (*self).onFocusGained = nullptr;
-    (*self).onFocusLost = nullptr;
-    (*self).onZoomFilled = nullptr;
-    (*self).onZoomBack = nullptr;
-    (*self).onOcclusionChanged = nullptr;
+    WindowEvent_setSelf(self, nullptr);
+    WindowEvent_setOnQuitRequested(self, nullptr);
+    WindowEvent_setOnAfterQuit(self, nullptr);
+    WindowEvent_setOnResized(self, nullptr);
+    WindowEvent_setOnMoved(self, nullptr);
+    WindowEvent_setOnFullscreen(self, nullptr);
+    WindowEvent_setOnMinimized(self, nullptr);
+    WindowEvent_setOnRestored(self, nullptr);
+    WindowEvent_setOnPressed(self, nullptr);
+    WindowEvent_setOnFocusGained(self, nullptr);
+    WindowEvent_setOnFocusLost(self, nullptr);
+    WindowEvent_setOnZoomFilled(self, nullptr);
+    WindowEvent_setOnZoomBack(self, nullptr);
+    WindowEvent_setOnOcclusionChanged(self, nullptr);
     return true;
 }
 
@@ -156,117 +156,130 @@ bool WindowEvent_init(WindowEvent *self) {
 bool WindowEvent_fireQuitRequested(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return true;
-    if((*self).onQuitRequested == nullptr)
+    WindowQuitRequestedFn fn = WindowEvent_getOnQuitRequested(self);
+    if(fn == nullptr)
         return true;
-    return (*self).onQuitRequested((*self).self, window);
+    return fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner after the window has completed its close path. */
 fn WindowEvent_fireAfterQuit(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onAfterQuit == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnAfterQuit(self);
+    if(fn == nullptr)
         return;
-    (*self).onAfterQuit((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner of the window's new content dimensions. */
 fn WindowEvent_fireResized(WindowEvent *self, Window *window, i32 width, i32 height) {
     if(self == nullptr)
         return;
-    if((*self).onResized == nullptr)
+    WindowResizedFn fn = WindowEvent_getOnResized(self);
+    if(fn == nullptr)
         return;
-    (*self).onResized((*self).self, window, width, height);
+    fn(WindowEvent_getSelf(self), window, width, height);
 }
 
 /** Notifies the owner that the window origin changed. */
 fn WindowEvent_fireMoved(WindowEvent *self, Window *window, i32 x, i32 y) {
     if(self == nullptr)
         return;
-    if((*self).onMoved == nullptr)
+    WindowMovedFn fn = WindowEvent_getOnMoved(self);
+    if(fn == nullptr)
         return;
-    (*self).onMoved((*self).self, window, x, y);
+    fn(WindowEvent_getSelf(self), window, x, y);
 }
 
 /** Notifies the owner that the window entered fullscreen. */
 fn WindowEvent_fireFullscreen(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onFullscreen == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnFullscreen(self);
+    if(fn == nullptr)
         return;
-    (*self).onFullscreen((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that the window was minimized. */
 fn WindowEvent_fireMinimized(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onMinimized == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnMinimized(self);
+    if(fn == nullptr)
         return;
-    (*self).onMinimized((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that the window was restored. */
 fn WindowEvent_fireRestored(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onRestored == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnRestored(self);
+    if(fn == nullptr)
         return;
-    (*self).onRestored((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner of a mouse press on the window. */
 fn WindowEvent_firePressed(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onPressed == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnPressed(self);
+    if(fn == nullptr)
         return;
-    (*self).onPressed((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that this window gained key focus. */
 fn WindowEvent_fireFocusGained(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onFocusGained == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnFocusGained(self);
+    if(fn == nullptr)
         return;
-    (*self).onFocusGained((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that this window lost key focus. */
 fn WindowEvent_fireFocusLost(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onFocusLost == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnFocusLost(self);
+    if(fn == nullptr)
         return;
-    (*self).onFocusLost((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that the window entered zoom-to-fill. */
 fn WindowEvent_fireZoomFilled(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onZoomFilled == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnZoomFilled(self);
+    if(fn == nullptr)
         return;
-    (*self).onZoomFilled((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner that the window exited zoom-to-fill. */
 fn WindowEvent_fireZoomBack(WindowEvent *self, Window *window) {
     if(self == nullptr)
         return;
-    if((*self).onZoomBack == nullptr)
+    WindowNoArgFn fn = WindowEvent_getOnZoomBack(self);
+    if(fn == nullptr)
         return;
-    (*self).onZoomBack((*self).self, window);
+    fn(WindowEvent_getSelf(self), window);
 }
 
 /** Notifies the owner when the window's occlusion visibility changes. */
 fn WindowEvent_fireOcclusionChanged(WindowEvent *self, Window *window, bool visible) {
     if(self == nullptr)
         return;
-    if((*self).onOcclusionChanged == nullptr)
+    WindowOcclusionFn fn = WindowEvent_getOnOcclusionChanged(self);
+    if(fn == nullptr)
         return;
-    (*self).onOcclusionChanged((*self).self, window, visible);
+    fn(WindowEvent_getSelf(self), window, visible);
 }
 
 // SETTERS (PUBLIC & PRIVATE)

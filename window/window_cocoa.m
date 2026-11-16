@@ -372,6 +372,148 @@ struct Window {
     bool viewportFlushToTop; // true when decorated window has viewport flushed into top bar
 };
 
+;;GETTER
+static NSWindow *Window_nsWindow(const Window *w) { return (*w).nsWindow; }
+;;SETTER
+static fn Window_setNsWindow(Window *w, NSWindow *v) { (*w).nsWindow = v; }
+;;GETTER
+static WindowDelegate *Window_delegate(const Window *w) { return (*w).delegate; }
+;;SETTER
+static fn Window_setDelegate(Window *w, WindowDelegate *v) { (*w).delegate = v; }
+;;GETTER
+static WindowEvent *Window_lifecycleMut(Window *w) { return &(*w).lifecycle; }
+;;GETTER
+static u32 Window_idRaw(const Window *w) { return (*w).id; }
+;;SETTER
+static fn Window_setIdRaw(Window *w, u32 v) { (*w).id = v; }
+;;GETTER
+static _Atomic bool *Window_shouldCloseMut(Window *w) { return &(*w).shouldClose; }
+;;GETTER
+static const _Atomic bool *Window_shouldClosePtr(const Window *w) { return &(*w).shouldClose; }
+;;GETTER
+static _Atomic u64 *Window_sizeGenerationMut(Window *w) { return &(*w).sizeGeneration; }
+;;GETTER
+static const _Atomic u64 *Window_sizeGenerationPtr(const Window *w) { return &(*w).sizeGeneration; }
+;;GETTER
+static _Atomic i32 *Window_cachedWidthMut(Window *w) { return &(*w).cachedWidth; }
+;;GETTER
+static const _Atomic i32 *Window_cachedWidthPtr(const Window *w) { return &(*w).cachedWidth; }
+;;GETTER
+static _Atomic i32 *Window_cachedHeightMut(Window *w) { return &(*w).cachedHeight; }
+;;GETTER
+static const _Atomic i32 *Window_cachedHeightPtr(const Window *w) { return &(*w).cachedHeight; }
+;;GETTER
+static d64 Window_cachedScale(const Window *w) { return (*w).cachedScale; }
+;;SETTER
+static fn Window_setCachedScale(Window *w, d64 v) { (*w).cachedScale = v; }
+;;GETTER
+static d64 Window_cachedX(const Window *w) { return (*w).cachedX; }
+;;SETTER
+static fn Window_setCachedX(Window *w, d64 v) { (*w).cachedX = v; }
+;;GETTER
+static d64 Window_cachedY(const Window *w) { return (*w).cachedY; }
+;;SETTER
+static fn Window_setCachedY(Window *w, d64 v) { (*w).cachedY = v; }
+;;GETTER
+static d64 Window_cachedContentX(const Window *w) { return (*w).cachedContentX; }
+;;SETTER
+static fn Window_setCachedContentX(Window *w, d64 v) { (*w).cachedContentX = v; }
+;;GETTER
+static d64 Window_cachedContentY(const Window *w) { return (*w).cachedContentY; }
+;;SETTER
+static fn Window_setCachedContentY(Window *w, d64 v) { (*w).cachedContentY = v; }
+;;GETTER
+static _Atomic bool *Window_liveResizingMut(Window *w) { return &(*w).liveResizing; }
+;;GETTER
+static const _Atomic bool *Window_liveResizingPtr(const Window *w) { return &(*w).liveResizing; }
+;;GETTER
+static _Atomic bool *Window_miniaturizingMut(Window *w) { return &(*w).miniaturizing; }
+;;GETTER
+static _Atomic i32 *Window_presentModeMut(Window *w) { return &(*w).presentMode; }
+;;GETTER
+static const _Atomic i32 *Window_presentModePtr(const Window *w) { return &(*w).presentMode; }
+;;GETTER
+static _Atomic bool *Window_transparentMut(Window *w) { return &(*w).transparent; }
+;;GETTER
+static const _Atomic bool *Window_transparentPtr(const Window *w) { return &(*w).transparent; }
+;;GETTER
+static _Atomic u64 *Window_renderGenerationMut(Window *w) { return &(*w).renderGeneration; }
+;;GETTER
+static const _Atomic u64 *Window_renderGenerationPtr(const Window *w) { return &(*w).renderGeneration; }
+;;GETTER
+static _Atomic bool *Window_enabledMut(Window *w) { return &(*w).enabled; }
+;;GETTER
+static const _Atomic bool *Window_enabledPtr(const Window *w) { return &(*w).enabled; }
+;;GETTER
+static _Atomic bool *Window_keyEnabledMut(Window *w) { return &(*w).keyEnabled; }
+;;GETTER
+static const _Atomic bool *Window_keyEnabledPtr(const Window *w) { return &(*w).keyEnabled; }
+;;GETTER
+static bool Window_lastFocused(const Window *w) { return (*w).lastFocused; }
+;;SETTER
+static fn Window_setLastFocused(Window *w, bool v) { (*w).lastFocused = v; }
+;;GETTER
+static _Atomic u32 *Window_monitorIdMut(Window *w) { return &(*w).monitorId; }
+;;GETTER
+static const _Atomic u32 *Window_monitorIdPtr(const Window *w) { return &(*w).monitorId; }
+;;GETTER
+static WindowCursorType Window_cursorType(const Window *w) { return (*w).cursorType; }
+;;SETTER
+static fn Window_setCursorTypeRaw(Window *w, WindowCursorType v) { (*w).cursorType = v; }
+;;GETTER
+static TrafficLight *Window_trafficLights(const Window *w) { return (*w).trafficLights; }
+;;SETTER
+static fn Window_setTrafficLights(Window *w, TrafficLight *v) { (*w).trafficLights = v; }
+;;GETTER
+static NSView *Window_glView(const Window *w) { return (*w).glView; }
+;;SETTER
+static fn Window_setGlView(Window *w, NSView *v) { (*w).glView = v; }
+;;GETTER
+static any Window_backdropView(const Window *w) { return (*w).backdropView; }
+;;SETTER
+static fn Window_setBackdropView(Window *w, any v) { (*w).backdropView = v; }
+;;GETTER
+static any Window_glassView(const Window *w) { return (*w).glassView; }
+;;SETTER
+static fn Window_setGlassView(Window *w, any v) { (*w).glassView = v; }
+;;GETTER
+static WindowLiquidGlassDesc Window_liquidGlass(const Window *w) { return (*w).liquidGlass; }
+;;GETTER
+static const WindowLiquidGlassDesc *Window_liquidGlassPtr(const Window *w) { return &(*w).liquidGlass; }
+;;SETTER
+static fn Window_setLiquidGlass(Window *w, WindowLiquidGlassDesc v) { (*w).liquidGlass = v; }
+;;GETTER
+static WindowResizeRenderFn Window_resizeRenderFn(const Window *w) { return (*w).resizeRenderFn; }
+;;SETTER
+static fn Window_setResizeRenderFnRaw(Window *w, WindowResizeRenderFn v) { (*w).resizeRenderFn = v; }
+;;GETTER
+static any Window_resizeRenderUserdata(const Window *w) { return (*w).resizeRenderUserdata; }
+;;SETTER
+static fn Window_setResizeRenderUserdata(Window *w, any v) { (*w).resizeRenderUserdata = v; }
+;;GETTER
+static i32 Window_undecoratedMode(const Window *w) { return (*w).undecoratedMode; }
+;;SETTER
+static fn Window_setUndecoratedMode(Window *w, i32 v) { (*w).undecoratedMode = v; }
+;;GETTER
+static bool Window_viewportFlushToTop(const Window *w) { return (*w).viewportFlushToTop; }
+;;SETTER
+static fn Window_setViewportFlushToTopRaw(Window *w, bool v) { (*w).viewportFlushToTop = v; }
+
+;;GETTER
+static const char *WindowDesc_title(const WindowDesc *d) { return (*d).title; }
+;;GETTER
+static i32 WindowDesc_width(const WindowDesc *d) { return (*d).width; }
+;;GETTER
+static i32 WindowDesc_height(const WindowDesc *d) { return (*d).height; }
+;;GETTER
+static i32 WindowDesc_x(const WindowDesc *d) { return (*d).x; }
+;;GETTER
+static i32 WindowDesc_y(const WindowDesc *d) { return (*d).y; }
+;;GETTER
+static bool WindowDesc_centered(const WindowDesc *d) { return (*d).centered; }
+;;GETTER
+static bool WindowDesc_shown(const WindowDesc *d) { return (*d).shown; }
+
 // Window id registry: slot i holds the entries for engine id i (index = id,
 // slot 0 reserved for FOCUS_BROADCAST). Grows by doubling (the Dynamic
 // Scalability & Anti-Hardcoding Law — no fixed window ceiling; the pump and
@@ -494,9 +636,9 @@ static CGFloat windowBackingScale(const Window *window);
         // redundant call is cheap; dropping a step is what leaves the trailing
         // edge stale (the Continuous Real-Time Live Resize Law).
         if (Window_sizeGeneration(w) == previousSizeGeneration &&
-            !atomic_load_explicit(&(*w).miniaturizing, memory_order_relaxed) &&
-            ![[self window] isMiniaturized] && (*w).resizeRenderFn)
-            (*w).resizeRenderFn((*w).resizeRenderUserdata);
+            !atomic_load_explicit(Window_miniaturizingMut(w), memory_order_relaxed) &&
+            ![[self window] isMiniaturized] && Window_resizeRenderFn(w))
+            Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
         // A drag off the top or left edge changes BOTH the content size and
         // the window origin in the same tracking tick; refresh the origin here
         // so onMoved fires per step alongside onResized (windowDidMove: is the
@@ -509,7 +651,7 @@ static CGFloat windowBackingScale(const Window *window);
 - (discard)viewWillStartLiveResize {
     Window *w = windowHandleOf([self window]);
     if (w)
-        atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), true, memory_order_relaxed);
     [super viewWillStartLiveResize];
 }
 
@@ -517,13 +659,13 @@ static CGFloat windowBackingScale(const Window *window);
 - (discard)viewDidEndLiveResize {
     Window *w = windowHandleOf([self window]);
     if (w) {
-        atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
         // Final geometry reconciliation only: each live step already publishes
         // its current extent. The Frame hook no-ops when this size is unchanged;
         // no frozen drawable, delayed rebuild or mandatory settle frame exists.
-        if ((*w).resizeRenderFn)
-            (*w).resizeRenderFn((*w).resizeRenderUserdata);
+        if (Window_resizeRenderFn(w))
+            Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
     }
     [super viewDidEndLiveResize];
 }
@@ -555,7 +697,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) sender;
     Window *w = self.handlePtr;
     if (w)
-        return WindowEvent_fireQuitRequested(&(*w).lifecycle, w);
+        return WindowEvent_fireQuitRequested(Window_lifecycleMut(w), w);
     return YES;
 }
 
@@ -609,7 +751,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w)
-        atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), true, memory_order_relaxed);
 }
 
 /** Publish final fullscreen geometry and notify lifecycle listeners. */
@@ -617,10 +759,10 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
-        atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
         windowRefreshOrigin(w);
-        WindowEvent_fireFullscreen(&(*w).lifecycle, w);
+        WindowEvent_fireFullscreen(Window_lifecycleMut(w), w);
     }
 }
 
@@ -629,7 +771,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w)
-        atomic_store_explicit(&(*w).liveResizing, true, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), true, memory_order_relaxed);
 }
 
 /** Reconcile restored geometry, render once after transition, and notify listeners. */
@@ -637,14 +779,14 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
-        atomic_store_explicit(&(*w).liveResizing, false, memory_order_relaxed);
+        atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
         windowRefreshOrigin(w);
         // Same settle beat as viewDidEndLiveResize: geometry changed while
         // the live flag was set, so force one hook pass with it clear.
-        if ((*w).resizeRenderFn)
-            (*w).resizeRenderFn((*w).resizeRenderUserdata);
-        WindowEvent_fireRestored(&(*w).lifecycle, w);
+        if (Window_resizeRenderFn(w))
+            Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
+        WindowEvent_fireRestored(Window_lifecycleMut(w), w);
     }
 }
 
@@ -653,7 +795,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w)
-        atomic_store_explicit(&(*w).miniaturizing, true, memory_order_relaxed);
+        atomic_store_explicit(Window_miniaturizingMut(w), true, memory_order_relaxed);
 }
 
 /** Clear transition state and publish the minimized lifecycle event. */
@@ -661,8 +803,8 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
-        atomic_store_explicit(&(*w).miniaturizing, false, memory_order_relaxed);
-        WindowEvent_fireMinimized(&(*w).lifecycle, w);
+        atomic_store_explicit(Window_miniaturizingMut(w), false, memory_order_relaxed);
+        WindowEvent_fireMinimized(Window_lifecycleMut(w), w);
     }
 }
 
@@ -671,7 +813,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w)
-        atomic_store_explicit(&(*w).miniaturizing, true, memory_order_relaxed);
+        atomic_store_explicit(Window_miniaturizingMut(w), true, memory_order_relaxed);
 }
 
 /** Clear transition state, refresh size, and publish restoration. */
@@ -679,9 +821,9 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (w) {
-        atomic_store_explicit(&(*w).miniaturizing, false, memory_order_relaxed);
+        atomic_store_explicit(Window_miniaturizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
-        WindowEvent_fireRestored(&(*w).lifecycle, w);
+        WindowEvent_fireRestored(Window_lifecycleMut(w), w);
     }
 }
 
@@ -693,7 +835,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) newFrame;
     Window *w = self.handlePtr;
     if (w)
-        WindowEvent_fireZoomFilled(&(*w).lifecycle, w);
+        WindowEvent_fireZoomFilled(Window_lifecycleMut(w), w);
     return YES;
 }
 
@@ -707,19 +849,21 @@ static CGFloat windowBackingScale(const Window *window);
     Window *w = self.handlePtr;
     if (w) {
         bool visible = false;
-        if ((*w).nsWindow != nil)
-            visible = ([(*w).nsWindow occlusionState] & NSWindowOcclusionStateVisible) != 0;
-        WindowEvent_fireOcclusionChanged(&(*w).lifecycle, w, visible);
+        NSWindow *nsw = Window_nsWindow(w);
+        if (nsw != nil)
+            visible = ([nsw occlusionState] & NSWindowOcclusionStateVisible) != 0;
+        WindowEvent_fireOcclusionChanged(Window_lifecycleMut(w), w, visible);
     }
 }
 @end
 
 static CGFloat windowBackingScale(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil) {
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil) {
         NSScreen *main = [NSScreen mainScreen];
         return main ? [main backingScaleFactor] : 1.0;
     }
-    CGFloat s = [(*window).nsWindow backingScaleFactor];
+    CGFloat s = [nsw backingScaleFactor];
     return (s > 0.0) ? s : 1.0;
 }
 
@@ -727,14 +871,14 @@ static CGFloat windowBackingScale(const Window *window) {
 // fired in native physical display pixels. On Retina/HiDPI screens, convertRectToBacking
 // provides the exact hardware pixel size. Thread 0 only.
 static fn windowRefreshSize(Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return;
     @autoreleasepool {
-        NSWindow *nsw = (*window).nsWindow;
         NSView *cv = [nsw contentView];
         NSRect content = cv != nil ? [cv bounds] : [nsw contentRectForFrameRect:[nsw frame]];
         CGFloat scale = windowBackingScale(window);
-        (*window).cachedScale = (d64) scale;
+        Window_setCachedScale(window, (d64) scale);
 
         i32 cw, ch;
         if (cv != nil) {
@@ -746,21 +890,21 @@ static fn windowRefreshSize(Window *window) {
             ch = (i32) lround(content.size.height * scale);
         }
 
-        i32 lastW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
-        i32 lastH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
+        i32 lastW = atomic_load_explicit(Window_cachedWidthMut(window), memory_order_relaxed);
+        i32 lastH = atomic_load_explicit(Window_cachedHeightMut(window), memory_order_relaxed);
         if (cw != lastW || ch != lastH) {
-            atomic_store_explicit(&(*window).cachedWidth, cw, memory_order_relaxed);
-            atomic_store_explicit(&(*window).cachedHeight, ch, memory_order_relaxed);
-            atomic_fetch_add_explicit(&(*window).sizeGeneration, 1, memory_order_release);
-            WindowEvent_fireResized(&(*window).lifecycle, window, cw, ch);
+            atomic_store_explicit(Window_cachedWidthMut(window), cw, memory_order_relaxed);
+            atomic_store_explicit(Window_cachedHeightMut(window), ch, memory_order_relaxed);
+            atomic_fetch_add_explicit(Window_sizeGenerationMut(window), 1, memory_order_release);
+            WindowEvent_fireResized(Window_lifecycleMut(window), window, cw, ch);
             // Genie gate: never render+present while the WindowServer is
             // warping the window into or out of the dock — the seam present
             // would target a moving/occluded surface. The deminiaturize path
             // re-enters here AFTER the warp, so restore still renders.
-            if (!atomic_load_explicit(&(*window).miniaturizing, memory_order_relaxed)
+            if (!atomic_load_explicit(Window_miniaturizingMut(window), memory_order_relaxed)
                     && ![nsw isMiniaturized]
-                    && (*window).resizeRenderFn)
-                (*window).resizeRenderFn((*window).resizeRenderUserdata);
+                    && Window_resizeRenderFn(window))
+                Window_resizeRenderFn(window)(Window_resizeRenderUserdata(window));
         }
     }
 }
@@ -773,10 +917,10 @@ static fn windowRefreshSize(Window *window) {
 // the same tracking tick), from windowDidMove: (post-display backup), and from
 // the pump reflection pass. Thread 0 only.
 static fn windowRefreshOrigin(Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return;
     @autoreleasepool {
-        NSWindow *nsw = (*window).nsWindow;
         NSRect frame = [nsw frame];
         NSRect content = [nsw contentRectForFrameRect:frame];
         CGFloat screenHeight = [[NSScreen mainScreen] frame].size.height;
@@ -786,16 +930,16 @@ static fn windowRefreshOrigin(Window *window) {
         if (cv != nil) {
             NSRect cvRectInWindow = [cv frame];
             NSRect cvRectInScreen = [nsw convertRectToScreen:cvRectInWindow];
-            (*window).cachedContentX = (d64) cvRectInScreen.origin.x;
-            (*window).cachedContentY = (d64) (screenHeight - cvRectInScreen.origin.y - cvRectInScreen.size.height);
+            Window_setCachedContentX(window, (d64) cvRectInScreen.origin.x);
+            Window_setCachedContentY(window, (d64) (screenHeight - cvRectInScreen.origin.y - cvRectInScreen.size.height));
         } else {
-            (*window).cachedContentX = (d64) content.origin.x;
-            (*window).cachedContentY = (d64) (screenHeight - content.origin.y - content.size.height);
+            Window_setCachedContentX(window, (d64) content.origin.x);
+            Window_setCachedContentY(window, (d64) (screenHeight - content.origin.y - content.size.height));
         }
-        if (tx != (*window).cachedX || ty != (*window).cachedY) {
-            (*window).cachedX = tx;
-            (*window).cachedY = ty;
-            WindowEvent_fireMoved(&(*window).lifecycle, window, (i32) tx, (i32) ty);
+        if (tx != Window_cachedX(window) || ty != Window_cachedY(window)) {
+            Window_setCachedX(window, tx);
+            Window_setCachedY(window, ty);
+            WindowEvent_fireMoved(Window_lifecycleMut(window), window, (i32) tx, (i32) ty);
         }
     }
 }
@@ -803,15 +947,15 @@ static fn windowRefreshOrigin(Window *window) {
 // Mirror the OS key-window into the focus word AND the WindowEvent focus
 // slots (flips only). Thread 0 only, called at the end of each pump pass.
 static fn windowRefreshFocus(Window *window, NSWindow *keyWindow) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    if (window == nullptr || Window_nsWindow(window) == nil)
         return;
-    bool focused = (windowIdOf(keyWindow) == (*window).id);
-    if (focused != (*window).lastFocused) {
-        (*window).lastFocused = focused;
+    bool focused = (windowIdOf(keyWindow) == Window_idRaw(window));
+    if (focused != Window_lastFocused(window)) {
+        Window_setLastFocused(window, focused);
         if (focused)
-            WindowEvent_fireFocusGained(&(*window).lifecycle, window);
+            WindowEvent_fireFocusGained(Window_lifecycleMut(window), window);
         else
-            WindowEvent_fireFocusLost(&(*window).lifecycle, window);
+            WindowEvent_fireFocusLost(Window_lifecycleMut(window), window);
     }
 }
 
@@ -820,7 +964,7 @@ static u32 resolveMonitorId(Window *window) {
     if (window == nullptr)
         return 0;
     @autoreleasepool {
-        NSScreen *screen = [(*window).nsWindow screen];
+        NSScreen *screen = [Window_nsWindow(window) screen];
         if (screen == nil)
             return 0;
         NSNumber *displayId = [[screen deviceDescription] objectForKey:@"NSScreenNumber"];
@@ -833,7 +977,7 @@ static fn windowRefreshMonitor(Window *window) {
     if (window == nullptr)
         return;
     u32 next = resolveMonitorId(window);
-    atomic_store_explicit(&(*window).monitorId, next, memory_order_relaxed);
+    atomic_store_explicit(Window_monitorIdMut(window), next, memory_order_relaxed);
 }
 
 // Re-centre the cursor during the pump while locked, so the warp registers
@@ -918,7 +1062,7 @@ static fn routeEvent(NSEvent *event) {
 
     // Disabled windows receive nothing: events never enter the device rings.
     Window *target = (wid != FOCUS_BROADCAST) ? windowHandleOf([event window]) : nullptr;
-    if (target && !atomic_load_explicit(&(*target).enabled, memory_order_relaxed))
+    if (target && !atomic_load_explicit(Window_enabledMut(target), memory_order_relaxed))
         return;
 
     switch (type) {
@@ -1010,7 +1154,7 @@ static fn routeEvent(NSEvent *event) {
             Mouse_pushMoveEvent(wid, x, y);
             Mouse_pushButtonEvent(wid, button, KEY_ACTION_DOWN, kTapThresholdNanos);
             if (target)
-                WindowEvent_firePressed(&(*target).lifecycle, target);
+                WindowEvent_firePressed(Window_lifecycleMut(target), target);
             break;
         }
 
@@ -1171,7 +1315,7 @@ fn Window_waitEvents(Window *window, i32 timeoutMs) {
 /** Respect the C key-focus gate before allowing AppKit key-window eligibility. */
 - (BOOL)canBecomeKeyWindow {
     Window *h = self.vexHandle;
-    if (h != nullptr && !atomic_load_explicit(&(*h).keyEnabled, memory_order_relaxed))
+    if (h != nullptr && !atomic_load_explicit(Window_keyEnabledPtr(h), memory_order_relaxed))
         return NO;
     return [super canBecomeKeyWindow];
 }
@@ -1249,18 +1393,20 @@ static Window *windowAlloc(const WindowDesc *desc) {
         CGFloat scale = [NSScreen mainScreen] ? [[NSScreen mainScreen] backingScaleFactor] : 1.0;
         if (scale <= 0.0)
             scale = 1.0;
-        CGFloat cw = (CGFloat)(*desc).width / scale;
-        CGFloat ch = (CGFloat)(*desc).height / scale;
+        CGFloat cw = (CGFloat)WindowDesc_width(desc) / scale;
+        CGFloat ch = (CGFloat)WindowDesc_height(desc) / scale;
         NSRect wantFrame = [NSWindow frameRectForContentRect:NSMakeRect(0, 0, cw, ch)
                                                   styleMask:style];
-        if ((*desc).centered || ((*desc).x == 0 && (*desc).y == 0)) {
+        i32 dx = WindowDesc_x(desc);
+        i32 dy = WindowDesc_y(desc);
+        if (WindowDesc_centered(desc) || (dx == 0 && dy == 0)) {
             NSRect avail = [[NSScreen mainScreen] visibleFrame];
             wantFrame.origin.x = avail.origin.x + (avail.size.width - wantFrame.size.width) * 0.5;
             wantFrame.origin.y = avail.origin.y + (avail.size.height - wantFrame.size.height) * 0.5;
         } else {
             NSRect screen = [[NSScreen mainScreen] frame];
-            wantFrame.origin.x = (CGFloat)(*desc).x;
-            wantFrame.origin.y = screen.size.height - (CGFloat)(*desc).y - wantFrame.size.height;
+            wantFrame.origin.x = (CGFloat)dx;
+            wantFrame.origin.y = screen.size.height - (CGFloat)dy - wantFrame.size.height;
         }
         wantFrame.origin.x = (CGFloat) floor(wantFrame.origin.x + 0.5);
         wantFrame.origin.y = (CGFloat) floor(wantFrame.origin.y + 0.5);
@@ -1272,7 +1418,7 @@ static Window *windowAlloc(const WindowDesc *desc) {
                        styleMask:style
                           backing:NSBackingStoreBuffered
                             defer:NO];
-        [window setTitle:[NSString stringWithUTF8String:(*desc).title]];
+        [window setTitle:[NSString stringWithUTF8String:WindowDesc_title(desc)]];
         [window setReleasedWhenClosed:NO];
 
         WindowContentView *contentView = [[WindowContentView alloc] initWithFrame:frame];
@@ -1306,46 +1452,46 @@ static Window *windowAlloc(const WindowDesc *desc) {
         Window *w = (Window*) calloc(1, sizeof(Window));
         if (w == nullptr)
             return nullptr;
-        (*w).nsWindow = window;
+        Window_setNsWindow(w, window);
         window.vexHandle = w;
-        (*w).glView = glView;
-        (*w).backdropView = nullptr;
-        (*w).glassView = nullptr;
-        (*w).delegate = delegate;
-        WindowEvent_init(&(*w).lifecycle);
-        atomic_store_explicit(&(*w).shouldClose, false, memory_order_relaxed);
-        atomic_store_explicit(&(*w).sizeGeneration, 0, memory_order_relaxed);
+        Window_setGlView(w, glView);
+        Window_setBackdropView(w, nullptr);
+        Window_setGlassView(w, nullptr);
+        Window_setDelegate(w, delegate);
+        WindowEvent_init(Window_lifecycleMut(w));
+        atomic_store_explicit(Window_shouldCloseMut(w), false, memory_order_relaxed);
+        atomic_store_explicit(Window_sizeGenerationMut(w), 0, memory_order_relaxed);
         CGFloat winScale = [window backingScaleFactor];
         if (winScale <= 0.0)
             winScale = scale;
-        (*w).cachedScale = (d64) winScale;
+        Window_setCachedScale(w, (d64) winScale);
         NSRect initialContent = [window contentRectForFrameRect:[window frame]];
         i32 initPxW = (i32) lround(initialContent.size.width * winScale);
         i32 initPxH = (i32) lround(initialContent.size.height * winScale);
-        atomic_store_explicit(&(*w).cachedWidth, initPxW, memory_order_relaxed);
-        atomic_store_explicit(&(*w).cachedHeight, initPxH, memory_order_relaxed);
+        atomic_store_explicit(Window_cachedWidthMut(w), initPxW, memory_order_relaxed);
+        atomic_store_explicit(Window_cachedHeightMut(w), initPxH, memory_order_relaxed);
         NSRect initialFrame = [window frame];
         CGFloat screenH = [[NSScreen mainScreen] frame].size.height;
-        (*w).cachedX = (d64) initialFrame.origin.x;
-        (*w).cachedY = (d64) (screenH - initialFrame.origin.y - initialFrame.size.height);
-        (*w).cachedContentX = (d64) initialFrame.origin.x
-                              + (d64) (initialContent.origin.x - initialFrame.origin.x);
-        (*w).cachedContentY = (d64) (screenH - initialContent.origin.y - initialContent.size.height);
-        atomic_store_explicit(&(*w).presentMode, WINDOW_PRESENT_FIFO, memory_order_relaxed);
-        atomic_store_explicit(&(*w).transparent, false, memory_order_relaxed);
-        atomic_store_explicit(&(*w).renderGeneration, 0, memory_order_relaxed);
-        atomic_store_explicit(&(*w).enabled, true, memory_order_relaxed);
-        atomic_store_explicit(&(*w).keyEnabled, true, memory_order_relaxed);
-        (*w).lastFocused = false;
-        atomic_store_explicit(&(*w).monitorId, 0, memory_order_relaxed);
-        (*w).cursorType = WINDOW_CURSOR_DEFAULT;
+        Window_setCachedX(w, (d64) initialFrame.origin.x);
+        Window_setCachedY(w, (d64) (screenH - initialFrame.origin.y - initialFrame.size.height));
+        Window_setCachedContentX(w, (d64) initialFrame.origin.x
+                              + (d64) (initialContent.origin.x - initialFrame.origin.x));
+        Window_setCachedContentY(w, (d64) (screenH - initialContent.origin.y - initialContent.size.height));
+        atomic_store_explicit(Window_presentModeMut(w), WINDOW_PRESENT_FIFO, memory_order_relaxed);
+        atomic_store_explicit(Window_transparentMut(w), false, memory_order_relaxed);
+        atomic_store_explicit(Window_renderGenerationMut(w), 0, memory_order_relaxed);
+        atomic_store_explicit(Window_enabledMut(w), true, memory_order_relaxed);
+        atomic_store_explicit(Window_keyEnabledMut(w), true, memory_order_relaxed);
+        Window_setLastFocused(w, false);
+        atomic_store_explicit(Window_monitorIdMut(w), 0, memory_order_relaxed);
+        Window_setCursorTypeRaw(w, WINDOW_CURSOR_DEFAULT);
         // Traffic-light chrome controller (all three lights visible by default).
         // Created against the NSWindow; nullptr only if calloc fails.
-        (*w).trafficLights = TrafficLight_create((__bridge any) window);
-        (*w).resizeRenderFn = nullptr;
-        (*w).resizeRenderUserdata = nullptr;
-        (*w).id = windowIdAcquire(window, w);
-        delegate.shouldClosePtr = &(*w).shouldClose;
+        Window_setTrafficLights(w, TrafficLight_create((__bridge any) window));
+        Window_setResizeRenderFnRaw(w, nullptr);
+        Window_setResizeRenderUserdata(w, nullptr);
+        Window_setIdRaw(w, windowIdAcquire(window, w));
+        delegate.shouldClosePtr = Window_shouldCloseMut(w);
         delegate.handlePtr = w;
 
         sLastWindow = window;
@@ -1360,20 +1506,20 @@ static WindowDesc descResolve(const WindowDesc *desc) {
     WindowDesc d = { .title = "vex", .width = 800, .height = 600, .x = 0, .y = 0, .centered = true };
     if (desc == nullptr)
         return d;
-    if ((*desc).title)
-        d.title = (*desc).title;
-    if ((*desc).width > 0)
-        d.width = (*desc).width;
-    if ((*desc).height > 0)
-        d.height = (*desc).height;
-    if ((*desc).x != 0 || (*desc).y != 0) {
+    if (WindowDesc_title(desc))
+        d.title = WindowDesc_title(desc);
+    if (WindowDesc_width(desc) > 0)
+        d.width = WindowDesc_width(desc);
+    if (WindowDesc_height(desc) > 0)
+        d.height = WindowDesc_height(desc);
+    if (WindowDesc_x(desc) != 0 || WindowDesc_y(desc) != 0) {
         // Explicit placement defeats the centered default (a zeroed Desc
         // cannot express "top-left", so centered wins ties — documented).
-        d.x = (*desc).x;
-        d.y = (*desc).y;
+        d.x = WindowDesc_x(desc);
+        d.y = WindowDesc_y(desc);
         d.centered = false;
     }
-    d.shown = (*desc).shown;
+    d.shown = WindowDesc_shown(desc);
     return d;
 }
 
@@ -1421,15 +1567,17 @@ fn Window_destroy(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        if (sPendingKeyWindow == (*window).nsWindow)
+        NSWindow *nsw = Window_nsWindow(window);
+        u32 wid = Window_idRaw(window);
+        if (sPendingKeyWindow == nsw)
             sPendingKeyWindow = nil;
-        [(*window).nsWindow setDelegate:nil];
-        [(*window).nsWindow close]; // flag-only close requests may still have a native window
-        Key_detachWindowAll((*window).id);
-        Mouse_detachWindowAll((*window).id);
-        Touch_detachWindowAll((*window).id);
-        TrafficLight_destroy((*window).trafficLights);
-        windowIdRelease((*window).id);
+        [nsw setDelegate:nil];
+        [nsw close]; // flag-only close requests may still have a native window
+        Key_detachWindowAll(wid);
+        Mouse_detachWindowAll(wid);
+        Touch_detachWindowAll(wid);
+        TrafficLight_destroy(Window_trafficLights(window));
+        windowIdRelease(wid);
     }
     free(window);
 }
@@ -1448,20 +1596,20 @@ fn Window_destroyAll() {
 
 // Read the close latch, treating a missing window as already closed.
 bool Window_shouldClose(Window *window) {
-    return window ? atomic_load_explicit(&(*window).shouldClose, memory_order_relaxed) : true;
+    return window ? atomic_load_explicit(Window_shouldClosePtr(window), memory_order_relaxed) : true;
 }
 
 // Set the close latch observed by the host lifecycle loop.
 fn Window_setShouldClose(Window *window, bool shouldClose) {
     if (window != nullptr)
-        atomic_store_explicit(&(*window).shouldClose, shouldClose, memory_order_relaxed);
+        atomic_store_explicit(Window_shouldCloseMut(window), shouldClose, memory_order_relaxed);
 }
 
 // Ask AppKit to close the native window and set the C-side close latch.
 fn Window_close(Window *window) {
     if (!window) return;
-    @autoreleasepool { [(*window).nsWindow close]; }
-    atomic_store_explicit(&(*window).shouldClose, true, memory_order_relaxed);
+    @autoreleasepool { [Window_nsWindow(window) close]; }
+    atomic_store_explicit(Window_shouldCloseMut(window), true, memory_order_relaxed);
 }
 
 // --- Present policy (pure state; a future render path consumes it) ----------
@@ -1469,35 +1617,35 @@ fn Window_close(Window *window) {
 fn Window_setPresentMode(Window *window, i32 mode) {
     if (window == nullptr)
         return;
-    i32 prev = atomic_exchange_explicit(&(*window).presentMode, mode, memory_order_relaxed);
+    i32 prev = atomic_exchange_explicit(Window_presentModeMut(window), mode, memory_order_relaxed);
     if (prev != mode)
-        atomic_fetch_add_explicit(&(*window).renderGeneration, 1, memory_order_release);
+        atomic_fetch_add_explicit(Window_renderGenerationMut(window), 1, memory_order_release);
 }
 
 // Read the stored present policy, defaulting to FIFO for a null handle.
 i32 Window_getPresentMode(const Window *window) {
     if (window == nullptr)
         return WINDOW_PRESENT_FIFO;
-    return atomic_load_explicit(&(*window).presentMode, memory_order_relaxed);
+    return atomic_load_explicit(Window_presentModePtr(window), memory_order_relaxed);
 }
 
 // Update the stored transparency policy and advance the render generation on change.
 fn Window_setTransparent(Window *window, bool transparent) {
     if (window == nullptr)
         return;
-    bool prev = atomic_exchange_explicit(&(*window).transparent, transparent, memory_order_relaxed);
+    bool prev = atomic_exchange_explicit(Window_transparentMut(window), transparent, memory_order_relaxed);
     if (prev != transparent)
-        atomic_fetch_add_explicit(&(*window).renderGeneration, 1, memory_order_release);
+        atomic_fetch_add_explicit(Window_renderGenerationMut(window), 1, memory_order_release);
 }
 
 // Read the stored transparency policy, returning false for a null handle.
 bool Window_isTransparent(const Window *window) {
-    return window ? atomic_load_explicit(&(*window).transparent, memory_order_relaxed) : false;
+    return window ? atomic_load_explicit(Window_transparentPtr(window), memory_order_relaxed) : false;
 }
 
 // Read the policy generation used by downstream render-resource rebuilds.
 u64 Window_renderGeneration(const Window *window) {
-    return window ? atomic_load_explicit(&(*window).renderGeneration, memory_order_acquire) : 0;
+    return window ? atomic_load_explicit(Window_renderGenerationPtr(window), memory_order_acquire) : 0;
 }
 
 // --- Graphics board slots (stored + ordered; rendering lives elsewhere) -----
@@ -1565,12 +1713,12 @@ fn Window_compositeBoards(Window *window) {
 fn Window_setEnabled(Window *window, bool enabled) {
     if (window == nullptr)
         return;
-    atomic_store_explicit(&(*window).enabled, enabled, memory_order_relaxed);
+    atomic_store_explicit(Window_enabledMut(window), enabled, memory_order_relaxed);
 }
 
 // Read whether OS input forwarding is enabled for this window.
 bool Window_isEnabled(const Window *window) {
-    return window ? atomic_load_explicit(&(*window).enabled, memory_order_relaxed) : false;
+    return window ? atomic_load_explicit(Window_enabledPtr(window), memory_order_relaxed) : false;
 }
 
 // Read live-resize state, including the file-local diagnostic override seam.
@@ -1582,13 +1730,13 @@ bool Window_isLiveResizing(const Window *window) {
         fclose(probe);
         return window != nullptr;
     }
-    return window ? atomic_load_explicit(&(*window).liveResizing, memory_order_relaxed) : false;
+    return window ? atomic_load_explicit(Window_liveResizingPtr(window), memory_order_relaxed) : false;
 }
 
 // --- Chrome / state API -----------------------------------------------------
 
 static NSWindowStyleMask styleMaskOf(Window *window) {
-    return [(*window).nsWindow styleMask];
+    return [Window_nsWindow(window) styleMask];
 }
 
 // Test whether the native window's current style mask contains the requested bit.
@@ -1602,7 +1750,7 @@ static fn updateStyleMask(Window *window, NSWindowStyleMask add, NSWindowStyleMa
     NSWindowStyleMask mask = styleMaskOf(window);
     if ((mask & NSWindowStyleMaskFullScreen) != 0)
         return;
-    [(*window).nsWindow setStyleMask:(mask & ~clear) | add];
+    [Window_nsWindow(window) setStyleMask:(mask & ~clear) | add];
 }
 
 // Re-apply the traffic-light chrome through the segregated TrafficLight class
@@ -1614,7 +1762,7 @@ static fn updateStyleMask(Window *window, NSWindowStyleMask add, NSWindowStyleMa
 static fn refreshChrome(Window *w) {
     if (w == nullptr)
         return;
-    TrafficLight_refresh((*w).trafficLights);
+    TrafficLight_refresh(Window_trafficLights(w));
 }
 
 // Set the AppKit title and reapply hidden-title chrome when required.
@@ -1622,15 +1770,16 @@ fn Window_setTitle(Window *window, const char *title) {
     if (window == nullptr || title == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setTitle:[NSString stringWithUTF8String:title]];
+        NSWindow *nsw = Window_nsWindow(window);
+        [nsw setTitle:[NSString stringWithUTF8String:title]];
 
         // macOS 15+ re-reveals the native title view whenever the title string
         // changes, even when titleVisibility is hidden. Re-apply the hidden
         // state for FullSizeContentView (NAKED) windows, then re-seat the
         // traffic-light chrome so a title change can't resurrect hidden lights.
         if ((styleMaskOf(window) & NSWindowStyleMaskFullSizeContentView) != 0) {
-            [(*window).nsWindow setTitlebarAppearsTransparent:YES];
-            [(*window).nsWindow setTitleVisibility:NSWindowTitleHidden];
+            [nsw setTitlebarAppearsTransparent:YES];
+            [nsw setTitleVisibility:NSWindowTitleHidden];
         }
         refreshChrome(window);
     }
@@ -1640,14 +1789,14 @@ fn Window_setTitle(Window *window, const char *title) {
 i32 Window_width(Window *window) {
     if (window == nullptr)
         return 0;
-    return atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
+    return atomic_load_explicit(Window_cachedWidthMut(window), memory_order_relaxed);
 }
 
 // Read the cached content height in native physical pixels.
 i32 Window_height(Window *window) {
     if (window == nullptr)
         return 0;
-    return atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
+    return atomic_load_explicit(Window_cachedHeightMut(window), memory_order_relaxed);
 }
 
 // Convert requested physical dimensions to AppKit points and resize the content.
@@ -1658,7 +1807,7 @@ fn Window_setSize(Window *window, i32 width, i32 height) {
         CGFloat scale = windowBackingScale(window);
         CGFloat ptW = (CGFloat) width / scale;
         CGFloat ptH = (CGFloat) height / scale;
-        [(*window).nsWindow setContentSize:NSMakeSize(ptW, ptH)];
+        [Window_nsWindow(window) setContentSize:NSMakeSize(ptW, ptH)];
         windowRefreshSize(window);
     }
 }
@@ -1670,25 +1819,26 @@ f32 Window_getScale(const Window *window) {
 
 // Reconcile scale, physical size, screen origin, and monitor after display changes.
 fn Window_revalidate(Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return;
     @autoreleasepool {
         CGFloat curScale = windowBackingScale(window);
-        d64 prevScale = (*window).cachedScale;
+        d64 prevScale = Window_cachedScale(window);
         if (prevScale <= 0.0)
             prevScale = curScale;
 
         // If the scale factor changed (e.g. dragged from 2.0x Retina to 1.0x external monitor),
         // adjust the points content size so the target physical pixel size is preserved.
-        i32 targetPxW = atomic_load_explicit(&(*window).cachedWidth, memory_order_relaxed);
-        i32 targetPxH = atomic_load_explicit(&(*window).cachedHeight, memory_order_relaxed);
+        i32 targetPxW = atomic_load_explicit(Window_cachedWidthMut(window), memory_order_relaxed);
+        i32 targetPxH = atomic_load_explicit(Window_cachedHeightMut(window), memory_order_relaxed);
         if (curScale != prevScale && targetPxW > 0 && targetPxH > 0) {
             CGFloat newPtW = (CGFloat) targetPxW / curScale;
             CGFloat newPtH = (CGFloat) targetPxH / curScale;
-            [(*window).nsWindow setContentSize:NSMakeSize(newPtW, newPtH)];
+            [nsw setContentSize:NSMakeSize(newPtW, newPtH)];
         }
 
-        (*window).cachedScale = (d64) curScale;
+        Window_setCachedScale(window, (d64) curScale);
         windowRefreshSize(window);
         windowRefreshOrigin(window);
         windowRefreshMonitor(window);
@@ -1700,21 +1850,22 @@ fn Window_setSizePoints(Window *window, f32 width, f32 height) {
     if (window == nullptr || width <= 0.0f || height <= 0.0f)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setContentSize:NSMakeSize((CGFloat) width, (CGFloat) height)];
+        [Window_nsWindow(window) setContentSize:NSMakeSize((CGFloat) width, (CGFloat) height)];
         windowRefreshSize(window);
     }
 }
 
 // Read content dimensions in points through optional output parameters.
 fn Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
-    if (window == nullptr || (*window).nsWindow == nil) {
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil) {
         if (outWidth) *outWidth = 0.0f;
         if (outHeight) *outHeight = 0.0f;
         return;
     }
     @autoreleasepool {
-        NSView *cv = [(*window).nsWindow contentView];
-        NSRect content = cv != nil ? [cv bounds] : [(*window).nsWindow contentRectForFrameRect:[(*window).nsWindow frame]];
+        NSView *cv = [nsw contentView];
+        NSRect content = cv != nil ? [cv bounds] : [nsw contentRectForFrameRect:[nsw frame]];
         if (outWidth)
             *outWidth = (f32) content.size.width;
         if (outHeight)
@@ -1758,10 +1909,11 @@ f32 Window_viewportHeightPoints(const Window *window) {
 
 // Return the outer NSWindow frame width in native pixels.
 i32 Window_windowWidth(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return 0;
     @autoreleasepool {
-        NSRect frame = [(*window).nsWindow frame];
+        NSRect frame = [nsw frame];
         CGFloat scale = windowBackingScale(window);
         return (i32) lround(frame.size.width * scale);
     }
@@ -1769,10 +1921,11 @@ i32 Window_windowWidth(const Window *window) {
 
 // Return the outer NSWindow frame height in native pixels.
 i32 Window_windowHeight(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return 0;
     @autoreleasepool {
-        NSRect frame = [(*window).nsWindow frame];
+        NSRect frame = [nsw frame];
         CGFloat scale = windowBackingScale(window);
         return (i32) lround(frame.size.height * scale);
     }
@@ -1780,19 +1933,21 @@ i32 Window_windowHeight(const Window *window) {
 
 // Return the outer NSWindow frame width in AppKit points.
 f32 Window_windowWidthPoints(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return 0.0f;
     @autoreleasepool {
-        return (f32) [(*window).nsWindow frame].size.width;
+        return (f32) [nsw frame].size.width;
     }
 }
 
 // Return the outer NSWindow frame height in AppKit points.
 f32 Window_windowHeightPoints(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return 0.0f;
     @autoreleasepool {
-        return (f32) [(*window).nsWindow frame].size.height;
+        return (f32) [nsw frame].size.height;
     }
 }
 
@@ -1802,24 +1957,24 @@ fn Window_setLocation(Window *window, i32 x, i32 y) {
         return;
     @autoreleasepool {
         NSRect screen = [[NSScreen mainScreen] frame];
-        [(*window).nsWindow setFrameTopLeftPoint:NSMakePoint((CGFloat) x, screen.size.height - (CGFloat) y)];
+        [Window_nsWindow(window) setFrameTopLeftPoint:NSMakePoint((CGFloat) x, screen.size.height - (CGFloat) y)];
     }
 }
 
 // Return the cached top-left screen origin through optional output pointers.
 fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
-        *outX = window ? (i32) (*window).cachedX : 0;
+        *outX = window ? (i32) Window_cachedX(window) : 0;
     if (outY)
-        *outY = window ? (i32) (*window).cachedY : 0;
+        *outY = window ? (i32) Window_cachedY(window) : 0;
 }
 
 // Return the cached content-view screen origin through optional outputs.
 fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
-        *outX = window ? (i32) (*window).cachedContentX : 0;
+        *outX = window ? (i32) Window_cachedContentX(window) : 0;
     if (outY)
-        *outY = window ? (i32) (*window).cachedContentY : 0;
+        *outY = window ? (i32) Window_cachedContentY(window) : 0;
 }
 
 // Center the window in the main display's usable visible frame.
@@ -1830,11 +1985,12 @@ fn Window_center(Window *window) {
         // Explicit _main-screen centering (not [nsWindow center]'s
         // current-screen heuristic): the window lands in the usable area,
         // clear of the menu bar and Dock.
+        NSWindow *nsw = Window_nsWindow(window);
         NSRect avail = [[NSScreen mainScreen] visibleFrame];
-        NSRect wf = [(*window).nsWindow frame];
+        NSRect wf = [nsw frame];
         CGFloat x = avail.origin.x + (avail.size.width - wf.size.width) * 0.5;
         CGFloat y = avail.origin.y + (avail.size.height - wf.size.height) * 0.5;
-        [(*window).nsWindow setFrameOrigin:NSMakePoint((CGFloat) floor(x + 0.5), (CGFloat) floor(y + 0.5))];
+        [nsw setFrameOrigin:NSMakePoint((CGFloat) floor(x + 0.5), (CGFloat) floor(y + 0.5))];
     }
 }
 
@@ -1885,7 +2041,7 @@ fn Window_show(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        claimKeyAfterActivation((*window).nsWindow);
+        claimKeyAfterActivation(Window_nsWindow(window));
         windowRefreshMonitor(window);
     }
 }
@@ -1895,9 +2051,10 @@ fn Window_hide(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        if (sPendingKeyWindow == (*window).nsWindow)
+        NSWindow *nsw = Window_nsWindow(window);
+        if (sPendingKeyWindow == nsw)
             sPendingKeyWindow = nil;
-        [(*window).nsWindow orderOut:nil];
+        [nsw orderOut:nil];
     }
 }
 
@@ -1956,12 +2113,13 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        NSWindowCollectionBehavior behavior = [(*window).nsWindow collectionBehavior];
+        NSWindow *nsw = Window_nsWindow(window);
+        NSWindowCollectionBehavior behavior = [nsw collectionBehavior];
         if (enabled)
             behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
         else
             behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
-        [(*window).nsWindow setCollectionBehavior:behavior];
+        [nsw setCollectionBehavior:behavior];
     }
 }
 
@@ -1974,8 +2132,8 @@ fn Window_setUndecorated(Window *window, i32 mode) {
         if ((mask & NSWindowStyleMaskFullScreen) != 0)
             return;
 
-        (*window).undecoratedMode = mode;
-        (*window).viewportFlushToTop = false;
+        Window_setUndecoratedMode(window, mode);
+        Window_setViewportFlushToTop(window, false);
 
         NSWindowStyleMask next;
         if (mode == WINDOW_UNDECORATED_BORDERLESS)
@@ -1988,18 +2146,19 @@ fn Window_setUndecorated(Window *window, i32 mode) {
             next = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
                  | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
 
-        [(*window).nsWindow setStyleMask:next];
+        NSWindow *nsw = Window_nsWindow(window);
+        [nsw setStyleMask:next];
 
         // setStyleMask: resets the collectionBehavior, dropping FullScreenPrimary.
-        [(*window).nsWindow setCollectionBehavior:([(*window).nsWindow collectionBehavior] | NSWindowCollectionBehaviorFullScreenPrimary)];
+        [nsw setCollectionBehavior:([nsw collectionBehavior] | NSWindowCollectionBehaviorFullScreenPrimary)];
 
         bool transparent = (mode == WINDOW_UNDECORATED_NAKED);
-        [(*window).nsWindow setTitlebarAppearsTransparent:transparent];
-        [(*window).nsWindow setTitleVisibility:(transparent ? NSWindowTitleHidden : NSWindowTitleVisible)];
+        [nsw setTitlebarAppearsTransparent:transparent];
+        [nsw setTitleVisibility:(transparent ? NSWindowTitleHidden : NSWindowTitleVisible)];
 
         // Mask (and therefore the native light layout) changed: re-snapshot and
         // re-apply per-button visibility + offset against the new layout.
-        TrafficLight_resetBase((*window).trafficLights);
+        TrafficLight_resetBase(Window_trafficLights(window));
         refreshChrome(window);
         windowRefreshSize(window);
         windowRefreshOrigin(window);
@@ -2015,7 +2174,7 @@ fn Window_setDecorated(Window *window, bool decorated) {
 bool Window_isDecorated(const Window *window) {
     if (window == nullptr)
         return false;
-    return (*window).undecoratedMode == WINDOW_DECORATED;
+    return Window_undecoratedMode(window) == WINDOW_DECORATED;
 }
 
 // Translate the naked-titlebar preference into the native chrome mode setter.
@@ -2027,7 +2186,7 @@ fn Window_setNaked(Window *window, bool naked) {
 bool Window_isNaked(const Window *window) {
     if (window == nullptr)
         return false;
-    return (*window).undecoratedMode == WINDOW_UNDECORATED_NAKED;
+    return Window_undecoratedMode(window) == WINDOW_UNDECORATED_NAKED;
 }
 
 // Translate the borderless preference into the native chrome mode setter.
@@ -2039,7 +2198,7 @@ fn Window_setBorderless(Window *window, bool borderless) {
 bool Window_isBorderless(const Window *window) {
     if (window == nullptr)
         return false;
-    return (*window).undecoratedMode == WINDOW_UNDECORATED_BORDERLESS;
+    return Window_undecoratedMode(window) == WINDOW_UNDECORATED_BORDERLESS;
 }
 
 // Extend or restore decorated content into the titlebar and refresh geometry.
@@ -2048,28 +2207,30 @@ fn Window_setViewportFlushToTop(Window *window, bool flush) {
         return;
     // Viewport flush-to-top ONLY applies when the window is decorated (not naked, not borderless).
     // If the window is currently naked or undecorated, this function is disabled (no-op).
-    if ((*window).undecoratedMode != WINDOW_DECORATED)
+    if (Window_undecoratedMode(window) != WINDOW_DECORATED)
         return;
-    if ((*window).viewportFlushToTop == flush)
+    if (Window_viewportFlushToTop(window) == flush)
         return;
     @autoreleasepool {
         NSWindowStyleMask mask = styleMaskOf(window);
         if ((mask & NSWindowStyleMaskFullScreen) != 0)
             return;
 
-        (*window).viewportFlushToTop = flush;
+        Window_setViewportFlushToTopRaw(window, flush);
+    }
 
+        NSWindow *nsw = Window_nsWindow(window);
         if (flush) {
             updateStyleMask(window, NSWindowStyleMaskFullSizeContentView, 0);
-            [(*window).nsWindow setTitlebarAppearsTransparent:YES];
-            [(*window).nsWindow setTitleVisibility:NSWindowTitleHidden];
+            [nsw setTitlebarAppearsTransparent:YES];
+            [nsw setTitleVisibility:NSWindowTitleHidden];
         } else {
             updateStyleMask(window, 0, NSWindowStyleMaskFullSizeContentView);
-            [(*window).nsWindow setTitlebarAppearsTransparent:NO];
-            [(*window).nsWindow setTitleVisibility:NSWindowTitleVisible];
+            [nsw setTitlebarAppearsTransparent:NO];
+            [nsw setTitleVisibility:NSWindowTitleVisible];
         }
         // Native light layout changed with the mask: re-snapshot, re-seat.
-        TrafficLight_resetBase((*window).trafficLights);
+        TrafficLight_resetBase(Window_trafficLights(window));
         refreshChrome(window);
         windowRefreshSize(window);
         windowRefreshOrigin(window);
@@ -2080,9 +2241,9 @@ fn Window_setViewportFlushToTop(Window *window, bool flush) {
 bool Window_isViewportFlushToTop(const Window *window) {
     if (window == nullptr)
         return false;
-    if ((*window).undecoratedMode != WINDOW_DECORATED)
+    if (Window_undecoratedMode(window) != WINDOW_DECORATED)
         return false;
-    return (*window).viewportFlushToTop;
+    return Window_viewportFlushToTop(window);
 }
 
 // Route f32ing traffic-light behavior through the titlebar-flush setting.
@@ -2110,7 +2271,7 @@ fn Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLight 
     if (i < 0)
         return;
     @autoreleasepool {
-        TrafficLight_setButtonVisible((*window).trafficLights, (TrafficLightButton) i, visible);
+        TrafficLight_setButtonVisible(Window_trafficLights(window), (TrafficLightButton) i, visible);
     }
 }
 
@@ -2119,7 +2280,7 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
     i32 i = lightIndex(light);
     if (window == nullptr || i < 0)
         return false;
-    return TrafficLight_isButtonVisible((*window).trafficLights, (TrafficLightButton) i);
+    return TrafficLight_isButtonVisible(Window_trafficLights(window), (TrafficLightButton) i);
 }
 
 // Set the traffic-light cluster's header-relative position in AppKit points.
@@ -2127,7 +2288,7 @@ fn Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        TrafficLight_setHeaderPosition((*window).trafficLights, x, y);
+        TrafficLight_setHeaderPosition(Window_trafficLights(window), x, y);
     }
 }
 
@@ -2136,7 +2297,7 @@ fn Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f
     f32 x = 0.0f;
     f32 y = 0.0f;
     if (window != nullptr)
-        TrafficLight_getHeaderPosition((*window).trafficLights, &x, &y);
+        TrafficLight_getHeaderPosition(Window_trafficLights(window), &x, &y);
     if (outX)
         *outX = x;
     if (outY)
@@ -2148,7 +2309,7 @@ fn Window_setOpacity(Window *window, f32 opacity) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setAlphaValue:(CGFloat) opacity];
+        [Window_nsWindow(window) setAlphaValue:(CGFloat) opacity];
     }
 }
 
@@ -2157,10 +2318,11 @@ fn Window_setTransparentBackground(Window *window, bool transparent) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setOpaque:!transparent];
-        [(*window).nsWindow setBackgroundColor:(transparent ? [NSColor clearColor] : [NSColor windowBackgroundColor])];
-        if ([(*window).nsWindow contentView].layer)
-            [(*window).nsWindow contentView].layer.opaque = !transparent;
+        NSWindow *nsw = Window_nsWindow(window);
+        [nsw setOpaque:!transparent];
+        [nsw setBackgroundColor:(transparent ? [NSColor clearColor] : [NSColor windowBackgroundColor])];
+        if ([nsw contentView].layer)
+            [nsw contentView].layer.opaque = !transparent;
         Window_setTransparent(window, transparent);
     }
 }
@@ -2172,11 +2334,12 @@ fn Window_setBackdropBlur(Window *window, f32 radius) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        NSView *content = [(*window).nsWindow contentView];
+        NSView *content = [Window_nsWindow(window) contentView];
         if (content == nil)
             return;
+        any backdrop = Window_backdropView(window);
         if (radius > 0.0f) {
-            if ((*window).backdropView == nullptr) {
+            if (backdrop == nullptr) {
                 NSVisualEffectView *ve = [[NSVisualEffectView alloc] initWithFrame:content.bounds];
                 ve.blendingMode = NSVisualEffectBlendingModeBehindWindow;
                 ve.material = NSVisualEffectMaterialHUDWindow;
@@ -2184,14 +2347,14 @@ fn Window_setBackdropBlur(Window *window, f32 radius) {
                 ve.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
                 [content addSubview:ve
                         positioned:NSWindowBelow
-                        relativeTo:(*window).glView];
-                (*window).backdropView = (__bridge_retained any ) ve;
+                        relativeTo:Window_glView(window)];
+                Window_setBackdropView(window, (__bridge_retained any ) ve);
             }
-        } else if ((*window).backdropView != nullptr) {
-            NSView *ve = (__bridge NSView *)(*window).backdropView;
+        } else if (backdrop != nullptr) {
+            NSView *ve = (__bridge NSView *)backdrop;
             [ve removeFromSuperview];
-            CFRelease((*window).backdropView);
-            (*window).backdropView = nullptr;
+            CFRelease(backdrop);
+            Window_setBackdropView(window, nullptr);
         }
     }
 }
@@ -2210,30 +2373,32 @@ bool Window_macOS_hasLiquidGlass() {
 fn Window_macOS_setLiquidGlass(Window *window, const WindowLiquidGlassDesc *desc) {
     if (window == nullptr)
         return;
-    (*window).liquidGlass = desc != nullptr ? *desc : (WindowLiquidGlassDesc){ 0 };
-    WindowLiquidGlassDesc glass = (*window).liquidGlass;
+    Window_setLiquidGlass(window, desc != nullptr ? *desc : (WindowLiquidGlassDesc){ 0 });
+    WindowLiquidGlassDesc glass = Window_liquidGlass(window);
     @autoreleasepool {
+        any glassView = Window_glassView(window);
         if (!glass.enabled || !Window_macOS_hasLiquidGlass()) {
-            if ((*window).glassView != nullptr) {
-                NSView *g = (__bridge NSView *)(*window).glassView;
+            if (glassView != nullptr) {
+                NSView *g = (__bridge NSView *)glassView;
                 [g removeFromSuperview];
-                CFRelease((*window).glassView);
-                (*window).glassView = nullptr;
+                CFRelease(glassView);
+                Window_setGlassView(window, nullptr);
             }
             return;
         }
-        NSView *content = [(*window).nsWindow contentView];
+        NSView *content = [Window_nsWindow(window) contentView];
         if (content == nil)
             return;
-        if ((*window).glassView == nullptr) {
+        if (glassView == nullptr) {
             Class glassClass = NSClassFromString(@"NSGlassEffectView");
             NSView *g = [[glassClass alloc] initWithFrame:content.bounds];
             g.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
-            [content addSubview:g positioned:NSWindowBelow relativeTo:(*window).glView];
-            (*window).glassView = (__bridge_retained any ) g;
+            [content addSubview:g positioned:NSWindowBelow relativeTo:Window_glView(window)];
+            glassView = (__bridge_retained any ) g;
+            Window_setGlassView(window, glassView);
         }
-        NSView *g = (__bridge NSView *)(*window).glassView;
-        WindowLiquidGlassDesc d = (*window).liquidGlass;
+        NSView *g = (__bridge NSView *)glassView;
+        WindowLiquidGlassDesc d = Window_liquidGlass(window);
         if ([g respondsToSelector:NSSelectorFromString(@"setStyle:")])
             [g setValue:@(d.style) forKey:@"style"];
         if ([g respondsToSelector:NSSelectorFromString(@"setCornerRadius:")])
@@ -2252,7 +2417,7 @@ fn Window_macOS_setLiquidGlass(Window *window, const WindowLiquidGlassDesc *desc
 bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *out) {
     if (window == nullptr || out == nullptr)
         return false;
-    *out = (*window).liquidGlass;
+    *out = Window_liquidGlass(window);
     return true;
 }
 
@@ -2261,7 +2426,7 @@ fn Window_setAlwaysOnTop(Window *window, bool onTop) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setLevel:(onTop ? NSFloatingWindowLevel : NSNormalWindowLevel)];
+        [Window_nsWindow(window) setLevel:(onTop ? NSFloatingWindowLevel : NSNormalWindowLevel)];
     }
 }
 
@@ -2270,7 +2435,8 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width,
     if (window == nullptr || pixels == nullptr || width <= 0 || height <= 0)
         return;
     @autoreleasepool {
-        NSView *view = (*window).glView ? (*window).glView : [(*window).nsWindow contentView];
+        NSView *glView = Window_glView(window);
+        NSView *view = glView ? glView : [Window_nsWindow(window) contentView];
         if (view == nil)
             return;
         // ZERO-COPY: the CGImage borrows the caller's buffer directly — no
@@ -2338,7 +2504,8 @@ fn Window_presentSurface(Window *window, any surface) {
     if (window == nullptr || surface == nullptr)
         return;
     @autoreleasepool {
-        NSView *view = (*window).glView ? (*window).glView : [(*window).nsWindow contentView];
+        NSView *glView = Window_glView(window);
+        NSView *view = glView ? glView : [Window_nsWindow(window) contentView];
         if (view == nil)
             return;
         view.wantsLayer = YES;
@@ -2349,7 +2516,8 @@ fn Window_presentSurface(Window *window, any surface) {
         [CATransaction setDisableActions:YES];
         layer.contents = (__bridge id)(IOSurfaceRef) surface;
         layer.contentsGravity = kCAGravityResize;
-        d64 scale = (*window).cachedScale > 0.0 ? (*window).cachedScale : 1.0;
+        d64 cachedScale = Window_cachedScale(window);
+        d64 scale = cachedScale > 0.0 ? cachedScale : 1.0;
         layer.contentsScale = scale;
         [CATransaction commit];
         // This is a CALayer/IOSurface publication, not a CAMetalLayer drawable:
@@ -2365,7 +2533,8 @@ fn Window_presentSurface(Window *window, any surface) {
 any Window_presentSurfaceContents(const Window *window) {
     if (window == nullptr)
         return nullptr;
-    NSView *view = (*window).glView ? (*window).glView : [(*window).nsWindow contentView];
+    NSView *glView = Window_glView(window);
+    NSView *view = glView ? glView : [Window_nsWindow(window) contentView];
     if (view == nil || view.layer == nil)
         return nullptr;
     return (__bridge any ) view.layer.contents;
@@ -2431,7 +2600,7 @@ fn Window_setClickThrough(Window *window, bool clickThrough) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setIgnoresMouseEvents:clickThrough];
+        [Window_nsWindow(window) setIgnoresMouseEvents:clickThrough];
     }
 }
 
@@ -2440,7 +2609,7 @@ fn Window_setShadow(Window *window, bool shadow) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setHasShadow:shadow];
+        [Window_nsWindow(window) setHasShadow:shadow];
     }
 }
 
@@ -2449,7 +2618,7 @@ fn Window_setMovableByBackground(Window *window, bool movable) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setMovableByWindowBackground:movable];
+        [Window_nsWindow(window) setMovableByWindowBackground:movable];
     }
 }
 
@@ -2458,7 +2627,7 @@ fn Window_bringToFront(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow orderFrontRegardless];
+        [Window_nsWindow(window) orderFrontRegardless];
     }
 }
 
@@ -2480,7 +2649,7 @@ fn Window_minimize(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow miniaturize:nil];
+        [Window_nsWindow(window) miniaturize:nil];
     }
 }
 
@@ -2489,7 +2658,7 @@ fn Window_restore(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow deminiaturize:nil];
+        [Window_nsWindow(window) deminiaturize:nil];
     }
 }
 
@@ -2497,10 +2666,10 @@ fn Window_restore(Window *window) {
 bool Window_isMinimized(Window *window) {
     if (window == nullptr)
         return false;
-    if (atomic_load_explicit(&(*window).miniaturizing, memory_order_relaxed))
+    if (atomic_load_explicit(Window_miniaturizingMut(window), memory_order_relaxed))
         return true;
     @autoreleasepool {
-        return [(*window).nsWindow isMiniaturized];
+        return [Window_nsWindow(window) isMiniaturized];
     }
 }
 
@@ -2520,7 +2689,7 @@ fn Window_setFullscreen(Window *window, bool fullscreen) {
         return;
     @autoreleasepool {
         if (fullscreen != Window_isFullscreen(window))
-            [(*window).nsWindow toggleFullScreen:nil];
+            [Window_nsWindow(window) toggleFullScreen:nil];
     }
 }
 
@@ -2529,7 +2698,7 @@ fn Window_toggleFullscreen(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow toggleFullScreen:nil];
+        [Window_nsWindow(window) toggleFullScreen:nil];
     }
 }
 
@@ -2539,7 +2708,7 @@ fn Window_setDRM(Window *window, bool enabled) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        [(*window).nsWindow setSharingType:(enabled ? NSWindowSharingNone : NSWindowSharingReadOnly)];
+        [Window_nsWindow(window) setSharingType:(enabled ? NSWindowSharingNone : NSWindowSharingReadOnly)];
     }
 }
 
@@ -2552,7 +2721,7 @@ fn Window_setMinSize(Window *window, i32 width, i32 height) {
         CGFloat scale = windowBackingScale(window);
         CGFloat ptW = width > 0 ? ((CGFloat) width / scale) : 0.0;
         CGFloat ptH = height > 0 ? ((CGFloat) height / scale) : 0.0;
-        [(*window).nsWindow setContentMinSize:NSMakeSize(ptW, ptH)];
+        [Window_nsWindow(window) setContentMinSize:NSMakeSize(ptW, ptH)];
     }
 }
 
@@ -2564,7 +2733,7 @@ fn Window_setMaxSize(Window *window, i32 width, i32 height) {
         CGFloat scale = windowBackingScale(window);
         CGFloat ptW = width > 0 ? ((CGFloat) width / scale) : (CGFloat) CGFLOAT_MAX;
         CGFloat ptH = height > 0 ? ((CGFloat) height / scale) : (CGFloat) CGFLOAT_MAX;
-        [(*window).nsWindow setContentMaxSize:NSMakeSize(ptW, ptH)];
+        [Window_nsWindow(window) setContentMaxSize:NSMakeSize(ptW, ptH)];
     }
 }
 
@@ -2577,7 +2746,7 @@ fn Window_setCursorLocked(Window *window, bool locked) {
     if (locked == s_cursorLocked)
         return;
     if (locked) {
-        NSWindow *anchor = window ? (*window).nsWindow : sLastWindow;
+        NSWindow *anchor = window ? Window_nsWindow(window) : sLastWindow;
         NSRect frame = anchor ? [anchor frame] : [[NSScreen mainScreen] frame];
         s_lockCenter = NSMakePoint(frame.origin.x + frame.size.width / 2.0,
                                    frame.origin.y + frame.size.height / 2.0);
@@ -2596,8 +2765,8 @@ fn Window_setCursorLocked(Window *window, bool locked) {
 fn Window_setCursorType(Window *window, WindowCursorType type) {
     if (window == nullptr)
         return;
-    WindowCursorType prev = (*window).cursorType;
-    (*window).cursorType = type;
+    WindowCursorType prev = Window_cursorType(window);
+    Window_setCursorTypeRaw(window, type);
     @autoreleasepool {
         if (prev == WINDOW_CURSOR_HIDDEN && type != WINDOW_CURSOR_HIDDEN)
             [NSCursor unhide];
@@ -2635,7 +2804,7 @@ fn Window_setCursorType(Window *window, WindowCursorType type) {
 WindowCursorType Window_getCursorType(const Window *window) {
     if (window == nullptr)
         return WINDOW_CURSOR_DEFAULT;
-    return (*window).cursorType;
+    return Window_cursorType(window);
 }
 
 // --- Software frame presentation (inert without a render target) ------------
@@ -2650,15 +2819,17 @@ bool Window_present(Window *window, const Buffer *frame) {
 // --- Surface anchors (thread 0) ----------------------------------------------
 
 any Window_contentView(Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return nullptr;
-    return (__bridge any) [(*window).nsWindow contentView];
+    return (__bridge any) [nsw contentView];
 }
 
 any Window_nativeHandle(const Window *window) {
-    if (window == nullptr || (*window).nsWindow == nil)
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    if (nsw == nil)
         return nullptr;
-    return (__bridge any) (*window).nsWindow;
+    return (__bridge any) nsw;
 }
 
 // ;;INTENTION("Window_metalLayer is gone from this file by design (no Metal here). Returns nullptr so the VK_EXT_metal_surface path degrades cleanly until the render personal create their own CAMetalLayer on the content view. Retires with the composite seam.")
@@ -2685,42 +2856,42 @@ fn Window_workerPresentEnd() {
 fn Window_addKeyAdapter(Window *window, const KeyHandler *adapter) {
     if (window == nullptr)
         return;
-    Key_attachWindow((*window).id, adapter);
+    Key_attachWindow(Window_idRaw(window), adapter);
 }
 
 // Detach a key callback from the window's engine input slot.
 bool Window_removeKeyAdapter(Window *window, const KeyHandler *adapter) {
     if (window == nullptr)
         return false;
-    return Key_detachWindow((*window).id, adapter);
+    return Key_detachWindow(Window_idRaw(window), adapter);
 }
 
 // Attach a mouse callback to the window's engine input slot.
 fn Window_addMouseAdapter(Window *window, const MouseHandler *adapter) {
     if (window == nullptr)
         return;
-    Mouse_attachWindow((*window).id, adapter);
+    Mouse_attachWindow(Window_idRaw(window), adapter);
 }
 
 // Detach a mouse callback from the window's engine input slot.
 bool Window_removeMouseAdapter(Window *window, const MouseHandler *adapter) {
     if (window == nullptr)
         return false;
-    return Mouse_detachWindow((*window).id, adapter);
+    return Mouse_detachWindow(Window_idRaw(window), adapter);
 }
 
 // Attach a touch callback to the window's engine input slot.
 fn Window_addTouchAdapter(Window *window, const TouchHandler *adapter) {
     if (window == nullptr)
         return;
-    Touch_attachWindow((*window).id, adapter);
+    Touch_attachWindow(Window_idRaw(window), adapter);
 }
 
 // Detach a touch callback from the window's engine input slot.
 bool Window_removeTouchAdapter(Window *window, const TouchHandler *adapter) {
     if (window == nullptr)
         return false;
-    return Touch_detachWindow((*window).id, adapter);
+    return Touch_detachWindow(Window_idRaw(window), adapter);
 }
 
 // Drain key, mouse, and touch callback queues for the engine input modules.
@@ -2734,7 +2905,7 @@ fn Window_dispatchEvents(Window *window) {
 // --- Focus (the spotlight: one focused window per machine) -------------------
 
 u32 Window_id(Window *window) {
-    return window ? (*window).id : FOCUS_BROADCAST;
+    return window ? Window_idRaw(window) : FOCUS_BROADCAST;
 }
 
 // Request AppKit activation and schedule the window for key-window promotion.
@@ -2742,28 +2913,28 @@ fn Window_focus(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        claimKeyAfterActivation((*window).nsWindow);
-        Focus_set((*window).id);
+        claimKeyAfterActivation(Window_nsWindow(window));
+        Focus_set(Window_idRaw(window));
     }
 }
 
 // Compare this window's id with the current process-wide focus identity.
 bool Window_isFocused(Window *window) {
-    return window && Focus_isFocused((*window).id);
+    return window && Focus_isFocused(Window_idRaw(window));
 }
 
 // Enable or suppress AppKit key-window eligibility for this window.
 fn Window_setKeyEnabled(Window *window, bool enabled) {
     if (window == nullptr)
         return;
-    atomic_store_explicit(&(*window).keyEnabled, enabled, memory_order_relaxed);
+    atomic_store_explicit(Window_keyEnabledMut(window), enabled, memory_order_relaxed);
 }
 
 // Read whether this window currently accepts key focus.
 bool Window_isKeyEnabled(const Window *window) {
     if (window == nullptr)
         return false;
-    return atomic_load_explicit(&(*window).keyEnabled, memory_order_relaxed);
+    return atomic_load_explicit(Window_keyEnabledPtr(window), memory_order_relaxed);
 }
 
 // --- Lifecycle registry ------------------------------------------------------
@@ -2773,13 +2944,13 @@ bool Window_isKeyEnabled(const Window *window) {
 WindowEvent *Window_getLifecycle(Window *window) {
     if (window == nullptr)
         return nullptr;
-    return &(*window).lifecycle;
+    return Window_lifecycleMut(window);
 }
 
 // --- Monitor identity ---------------------------------------------------------
 
 u32 Window_getMonitorId(const Window *window) {
-    return window ? atomic_load_explicit(&(*window).monitorId, memory_order_acquire) : 0;
+    return window ? atomic_load_explicit(Window_monitorIdPtr(window), memory_order_acquire) : 0;
 }
 
 // --- Resize reflection ---------------------------------------------------------
@@ -2787,18 +2958,18 @@ u32 Window_getMonitorId(const Window *window) {
 u64 Window_sizeGeneration(Window *window) {
     if (window == nullptr)
         return 0;
-    return atomic_load_explicit(&(*window).sizeGeneration, memory_order_acquire);
+    return atomic_load_explicit(Window_sizeGenerationPtr(window), memory_order_acquire);
 }
 
 // Register the callback invoked synchronously as native resize geometry changes.
 fn Window_setResizeRenderHook(Window *window, WindowResizeRenderFn fn, any userdata) {
     if (window == nullptr)
         return;
-    (*window).resizeRenderFn = fn;
-    (*window).resizeRenderUserdata = userdata;
+    Window_setResizeRenderFnRaw(window, fn);
+    Window_setResizeRenderUserdata(window, userdata);
 }
 
 // Return the callback registered for synchronous resize rendering.
 WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
-    return window ? (*window).resizeRenderFn : nullptr;
+    return window ? Window_resizeRenderFn(window) : nullptr;
 }

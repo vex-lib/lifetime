@@ -163,21 +163,72 @@ bool Lifetime_isLegit(const_any ptr) {
     return true;
 }
 
+;;GETTER
+static any Lifetime_persistentArenaRaw(const Lifetime *lifetime) {
+    return (*lifetime).persistentArena;
+}
+
+;;GETTER
+static any Lifetime_transientArenaRaw(const Lifetime *lifetime) {
+    return (*lifetime).transientArena;
+}
+
+;;GETTER
+static u64 Lifetime_persistentType(const Lifetime *lifetime) {
+    return (*lifetime).persistentType;
+}
+
+;;GETTER
+static u64 Lifetime_transientType(const Lifetime *lifetime) {
+    return (*lifetime).transientType;
+}
+
+;;GETTER
+static any Lifetime_relationalRaw(const Lifetime *lifetime) {
+    return (*lifetime).relational;
+}
+
+;;SETTER
+static fn Lifetime_setPersistentArena(Lifetime *lifetime, any arena) {
+    (*lifetime).persistentArena = arena;
+}
+
+;;SETTER
+static fn Lifetime_setTransientArena(Lifetime *lifetime, any arena) {
+    (*lifetime).transientArena = arena;
+}
+
+;;SETTER
+static fn Lifetime_setPersistentType(Lifetime *lifetime, u64 typeId) {
+    (*lifetime).persistentType = typeId;
+}
+
+;;SETTER
+static fn Lifetime_setTransientType(Lifetime *lifetime, u64 typeId) {
+    (*lifetime).transientType = typeId;
+}
+
+;;SETTER
+static fn Lifetime_setRelationalRaw(Lifetime *lifetime, any relational) {
+    (*lifetime).relational = relational;
+}
+
 /** Validates both arena handles, their attestations, and an optional relational root. */
 bool Lifetime_isValid(const Lifetime *lifetime) {
     if (lifetime == nullptr) {
         return false;
     }
-    if (!Lifetime_isLegit((*lifetime).persistentArena)) {
+    if (!Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime))) {
         return false;
     }
-    if (!Lifetime_isLegit((*lifetime).transientArena)) {
+    if (!Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime))) {
         return false;
     }
-    if ((*lifetime).persistentType == 0 || (*lifetime).transientType == 0) {
+    if (Lifetime_persistentType(lifetime) == 0 || Lifetime_transientType(lifetime) == 0) {
         return false;
     }
-    if ((*lifetime).relational != nullptr && !Lifetime_isLegit((*lifetime).relational)) {
+    any relational = Lifetime_relationalRaw(lifetime);
+    if (relational != nullptr && !Lifetime_isLegit(relational)) {
         return false;
     }
     return true;
@@ -187,35 +238,37 @@ bool Lifetime_isValid(const Lifetime *lifetime) {
 fn Lifetime_destroy(Lifetime *lifetime) {
     if (lifetime == nullptr)
         return;
-    if ((*lifetime).transientArena != nullptr) {
-        if (Lifetime_isLegit((*lifetime).transientArena)) {
-            MemoryArena_destroy((*lifetime).transientArena);
+    any transientArena = Lifetime_transientArenaRaw(lifetime);
+    if (transientArena != nullptr) {
+        if (Lifetime_isLegit(transientArena)) {
+            MemoryArena_destroy(transientArena);
         }
-        (*lifetime).transientArena = nullptr;
-        (*lifetime).transientType = 0;
+        Lifetime_setTransientArena(lifetime, nullptr);
+        Lifetime_setTransientType(lifetime, 0);
     }
-    if ((*lifetime).persistentArena != nullptr) {
-        if (Lifetime_isLegit((*lifetime).persistentArena)) {
-            MemoryArena_destroy((*lifetime).persistentArena);
+    any persistentArena = Lifetime_persistentArenaRaw(lifetime);
+    if (persistentArena != nullptr) {
+        if (Lifetime_isLegit(persistentArena)) {
+            MemoryArena_destroy(persistentArena);
         }
-        (*lifetime).persistentArena = nullptr;
-        (*lifetime).persistentType = 0;
+        Lifetime_setPersistentArena(lifetime, nullptr);
+        Lifetime_setPersistentType(lifetime, 0);
     }
-    (*lifetime).relational = nullptr;
+    Lifetime_setRelationalRaw(lifetime, nullptr);
 }
 
 /** Releases all allocations from the valid transient arena. */
 fn Lifetime_resetTransient(Lifetime *lifetime) {
-    if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).transientArena))
+    if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime)))
         return;
-    MemoryArena_freeAll((*lifetime).transientArena);
+    MemoryArena_freeAll(Lifetime_transientArenaRaw(lifetime));
 }
 
 /** Allocates typed bytes from the persistent arena and validates the result pointer. */
 any Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
-    if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).persistentArena))
+    if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime)))
         return nullptr;
-    any ptr = MemoryArena_alloc((*lifetime).persistentArena, typeId, Bytes);
+    any ptr = MemoryArena_alloc(Lifetime_persistentArenaRaw(lifetime), typeId, Bytes);
     if (!Lifetime_isLegit(ptr)) {
         return nullptr;
     }
@@ -224,9 +277,9 @@ any Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
 
 /** Allocates typed bytes from the transient arena and validates the result pointer. */
 any Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
-    if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).transientArena))
+    if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime)))
         return nullptr;
-    any ptr = MemoryArena_alloc((*lifetime).transientArena, typeId, Bytes);
+    any ptr = MemoryArena_alloc(Lifetime_transientArenaRaw(lifetime), typeId, Bytes);
     if (!Lifetime_isLegit(ptr)) {
         return nullptr;
     }
@@ -235,9 +288,9 @@ any Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
 
 /** Frees a validated pointer through the persistent arena. */
 fn Lifetime_freePersistent(Lifetime *lifetime, any ptr) {
-    if (lifetime == nullptr || !Lifetime_isLegit((*lifetime).persistentArena) || !Lifetime_isLegit(ptr))
+    if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime)) || !Lifetime_isLegit(ptr))
         return;
-    MemoryArena_free((*lifetime).persistentArena, ptr);
+    MemoryArena_free(Lifetime_persistentArenaRaw(lifetime), ptr);
 }
 
 // ACCESSORS (PUBLIC)
@@ -245,7 +298,7 @@ fn Lifetime_freePersistent(Lifetime *lifetime, any ptr) {
 any Lifetime_getRelational(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
-    return (*lifetime).relational;
+    return Lifetime_relationalRaw(lifetime);
 }
 
 /** Sets the relational symbol root after validating pointer legitimacy. */
@@ -254,19 +307,19 @@ fn Lifetime_setRelational(Lifetime *lifetime, any relational) {
         return;
     if (relational != nullptr && !Lifetime_isLegit(relational))
         return;
-    (*lifetime).relational = relational;
+    Lifetime_setRelationalRaw(lifetime, relational);
 }
 
 /** Gets the persistent arena handle (null-safe). */
 any Lifetime_getPersistentArena(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
-    return (*lifetime).persistentArena;
+    return Lifetime_persistentArenaRaw(lifetime);
 }
 
 /** Gets the transient arena handle (null-safe). */
 any Lifetime_getTransientArena(const Lifetime *lifetime) {
     if (lifetime == nullptr)
         return nullptr;
-    return (*lifetime).transientArena;
+    return Lifetime_transientArenaRaw(lifetime);
 }

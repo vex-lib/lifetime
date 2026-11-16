@@ -87,9 +87,68 @@
 static const bytes COMMANDLINE_DEFAULT_COLUMNS = 80;
 static const bytes COMMANDLINE_DEFAULT_ROWS = 24;
 
+;;GETTER
+static bool CommandLine_explicitIo(const CommandLine *self) { return (*self).explicitIo; }
+;;SETTER
+static fn CommandLine_setExplicitIo(CommandLine *self, bool v) { (*self).explicitIo = v; }
+;;GETTER
+static CommandLineIo CommandLine_ioVal(const CommandLine *self) { return (*self).io; }
+;;GETTER
+static CommandLineIo *CommandLine_ioMut(CommandLine *self) { return &(*self).io; }
+;;GETTER
+static const CommandLineIo *CommandLine_ioPtr(const CommandLine *self) { return &(*self).io; }
+;;SETTER
+static fn CommandLine_setIoVal(CommandLine *self, CommandLineIo io) { (*self).io = io; }
+;;GETTER
+static bytes CommandLine_capacity(const CommandLine *self) { return (*self).capacity; }
+;;SETTER
+static fn CommandLine_setCapacity(CommandLine *self, bytes v) { (*self).capacity = v; }
+;;GETTER
+static char *CommandLine_cells(const CommandLine *self) { return (*self).cells; }
+;;SETTER
+static fn CommandLine_setCells(CommandLine *self, char *v) { (*self).cells = v; }
+;;GETTER
+static bytes CommandLine_width(const CommandLine *self) { return (*self).width; }
+;;SETTER
+static fn CommandLine_setWidth(CommandLine *self, bytes v) { (*self).width = v; }
+;;GETTER
+static bytes CommandLine_height(const CommandLine *self) { return (*self).height; }
+;;SETTER
+static fn CommandLine_setHeight(CommandLine *self, bytes v) { (*self).height = v; }
+;;GETTER
+static bool CommandLine_opened(const CommandLine *self) { return (*self).opened; }
+;;SETTER
+static fn CommandLine_setOpened(CommandLine *self, bool v) { (*self).opened = v; }
+;;GETTER
+static bool CommandLine_active(const CommandLine *self) { return (*self).active; }
+;;SETTER
+static fn CommandLine_setActive(CommandLine *self, bool v) { (*self).active = v; }
+;;GETTER
+static _Atomic u32 *CommandLine_runMut(CommandLine *self) { return &(*self).run; }
+;;GETTER
+static const _Atomic u32 *CommandLine_runPtr(const CommandLine *self) { return &(*self).run; }
+;;GETTER
+static bytes CommandLine_refusalCount(const CommandLine *self) { return (*self).refusalCount; }
+;;SETTER
+static fn CommandLine_setRefusalCount(CommandLine *self, bytes v) { (*self).refusalCount = v; }
+;;GETTER
+static CommandLineApp CommandLine_appVal(const CommandLine *self) { return (*self).app; }
+;;GETTER
+static CommandLineApp *CommandLine_appMut(CommandLine *self) { return &(*self).app; }
+;;SETTER
+static fn CommandLine_setAppVal(CommandLine *self, CommandLineApp app) { (*self).app = app; }
+;;GETTER
+static u64 CommandLine_generation(const CommandLine *self) { return (*self).generation; }
+;;SETTER
+static fn CommandLine_setGeneration(CommandLine *self, u64 v) { (*self).generation = v; }
+;;GETTER
+static char *CommandLine_titleMut(CommandLine *self) { return (*self).title; }
+;;GETTER
+static const char *CommandLine_titlePtr(const CommandLine *self) { return (*self).title; }
+
 // The effective backend: an injected io wins; otherwise the default (ncurses).
 static CommandLineIo cmdIo(const CommandLine *self) {
-    return (*self).explicitIo ? (*self).io : CommandLine_defaultIo();
+    return CommandLine_explicitIo(self) ? CommandLine_ioVal(self) : CommandLine_defaultIo();
 }
 
 // (Re)allocate the owned grid for width*height cells. Overflow-checked cold path.
@@ -97,16 +156,16 @@ static bool cmdAllocGrid(CommandLine *self, bytes width, bytes height) {
     if (width == 0 || height == 0 || height > SIZE_MAX / width)
         return false;
     bytes bytes = width * height;
-    if (bytes > (*self).capacity) {
-        char *next = (char*) realloc((*self).cells, bytes);
+    if (bytes > CommandLine_capacity(self)) {
+        char *next = (char*) realloc(CommandLine_cells(self), bytes);
         if (next == nullptr)
             return false;
-        (*self).cells = next;
-        (*self).capacity = bytes;
+        CommandLine_setCells(self, next);
+        CommandLine_setCapacity(self, bytes);
     }
-    (*self).width = width;
-    (*self).height = height;
-    memset((*self).cells, ' ', bytes);
+    CommandLine_setWidth(self, width);
+    CommandLine_setHeight(self, height);
+    memset(CommandLine_cells(self), ' ', bytes);
     return true;
 }
 
@@ -125,33 +184,33 @@ CommandLine *CommandLine_1(const char *title) {
 fn CommandLine_free(CommandLine *self) {
     if (self == nullptr)
         return;
-    if ((*self).opened)
+    if (CommandLine_opened(self))
         CommandLine_close(self);
-    free((*self).cells);
+    free(CommandLine_cells(self));
     free(self);
 }
 
 bool CommandLine_setIo(CommandLine *self, const CommandLineIo *io) {
-    if (self == nullptr || (*self).opened || (*self).active) {
+    if (self == nullptr || CommandLine_opened(self) || CommandLine_active(self)) {
         THROW("CommandLine setIo: null or busy");
         return false;
     }
     if (io == nullptr) {
-        memset(&(*self).io, 0, sizeof((*self).io));
-        (*self).explicitIo = false;
+        memset(CommandLine_ioMut(self), 0, sizeof(CommandLineIo));
+        CommandLine_setExplicitIo(self, false);
         return true;
     }
-    (*self).io = *io;
-    (*self).explicitIo = true;
+    CommandLine_setIoVal(self, *io);
+    CommandLine_setExplicitIo(self, true);
     return true;
 }
 
 const CommandLineIo *CommandLine_getIo(const CommandLine *self) {
-    return self ? &(*self).io : nullptr;
+    return self ? CommandLine_ioPtr(self) : nullptr;
 }
 
 bool CommandLine_open(CommandLine *self) {
-    if (self == nullptr || (*self).opened) {
+    if (self == nullptr || CommandLine_opened(self)) {
         THROW("CommandLine open: null or already open");
         return false;
     }
@@ -164,70 +223,74 @@ bool CommandLine_open(CommandLine *self) {
         THROW("CommandLine open: device refused");
         return false;
     }
-    (*self).io = io;
-    (*self).explicitIo = true;   // freeze the resolved backend for this session
+    CommandLine_setIoVal(self, io);
+    CommandLine_setExplicitIo(self, true);   // freeze the resolved backend for this session
     bytes w = COMMANDLINE_DEFAULT_COLUMNS, h = COMMANDLINE_DEFAULT_ROWS;
     if (!io.size(io.ctx, &w, &h) || !cmdAllocGrid(self, w, h)) {
         io.close(io.ctx);
         THROW("CommandLine open: grid admission failed");
         return false;
     }
-    (*self).opened = true;
+    CommandLine_setOpened(self, true);
     // A device session owns one loop history: opening (never legal while a loop
     // is live) starts the word fresh, so a cancelled session is revived only by
     // an explicit close/reopen, never silently mid-session.
-    atomic_store_explicit(&(*self).run, COMMANDLINE_RUN_IDLE, memory_order_release);
+    atomic_store_explicit(CommandLine_runMut(self), COMMANDLINE_RUN_IDLE, memory_order_release);
     return true;
 }
 
 fn CommandLine_close(CommandLine *self) {
-    if (self == nullptr || !(*self).opened)
+    if (self == nullptr || !CommandLine_opened(self))
         return;
-    CommandLineIo io = (*self).io;
+    CommandLineIo io = CommandLine_ioVal(self);
     if (io.close != nullptr)
         io.close(io.ctx);
-    free((*self).cells);
-    (*self).cells = nullptr;
-    (*self).capacity = 0;
-    (*self).width = 0;
-    (*self).height = 0;
-    (*self).opened = false;
-    (*self).active = false;
+    free(CommandLine_cells(self));
+    CommandLine_setCells(self, nullptr);
+    CommandLine_setCapacity(self, 0);
+    CommandLine_setWidth(self, 0);
+    CommandLine_setHeight(self, 0);
+    CommandLine_setOpened(self, false);
+    CommandLine_setActive(self, false);
 }
 
 bool CommandLine_revalidate(CommandLine *self) {
-    if (self == nullptr || !(*self).opened) {
+    if (self == nullptr || !CommandLine_opened(self)) {
         THROW("CommandLine revalidate: not open");
         return false;
     }
-    CommandLineIo io = (*self).io;
+    CommandLineIo io = CommandLine_ioVal(self);
     if (io.size == nullptr) {
         THROW("CommandLine revalidate: not open");
         return false;
     }
-    bytes w = (*self).width, h = (*self).height;
+    bytes curW = CommandLine_width(self);
+    bytes curH = CommandLine_height(self);
+    bytes w = curW, h = curH;
     if (!io.size(io.ctx, &w, &h) || w == 0 || h == 0) {
-        if ((*self).refusalCount == 0)
+        bytes rc = CommandLine_refusalCount(self);
+        if (rc == 0)
             THROW("CommandLine resized: device reported %zux%zu", w, h);
-        if ((*self).refusalCount != SIZE_MAX)
-            ++(*self).refusalCount;
+        if (rc != SIZE_MAX)
+            CommandLine_setRefusalCount(self, rc + 1);
         return false;
     }
-    if (w == (*self).width && h == (*self).height)
+    if (w == curW && h == curH)
         return CommandLine_present(self);
     if (!cmdAllocGrid(self, w, h)) {
-        if ((*self).refusalCount == 0)
+        bytes rc = CommandLine_refusalCount(self);
+        if (rc == 0)
             THROW("CommandLine resized: grid %zux%zu exceeds backing", w, h);
-        if ((*self).refusalCount != SIZE_MAX)
-            ++(*self).refusalCount;
+        if (rc != SIZE_MAX)
+            CommandLine_setRefusalCount(self, rc + 1);
         return false;
     }
     // A resize repaints in one step: redraw the app, then present once.
-    CommandLineApp app = (*self).app;
+    CommandLineApp app = CommandLine_appVal(self);
     if (app.draw != nullptr) {
-        (*self).active = true;
+        CommandLine_setActive(self, true);
         bool ok = app.draw(app.ctx, self);
-        (*self).active = false;
+        CommandLine_setActive(self, false);
         if (!ok)
             return false;
     }
@@ -235,22 +298,23 @@ bool CommandLine_revalidate(CommandLine *self) {
 }
 
 bool CommandLine_present(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || (*self).cells == nullptr)
+    char *cells = self ? CommandLine_cells(self) : nullptr;
+    if (self == nullptr || !CommandLine_opened(self) || cells == nullptr)
         return false;
-    CommandLineIo io = (*self).io;
+    CommandLineIo io = CommandLine_ioVal(self);
     if (io.present == nullptr)
         return false;
-    return io.present(io.ctx, (*self).cells, (*self).width, (*self).height);
+    return io.present(io.ctx, cells, CommandLine_width(self), CommandLine_height(self));
 }
 
 bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app) {
-    if (self == nullptr || app == nullptr || (*app).draw == nullptr || (*self).active
-        || (*self).generation == UINT64_MAX) {
+    if (self == nullptr || app == nullptr || CommandLineApp_draw(app) == nullptr || CommandLine_active(self)
+        || CommandLine_generation(self) == UINT64_MAX) {
         THROW("CommandLine setApp: null draw, busy or generation overflow");
         return false;
     }
-    (*self).app = *app;
-    ++(*self).generation;
+    CommandLine_setAppVal(self, *app);
+    CommandLine_setGeneration(self, CommandLine_generation(self) + 1);
     return true;
 }
 
@@ -273,55 +337,55 @@ bool CommandLine_hasApp(const CommandLine *self) {
 bool CommandLine_detachApp(CommandLine *self) {
     if (!CommandLine_hasApp(self))
         return false;
-    CommandLineApp app = (*self).app;
+    CommandLineApp app = CommandLine_appVal(self);
     if (app.detach != nullptr)
         app.detach(app.ctx);
-    memset(&(*self).app, 0, sizeof((*self).app));
+    memset(CommandLine_appMut(self), 0, sizeof(CommandLineApp));
     return true;
 }
 
 /** Requests cancel; only a live loop consumes it (IDLE stops are discarded). */
 static fn cmdRequestCancel(CommandLine *self) {
     u32 expected = COMMANDLINE_RUN_RUNNING;
-    atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+    atomic_compare_exchange_strong_explicit(CommandLine_runMut(self), &expected,
         COMMANDLINE_RUN_CANCELLED, memory_order_acq_rel, memory_order_relaxed);
 }
 
 bool CommandLine_tick(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || !CommandLine_hasApp(self)) {
+    if (self == nullptr || !CommandLine_opened(self) || !CommandLine_hasApp(self)) {
         THROW("CommandLine tick: not open or no app");
         return false;
     }
     CommandLineEvent ev;
-    CommandLineApp app = (*self).app;
+    CommandLineApp app = CommandLine_appVal(self);
     if (CommandLine_poll(self, 0, &ev)) {
         if (ev.kind == COMMANDLINE_EVENT_RESIZE)
             return CommandLine_revalidate(self);   // revalidate draws + presents
         if (app.input != nullptr) {
-            (*self).active = true;
+            CommandLine_setActive(self, true);
             bool ok = app.input(app.ctx, self, &ev);
-            (*self).active = false;
+            CommandLine_setActive(self, false);
             if (!ok) {
                 cmdRequestCancel(self);
                 return false;
             }
         }
     }
-    (*self).active = true;
+    CommandLine_setActive(self, true);
     bool drew = app.draw(app.ctx, self);
-    (*self).active = false;
+    CommandLine_setActive(self, false);
     if (!drew)
         return false;
     return CommandLine_present(self);
 }
 
 i32 CommandLine_run(CommandLine *self) {
-    if (self == nullptr || !(*self).opened || !CommandLine_hasApp(self)) {
+    if (self == nullptr || !CommandLine_opened(self) || !CommandLine_hasApp(self)) {
         THROW("CommandLine run: not open or no app");
         return 1;
     }
     u32 expected = COMMANDLINE_RUN_IDLE;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+    if (!atomic_compare_exchange_strong_explicit(CommandLine_runMut(self), &expected,
             COMMANDLINE_RUN_RUNNING, memory_order_acq_rel, memory_order_relaxed)) {
         if (expected == COMMANDLINE_RUN_CANCELLED)
             THROW("CommandLine run: session was cancelled; reopen the device for a new loop");
@@ -330,8 +394,8 @@ i32 CommandLine_run(CommandLine *self) {
         return 1;
     }
     i32 rc = 0;
-    CommandLineApp app = (*self).app;
-    while (atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_RUNNING) {
+    CommandLineApp app = CommandLine_appVal(self);
+    while (atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire) == COMMANDLINE_RUN_RUNNING) {
         CommandLineEvent ev;
         if (CommandLine_poll(self, 50, &ev)) {
             if (ev.kind == COMMANDLINE_EVENT_RESIZE) {
@@ -339,18 +403,18 @@ i32 CommandLine_run(CommandLine *self) {
                 continue;   // revalidate already drew + presented
             }
             if (app.input != nullptr) {
-                (*self).active = true;
+                CommandLine_setActive(self, true);
                 bool ok = app.input(app.ctx, self, &ev);
-                (*self).active = false;
+                CommandLine_setActive(self, false);
                 if (!ok) {
                     cmdRequestCancel(self);
                     break;
                 }
             }
         }
-        (*self).active = true;
+        CommandLine_setActive(self, true);
         bool drew = app.draw(app.ctx, self);
-        (*self).active = false;
+        CommandLine_setActive(self, false);
         if (!drew || !CommandLine_present(self)) {
             rc = 1;
             break;
@@ -359,7 +423,7 @@ i32 CommandLine_run(CommandLine *self) {
     // A stop leaves CANCELLED visible; a failure exit returns to IDLE so the
     // same device can be run again.
     expected = COMMANDLINE_RUN_RUNNING;
-    atomic_compare_exchange_strong_explicit(&(*self).run, &expected,
+    atomic_compare_exchange_strong_explicit(CommandLine_runMut(self), &expected,
         COMMANDLINE_RUN_IDLE, memory_order_acq_rel, memory_order_relaxed);
     return rc;
 }
@@ -374,43 +438,44 @@ fn CommandLine_requestCancel(CommandLine *self) {
 }
 
 bool CommandLine_isRunning(const CommandLine *self) {
-    return self && atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_RUNNING;
+    return self && atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire) == COMMANDLINE_RUN_RUNNING;
 }
 
 CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self) {
     if (self == nullptr)
         return COMMANDLINE_RUN_IDLE;
-    return (CommandLineRunPhase) atomic_load_explicit(&(*self).run, memory_order_acquire);
+    return (CommandLineRunPhase) atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire);
 }
 
-bytes CommandLine_getWidth(const CommandLine *self) { return self ? (*self).width : 0; }
-bytes CommandLine_getHeight(const CommandLine *self) { return self ? (*self).height : 0; }
-bytes CommandLine_getCapacity(const CommandLine *self) { return self ? (*self).capacity : 0; }
-char *CommandLine_getCells(CommandLine *self) { return self ? (*self).cells : nullptr; }
-const char *CommandLine_getCellsConst(const CommandLine *self) { return self ? (*self).cells : nullptr; }
+bytes CommandLine_getWidth(const CommandLine *self) { return self ? CommandLine_width(self) : 0; }
+bytes CommandLine_getHeight(const CommandLine *self) { return self ? CommandLine_height(self) : 0; }
+bytes CommandLine_getCapacity(const CommandLine *self) { return self ? CommandLine_capacity(self) : 0; }
+char *CommandLine_getCells(CommandLine *self) { return self ? CommandLine_cells(self) : nullptr; }
+const char *CommandLine_getCellsConst(const CommandLine *self) { return self ? CommandLine_cells(self) : nullptr; }
 
 bool CommandLine_clear(CommandLine *self) {
-    if (self == nullptr || (*self).cells == nullptr)
+    char *cells = self ? CommandLine_cells(self) : nullptr;
+    if (self == nullptr || cells == nullptr)
         return false;
-    memset((*self).cells, ' ', (*self).width * (*self).height);
+    memset(cells, ' ', CommandLine_width(self) * CommandLine_height(self));
     return true;
 }
 
 bool CommandLine_poll(CommandLine *self, i32 timeoutMs, CommandLineEvent *out) {
     if (out != nullptr)
         *out = (CommandLineEvent) { .kind = COMMANDLINE_EVENT_NONE };
-    if (self == nullptr || out == nullptr || !(*self).opened)
+    if (self == nullptr || out == nullptr || !CommandLine_opened(self))
         return false;
-    CommandLineIo io = (*self).io;
+    CommandLineIo io = CommandLine_ioVal(self);
     if (io.poll == nullptr)
         return false;
     return io.poll(io.ctx, timeoutMs, out);
 }
 
 bool CommandLine_setMouseReporting(CommandLine *self, bool enabled) {
-    if (self == nullptr || !(*self).opened)
+    if (self == nullptr || !CommandLine_opened(self))
         return false;
-    CommandLineIo io = (*self).io;
+    CommandLineIo io = CommandLine_ioVal(self);
     if (io.setMouse == nullptr)
         return false;
     return io.setMouse(io.ctx, enabled);
@@ -421,19 +486,21 @@ fn CommandLine_setTitle(CommandLine *self, const char *title) {
         return;
     const char *src = title ? title : "vex";
     bytes n = strlen(src);
-    if (n >= sizeof((*self).title))
-        n = sizeof((*self).title) - 1;
-    memcpy((*self).title, src, n);
-    (*self).title[n] = '\0';
+    bytes cap = sizeof(((CommandLine) {0}).title);
+    if (n >= cap)
+        n = cap - 1;
+    char *buf = CommandLine_titleMut(self);
+    memcpy(buf, src, n);
+    buf[n] = '\0';
 }
 
-const char *CommandLine_getTitle(const CommandLine *self) { return self ? (*self).title : "vex"; }
-u64 CommandLine_getGeneration(const CommandLine *self) { return self ? (*self).generation : 0; }
-bytes CommandLine_exhaustionCount(const CommandLine *self) { return self ? (*self).refusalCount : 0; }
-bool CommandLine_isOpen(const CommandLine *self) { return self && (*self).opened; }
-bool CommandLine_isActive(const CommandLine *self) { return self && (*self).active; }
+const char *CommandLine_getTitle(const CommandLine *self) { return self ? CommandLine_titlePtr(self) : "vex"; }
+u64 CommandLine_getGeneration(const CommandLine *self) { return self ? CommandLine_generation(self) : 0; }
+bytes CommandLine_exhaustionCount(const CommandLine *self) { return self ? CommandLine_refusalCount(self) : 0; }
+bool CommandLine_isOpen(const CommandLine *self) { return self && CommandLine_opened(self); }
+bool CommandLine_isActive(const CommandLine *self) { return self && CommandLine_active(self); }
 bool CommandLine_isCancelled(const CommandLine *self) {
-    return self && atomic_load_explicit(&(*self).run, memory_order_acquire) == COMMANDLINE_RUN_CANCELLED;
+    return self && atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire) == COMMANDLINE_RUN_CANCELLED;
 }
 
 bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *outTruncated) {
@@ -446,10 +513,10 @@ bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *
         return false;
     }
     i32 n = self ? snprintf(dest, cap, "CommandLine{title=\"%s\",%zux%zu,capacity=%zu,generation=%llu,refusalCount=%zu,run=%u,opened=%d,active=%d,hasApp=%d}",
-        (*self).title, (*self).width, (*self).height, (*self).capacity,
-        (u64) (*self).generation, (*self).refusalCount,
-        (u32) atomic_load_explicit(&(*self).run, memory_order_acquire),
-        (*self).opened, (*self).active, CommandLine_hasApp(self))
+        CommandLine_titlePtr(self), CommandLine_width(self), CommandLine_height(self), CommandLine_capacity(self),
+        (u64) CommandLine_generation(self), CommandLine_refusalCount(self),
+        (u32) atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire),
+        CommandLine_opened(self), CommandLine_active(self), CommandLine_hasApp(self))
         : snprintf(dest, cap, "nullptr");
     bool cut = n < 0 || (bytes) n >= cap;
     if (outTruncated != nullptr)

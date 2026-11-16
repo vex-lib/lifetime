@@ -153,8 +153,97 @@ static _Thread_local Application *s_current;
 // workerDone and hadWindows are one-way latches, not phases: they are set at
 // most once per launch and never combined into a lifecycle decision.
 
+;;GETTER
+static atomic_uint *Application_phaseMut(Application *self) { return &(*self).phase; }
+;;GETTER
+static const atomic_uint *Application_phasePtr(const Application *self) { return &(*self).phase; }
+;;GETTER
+static u32 Application_windowCount(const Application *self) { return (*self).window_count; }
+;;SETTER
+static fn Application_setWindowCount(Application *self, u32 v) { (*self).window_count = v; }
+;;GETTER
+static Window **Application_windowsMut(Application *self) { return (*self).windows; }
+;;GETTER
+static Window *Application_windowAt(const Application *self, u32 i) { return (*self).windows[i]; }
+;;SETTER
+static fn Application_setWindowAt(Application *self, u32 i, Window *w) { (*self).windows[i] = w; }
+;;GETTER
+static bool Application_hadWindows(const Application *self) { return (*self).hadWindows; }
+;;SETTER
+static fn Application_setHadWindows(Application *self, bool v) { (*self).hadWindows = v; }
+;;GETTER
+static any Application_hostLifetime(const Application *self) { return (*self).hostLifetime; }
+;;GETTER
+static pthread_mutex_t *Application_invokeMutexMut(Application *self) { return &(*self).invokeMutex; }
+;;GETTER
+static pthread_cond_t *Application_invokeConditionMut(Application *self) { return &(*self).invokeCondition; }
+;;GETTER
+static char *Application_nameMut(Application *self) { return (*self).name; }
+;;GETTER
+static char *Application_authorMut(Application *self) { return (*self).author; }
+;;GETTER
+static char *Application_versionMut(Application *self) { return (*self).version; }
+;;GETTER
+static char *Application_iconPathMut(Application *self) { return (*self).iconPath; }
+;;GETTER
+static u32 Application_startCount(const Application *self) { return (*self).startCount; }
+;;SETTER
+static fn Application_setStartCount(Application *self, u32 v) { (*self).startCount = v; }
+;;GETTER
+static ApplicationEventFn Application_startFnAt(const Application *self, u32 i) { return (*self).startFns[i]; }
+;;SETTER
+static fn Application_setStartFnAt(Application *self, u32 i, ApplicationEventFn f) { (*self).startFns[i] = f; }
+;;GETTER
+static any Application_startUserAt(const Application *self, u32 i) { return (*self).startUsers[i]; }
+;;SETTER
+static fn Application_setStartUserAt(Application *self, u32 i, any u) { (*self).startUsers[i] = u; }
+;;GETTER
+static atomic_bool *Application_workerDoneMut(Application *self) { return &(*self).workerDone; }
+;;GETTER
+static pthread_t Application_ownerThread(const Application *self) { return (*self).ownerThread; }
+;;SETTER
+static fn Application_setOwnerThread(Application *self, pthread_t t) { (*self).ownerThread = t; }
+;;GETTER
+static pthread_t *Application_startThreadMut(Application *self) { return &(*self).startThread; }
+;;GETTER
+static pthread_t Application_startThread(const Application *self) { return (*self).startThread; }
+;;GETTER
+static bool Application_workerLaunched(const Application *self) { return (*self).workerLaunched; }
+;;SETTER
+static fn Application_setWorkerLaunched(Application *self, bool v) { (*self).workerLaunched = v; }
+;;GETTER
+static ApplicationEventFn Application_pollFnAt(const Application *self, u32 i) { return (*self).pollFns[i]; }
+;;SETTER
+static fn Application_setPollFnAt(Application *self, u32 i, ApplicationEventFn f) { (*self).pollFns[i] = f; }
+;;GETTER
+static any Application_pollUserAt(const Application *self, u32 i) { return (*self).pollUsers[i]; }
+;;SETTER
+static fn Application_setPollUserAt(Application *self, u32 i, any u) { (*self).pollUsers[i] = u; }
+;;GETTER
+static AppInvokePhase Application_invokePhase(const Application *self) { return (*self).invokePhase; }
+;;SETTER
+static fn Application_setInvokePhase(Application *self, AppInvokePhase p) { (*self).invokePhase = p; }
+;;GETTER
+static ApplicationEventFn Application_invokeFn(const Application *self) { return (*self).invokeFn; }
+;;SETTER
+static fn Application_setInvokeFn(Application *self, ApplicationEventFn f) { (*self).invokeFn = f; }
+;;GETTER
+static any Application_invokeUser(const Application *self) { return (*self).invokeUser; }
+;;SETTER
+static fn Application_setInvokeUser(Application *self, any u) { (*self).invokeUser = u; }
+;;GETTER
+static AppHotReloadFn Application_hotReloadFn(const Application *self) { return (*self).hotReloadFn; }
+;;SETTER
+static fn Application_setHotReloadFn(Application *self, AppHotReloadFn f) { (*self).hotReloadFn = f; }
+;;GETTER
+static any Application_hotReloadUserdata(const Application *self) { return (*self).hotReloadUserdata; }
+;;SETTER
+static fn Application_setHotReloadUserdata(Application *self, any u) { (*self).hotReloadUserdata = u; }
+;;GETTER
+static AppHotPollFn Application_hotPoll(const Application *self) { return (*self).hotPoll; }
+
 static AppPhase appPhase(const Application *self) {
-    return (AppPhase) atomic_load_explicit(&(*self).phase, memory_order_acquire);
+    return (AppPhase) atomic_load_explicit(Application_phasePtr(self), memory_order_acquire);
 }
 
 static bool appPhaseRunning(AppPhase phase) {
@@ -167,11 +256,11 @@ static bool appPhaseActive(AppPhase phase) {
 
 /** IDLE or STOPPED -> STARTING. Refused from every admitted phase. */
 static bool appPhaseBegin(Application *self) {
-    u32 expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    u32 expected = atomic_load_explicit(Application_phaseMut(self), memory_order_relaxed);
     for (;;) {
         if (expected != APP_PHASE_IDLE && expected != APP_PHASE_STOPPED)
             return false;
-        if (atomic_compare_exchange_weak_explicit(&(*self).phase, &expected,
+        if (atomic_compare_exchange_weak_explicit(Application_phaseMut(self), &expected,
                 APP_PHASE_STARTING, memory_order_acq_rel, memory_order_relaxed))
             return true;
     }
@@ -180,17 +269,17 @@ static bool appPhaseBegin(Application *self) {
 /** STARTING -> RUNNING, by the startup worker (or by begin when it is empty). */
 static fn appPhaseAdvance(Application *self) {
     u32 expected = APP_PHASE_STARTING;
-    atomic_compare_exchange_strong_explicit(&(*self).phase, &expected,
+    atomic_compare_exchange_strong_explicit(Application_phaseMut(self), &expected,
         APP_PHASE_RUNNING, memory_order_acq_rel, memory_order_relaxed);
 }
 
 /** Any admitted phase -> CLOSING. Idempotent; a no-op in IDLE/STOPPED. */
 static fn appPhaseClose(Application *self) {
-    u32 expected = atomic_load_explicit(&(*self).phase, memory_order_relaxed);
+    u32 expected = atomic_load_explicit(Application_phaseMut(self), memory_order_relaxed);
     for (;;) {
         if (!appPhaseActive((AppPhase) expected))
             return;
-        if (atomic_compare_exchange_weak_explicit(&(*self).phase, &expected,
+        if (atomic_compare_exchange_weak_explicit(Application_phaseMut(self), &expected,
                 APP_PHASE_CLOSING, memory_order_acq_rel, memory_order_relaxed))
             return;
     }
@@ -198,7 +287,7 @@ static fn appPhaseClose(Application *self) {
 
 /** CLOSING -> STOPPED, by the owner after the worker join. */
 static fn appPhaseStop(Application *self) {
-    atomic_store_explicit(&(*self).phase, APP_PHASE_STOPPED, memory_order_release);
+    atomic_store_explicit(Application_phaseMut(self), APP_PHASE_STOPPED, memory_order_release);
 }
 
 ;;INTENTION("Application_start owns lifetime, not scene timing: startup callbacks "
@@ -235,10 +324,11 @@ fn Application_shutdown() {
 
 /** Returns true only when the application had windows and all are closing. */
 static bool appAllWindowsClosed(const Application *self) {
-    if ((*self).window_count == 0)
-        return (*self).hadWindows;
-    for (u32 i = 0; i < (*self).window_count; i++)
-        if (!Window_shouldClose((*self).windows[i]))
+    u32 count = Application_windowCount(self);
+    if (count == 0)
+        return Application_hadWindows(self);
+    for (u32 i = 0; i < count; i++)
+        if (!Window_shouldClose(Application_windowAt(self, i)))
             return false;
     return true;
 }
@@ -255,8 +345,9 @@ static fn appParkSlice(Application *self) {
         Key_dispatchEvents(); Mouse_dispatchEvents(); Touch_dispatchEvents();
         s_current = previous;
         Application_poll(self);
-        if ((*self).hostLifetime)
-            Lifetime_resetTransient((Lifetime*) (*self).hostLifetime);
+        any hostLifetime = Application_hostLifetime(self);
+        if (hostLifetime)
+            Lifetime_resetTransient((Lifetime*) hostLifetime);
         struct timespec slice = { APP_PARK_SLICE_NS / 1000000000ULL,
                                   APP_PARK_SLICE_NS % 1000000000ULL };
         nanosleep(&slice, nullptr);
@@ -269,11 +360,11 @@ Application *Application_0() {
     Application_init();
     Application *self = (Application*) calloc(1, sizeof(Application));
     if (!self) return nullptr;
-    if (pthread_mutex_init(&(*self).invokeMutex, nullptr) != 0) { free(self); return nullptr; }
-    if (pthread_cond_init(&(*self).invokeCondition, nullptr) != 0) {
-        pthread_mutex_destroy(&(*self).invokeMutex); free(self); return nullptr;
+    if (pthread_mutex_init(Application_invokeMutexMut(self), nullptr) != 0) { free(self); return nullptr; }
+    if (pthread_cond_init(Application_invokeConditionMut(self), nullptr) != 0) {
+        pthread_mutex_destroy(Application_invokeMutexMut(self)); free(self); return nullptr;
     }
-    strncpy((*self).name, "vex", APP_MAX_NAME - 1);
+    strncpy(Application_nameMut(self), "vex", APP_MAX_NAME - 1);
     return self;
 }
 
@@ -302,17 +393,17 @@ fn Application_free(Application *self) {
     // Caller must return from start/run (worker quiescence) before freeing.
     if (appPhaseActive(appPhase(self)))
         return;
-    pthread_cond_destroy(&(*self).invokeCondition);
-    pthread_mutex_destroy(&(*self).invokeMutex);
+    pthread_cond_destroy(Application_invokeConditionMut(self));
+    pthread_mutex_destroy(Application_invokeMutexMut(self));
     free(self);
 }
 
 /** Runs registered start callbacks on the worker until stopped, then marks it done. */
 static any appStartWorker(any userdata) {
     Application *self = userdata;
-    for (u32 i = 0; i < (*self).startCount && Application_isRunning(self); i++)
-        (*self).startFns[i](self, (*self).startUsers[i]);
-    atomic_store_explicit(&(*self).workerDone, true, memory_order_release);
+    for (u32 i = 0; i < Application_startCount(self) && Application_isRunning(self); i++)
+        Application_startFnAt(self, i)(self, Application_startUserAt(self, i));
+    atomic_store_explicit(Application_workerDoneMut(self), true, memory_order_release);
     appPhaseAdvance(self); // STARTING -> RUNNING; a pending close keeps CLOSING
     return nullptr;
 }
@@ -326,19 +417,22 @@ Application *Application_current() {
 bool Application_begin(Application *self) {
     if (!self) return false;
     if (!appPhaseBegin(self)) return false;
-    (*self).ownerThread = pthread_self();
-    bool hasWorker = (*self).startCount != 0;
-    atomic_store(&(*self).workerDone, !hasWorker);
-    for (u32 i = 0; i < (*self).window_count; i++)
-        if (!Window_shouldClose((*self).windows[i])) Window_show((*self).windows[i]);
+    Application_setOwnerThread(self, pthread_self());
+    bool hasWorker = Application_startCount(self) != 0;
+    atomic_store(Application_workerDoneMut(self), !hasWorker);
+    u32 count = Application_windowCount(self);
+    for (u32 i = 0; i < count; i++) {
+        Window *w = Application_windowAt(self, i);
+        if (!Window_shouldClose(w)) Window_show(w);
+    }
     if (hasWorker) {
-        if (pthread_create(&(*self).startThread, nullptr, appStartWorker, self) != 0) {
-            atomic_store(&(*self).workerDone, true);
+        if (pthread_create(Application_startThreadMut(self), nullptr, appStartWorker, self) != 0) {
+            atomic_store(Application_workerDoneMut(self), true);
             appPhaseClose(self);
             Application_finish(self);
             return false;
         }
-        (*self).workerLaunched = true;
+        Application_setWorkerLaunched(self, true);
     } else {
         appPhaseAdvance(self);
     }
@@ -354,39 +448,41 @@ fn Application_start(Application *self) {
 fn Application_close(Application *self) {
     if (!self) return;
     appPhaseClose(self);
-    pthread_mutex_lock(&(*self).invokeMutex);
-    pthread_cond_broadcast(&(*self).invokeCondition);
-    pthread_mutex_unlock(&(*self).invokeMutex);
+    pthread_mutex_lock(Application_invokeMutexMut(self));
+    pthread_cond_broadcast(Application_invokeConditionMut(self));
+    pthread_mutex_unlock(Application_invokeMutexMut(self));
 }
 
 /** Registers a startup callback before the application becomes active. */
 bool Application_addStartEvent(Application *self, ApplicationEventFn fn, any userdata) {
-    if (!self || !fn || appPhaseActive(appPhase(self)) || (*self).startCount == APP_MAX_EVENTS) return false;
-    u32 i = (*self).startCount++;
-    (*self).startFns[i] = fn; (*self).startUsers[i] = userdata;
+    if (!self || !fn || appPhaseActive(appPhase(self)) || Application_startCount(self) == APP_MAX_EVENTS) return false;
+    u32 i = Application_startCount(self);
+    Application_setStartCount(self, i + 1);
+    Application_setStartFnAt(self, i, fn); Application_setStartUserAt(self, i, userdata);
     return true;
 }
 
 /** Registers an owner-thread poll callback, accepting an identical registration once. */
 bool Application_addPollEvent(Application *self, ApplicationEventFn fn, any userdata) {
     if (!self || !fn) return false;
-    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), Application_ownerThread(self))) return false;
     u32 empty = APP_MAX_EVENTS;
     for (u32 i = 0; i < APP_MAX_EVENTS; i++) {
-        if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) return true;
-        if (!(*self).pollFns[i] && empty == APP_MAX_EVENTS) empty = i;
+        ApplicationEventFn curFn = Application_pollFnAt(self, i);
+        if (curFn == fn && Application_pollUserAt(self, i) == userdata) return true;
+        if (!curFn && empty == APP_MAX_EVENTS) empty = i;
     }
     if (empty == APP_MAX_EVENTS) return false;
-    (*self).pollFns[empty] = fn; (*self).pollUsers[empty] = userdata; return true;
+    Application_setPollFnAt(self, empty, fn); Application_setPollUserAt(self, empty, userdata); return true;
 }
 
 /** Removes the matching poll callback and userdata pair. */
 bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const_any userdata) {
     if (!self) return false;
-    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), Application_ownerThread(self))) return false;
     for (u32 i = 0; i < APP_MAX_EVENTS; i++)
-        if ((*self).pollFns[i] == fn && (*self).pollUsers[i] == userdata) {
-            (*self).pollFns[i] = nullptr; (*self).pollUsers[i] = nullptr; return true;
+        if (Application_pollFnAt(self, i) == fn && Application_pollUserAt(self, i) == userdata) {
+            Application_setPollFnAt(self, i, nullptr); Application_setPollUserAt(self, i, nullptr); return true;
         }
     return false;
 }
@@ -394,59 +490,62 @@ bool Application_removePollEvent(Application *self, ApplicationEventFn fn, const
 /** Runs immediately on the owner thread or queues work and waits for its completion. */
 bool Application_invoke(Application *self, ApplicationEventFn fn, any userdata) {
     if (!self || !fn || !Application_isRunning(self)) return false;
-    if (pthread_equal(pthread_self(), (*self).ownerThread)) {
+    if (pthread_equal(pthread_self(), Application_ownerThread(self))) {
         Application *previous = s_current; s_current = self;
         fn(self, userdata); s_current = previous; return true;
     }
-    pthread_mutex_lock(&(*self).invokeMutex);
-    while ((*self).invokePhase != APP_INVOKE_IDLE && Application_isRunning(self))
-        pthread_cond_wait(&(*self).invokeCondition, &(*self).invokeMutex);
-    if (!Application_isRunning(self)) { pthread_mutex_unlock(&(*self).invokeMutex); return false; }
-    (*self).invokeFn = fn; (*self).invokeUser = userdata;
-    (*self).invokePhase = APP_INVOKE_PENDING;
+    pthread_mutex_lock(Application_invokeMutexMut(self));
+    while (Application_invokePhase(self) != APP_INVOKE_IDLE && Application_isRunning(self))
+        pthread_cond_wait(Application_invokeConditionMut(self), Application_invokeMutexMut(self));
+    if (!Application_isRunning(self)) { pthread_mutex_unlock(Application_invokeMutexMut(self)); return false; }
+    Application_setInvokeFn(self, fn); Application_setInvokeUser(self, userdata);
+    Application_setInvokePhase(self, APP_INVOKE_PENDING);
     // Once admitted, wait for completion even if the callback requests close.
-    while ((*self).invokePhase != APP_INVOKE_IDLE)
-        pthread_cond_wait(&(*self).invokeCondition, &(*self).invokeMutex);
-    pthread_mutex_unlock(&(*self).invokeMutex);
+    while (Application_invokePhase(self) != APP_INVOKE_IDLE)
+        pthread_cond_wait(Application_invokeConditionMut(self), Application_invokeMutexMut(self));
+    pthread_mutex_unlock(Application_invokeMutexMut(self));
     return true;
 }
 
 /** Executes queued owner work and registered poll callbacks on the owner thread. */
 fn Application_poll(Application *self) {
-    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
+    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), Application_ownerThread(self))) return;
     Application *previous = s_current; s_current = self;
-    pthread_mutex_lock(&(*self).invokeMutex);
-    ApplicationEventFn fn = (*self).invokePhase == APP_INVOKE_PENDING ? (*self).invokeFn : nullptr;
-    any userdata = (*self).invokeUser;
-    if (fn) (*self).invokePhase = APP_INVOKE_EXECUTING;
-    pthread_mutex_unlock(&(*self).invokeMutex);
+    pthread_mutex_lock(Application_invokeMutexMut(self));
+    ApplicationEventFn fn = Application_invokePhase(self) == APP_INVOKE_PENDING ? Application_invokeFn(self) : nullptr;
+    any userdata = Application_invokeUser(self);
+    if (fn) Application_setInvokePhase(self, APP_INVOKE_EXECUTING);
+    pthread_mutex_unlock(Application_invokeMutexMut(self));
     if (fn) {
         fn(self, userdata);
-        pthread_mutex_lock(&(*self).invokeMutex);
-        (*self).invokeFn = nullptr;
-        (*self).invokePhase = APP_INVOKE_IDLE;
-        pthread_cond_broadcast(&(*self).invokeCondition);
-        pthread_mutex_unlock(&(*self).invokeMutex);
+        pthread_mutex_lock(Application_invokeMutexMut(self));
+        Application_setInvokeFn(self, nullptr);
+        Application_setInvokePhase(self, APP_INVOKE_IDLE);
+        pthread_cond_broadcast(Application_invokeConditionMut(self));
+        pthread_mutex_unlock(Application_invokeMutexMut(self));
     }
     if (Application_isRunning(self))
-        for (u32 i = 0; i < APP_MAX_EVENTS; i++)
-            if ((*self).pollFns[i]) (*self).pollFns[i](self, (*self).pollUsers[i]);
+        for (u32 i = 0; i < APP_MAX_EVENTS; i++) {
+            ApplicationEventFn pollFn = Application_pollFnAt(self, i);
+            if (pollFn) pollFn(self, Application_pollUserAt(self, i));
+        }
     s_current = previous;
 }
 
 /** Closes registered windows, drains admitted owner work, joins startup work, and deactivates. */
 fn Application_finish(Application *self) {
-    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), (*self).ownerThread)) return;
+    if (!self || !appPhaseActive(appPhase(self)) || !pthread_equal(pthread_self(), Application_ownerThread(self))) return;
     Application_close(self);
-    for (u32 i = 0; i < (*self).window_count; i++)
-        Window_close((*self).windows[i]);
+    u32 count = Application_windowCount(self);
+    for (u32 i = 0; i < count; i++)
+        Window_close(Application_windowAt(self, i));
     // Drain admitted owner work before joining a worker waiting on that work.
-    while (!atomic_load_explicit(&(*self).workerDone, memory_order_acquire)) {
+    while (!atomic_load_explicit(Application_workerDoneMut(self), memory_order_acquire)) {
         Application_poll(self);
         Window_pollEvents();
         struct timespec slice = {0, 1000000}; nanosleep(&slice, nullptr);
     }
-    if ((*self).workerLaunched) { pthread_join((*self).startThread, nullptr); (*self).workerLaunched = false; }
+    if (Application_workerLaunched(self)) { pthread_join(Application_startThread(self), nullptr); Application_setWorkerLaunched(self, false); }
     appPhaseStop(self);
 }
 
@@ -508,7 +607,7 @@ bool Application_isFinished(const Application *self) {
 fn Application_run(Application *self) {
     if (!self) return;
     if (!appPhaseActive(appPhase(self)) && !Application_begin(self)) return;
-    if (!pthread_equal(pthread_self(), (*self).ownerThread)) return;
+    if (!pthread_equal(pthread_self(), Application_ownerThread(self))) return;
     while (appPhaseRunning(appPhase(self))) {
         if (appAllWindowsClosed(self)) {
             appPhaseClose(self);
@@ -523,24 +622,29 @@ fn Application_run(Application *self) {
 /** Adds a borrowed window unless duplicated, full, or disallowed by active ownership. */
 bool Application_addWindow(Application *self, Window *win) {
     if (!self || !win) return false;
-    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), Application_ownerThread(self))) return false;
     if (appPhase(self) == APP_PHASE_CLOSING) return false;
-    for (u32 i = 0; i < (*self).window_count; i++)
-        if ((*self).windows[i] == win) return false;
-    if ((*self).window_count >= APP_MAX_WINDOWS) return false;
-    (*self).windows[(*self).window_count++] = win;
-    (*self).hadWindows = true;
+    u32 count = Application_windowCount(self);
+    for (u32 i = 0; i < count; i++)
+        if (Application_windowAt(self, i) == win) return false;
+    if (count >= APP_MAX_WINDOWS) return false;
+    Application_setWindowAt(self, count, win);
+    Application_setWindowCount(self, count + 1);
+    Application_setHadWindows(self, true);
     return true;
 }
 
 /** Removes a registered borrowed window without destroying it. */
 bool Application_removeWindow(Application *self, Window *win) {
     if (!self || !win) return false;
-    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), (*self).ownerThread)) return false;
-    for (u32 i = 0; i < (*self).window_count; i++) {
-        if ((*self).windows[i] == win) {
-            (*self).windows[i] = (*self).windows[--(*self).window_count];
-            (*self).windows[(*self).window_count] = nullptr;
+    if (appPhaseActive(appPhase(self)) && !pthread_equal(pthread_self(), Application_ownerThread(self))) return false;
+    u32 count = Application_windowCount(self);
+    for (u32 i = 0; i < count; i++) {
+        if (Application_windowAt(self, i) == win) {
+            u32 last = count - 1;
+            Application_setWindowAt(self, i, Application_windowAt(self, last));
+            Application_setWindowAt(self, last, nullptr);
+            Application_setWindowCount(self, last);
             return true;
         }
     }
@@ -550,18 +654,21 @@ bool Application_removeWindow(Application *self, Window *win) {
 /** Installs the callback notified after a successful generation reload. */
 fn Application_onHotReload(Application *self, AppHotReloadFn fn, any userdata) {
     if (!self) return;
-    (*self).hotReloadFn = fn;
-    (*self).hotReloadUserdata = userdata;
+    Application_setHotReloadFn(self, fn);
+    Application_setHotReloadUserdata(self, userdata);
 }
 
 /** Polls the associated reload watcher via the hotcwap-provided seam. */
 fn Application_pollHot(Application *self) {
-    if (!self || !(*self).hot || !(*self).hotPoll)
+    any hot = self ? Application_getHot(self) : nullptr;
+    AppHotPollFn hotPoll = self ? Application_hotPoll(self) : nullptr;
+    if (!self || !hot || !hotPoll)
         return;
     u32 loaded = 0;
-    i32 r = (*self).hotPoll((*self).hot, &loaded);
-    if (r == 0 && loaded > 0 && (*self).hotReloadFn)
-        (*self).hotReloadFn(self, loaded, (*self).hotReloadUserdata);
+    i32 r = hotPoll(hot, &loaded);
+    AppHotReloadFn reloadFn = Application_hotReloadFn(self);
+    if (r == 0 && loaded > 0 && reloadFn)
+        reloadFn(self, loaded, Application_hotReloadUserdata(self));
 }
 
 // SETTERS (PUBLIC & PRIVATE)
@@ -590,32 +697,36 @@ fn Application_setHostLifetime(Application *self, any lifetime) {
 /** Copies a name into the application's fixed-capacity name field. */
 fn Application_setName(Application *self, const char *name) {
     if (!self || !name) return;
-    strncpy((*self).name, name, APP_MAX_NAME - 1);
-    (*self).name[APP_MAX_NAME - 1] = '\0';
+    char *buf = Application_nameMut(self);
+    strncpy(buf, name, APP_MAX_NAME - 1);
+    buf[APP_MAX_NAME - 1] = '\0';
 }
 
 ;;SETTER
 /** Copies an author label into the application's fixed-capacity field. */
 fn Application_setAuthor(Application *self, const char *author) {
     if (!self || !author) return;
-    strncpy((*self).author, author, APP_MAX_NAME - 1);
-    (*self).author[APP_MAX_NAME - 1] = '\0';
+    char *buf = Application_authorMut(self);
+    strncpy(buf, author, APP_MAX_NAME - 1);
+    buf[APP_MAX_NAME - 1] = '\0';
 }
 
 ;;SETTER
 /** Copies a version string into the application's fixed-capacity field. */
 fn Application_setVersion(Application *self, const char *version) {
     if (!self || !version) return;
-    strncpy((*self).version, version, APP_MAX_VERSION - 1);
-    (*self).version[APP_MAX_VERSION - 1] = '\0';
+    char *buf = Application_versionMut(self);
+    strncpy(buf, version, APP_MAX_VERSION - 1);
+    buf[APP_MAX_VERSION - 1] = '\0';
 }
 
 ;;SETTER
 /** Copies an icon path into the application's fixed-capacity field. */
 fn Application_setIconPath(Application *self, const char *iconPath) {
     if (!self || !iconPath) return;
-    strncpy((*self).iconPath, iconPath, APP_MAX_ICON_PATH - 1);
-    (*self).iconPath[APP_MAX_ICON_PATH - 1] = '\0';
+    char *buf = Application_iconPathMut(self);
+    strncpy(buf, iconPath, APP_MAX_ICON_PATH - 1);
+    buf[APP_MAX_ICON_PATH - 1] = '\0';
 }
 
 // GETTERS (PUBLIC & PRIVATE)

@@ -110,53 +110,77 @@ static fn processSpawnSleepSlice() {
     nanosleep(&slice, nullptr);
 }
 
+;;GETTER
+static ProcessSpawnJob *ProcessSpawn_jobsMut(ProcessSpawn *self) { return (*self).jobs; }
+;;GETTER
+static const ProcessSpawnJob *ProcessSpawn_jobsPtr(const ProcessSpawn *self) { return (*self).jobs; }
+;;GETTER
+static u32 ProcessSpawn_count(const ProcessSpawn *self) { return (*self).count; }
+;;SETTER
+static fn ProcessSpawn_setCount(ProcessSpawn *self, u32 count) { (*self).count = count; }
+;;GETTER
+static i32 ProcessSpawnJob_pid(const ProcessSpawnJob *job) { return (*job).pid; }
+;;SETTER
+static fn ProcessSpawnJob_setPid(ProcessSpawnJob *job, i32 pid) { (*job).pid = pid; }
+;;GETTER
+static i32 ProcessSpawnJob_exitCode(const ProcessSpawnJob *job) { return (*job).exitCode; }
+;;SETTER
+static fn ProcessSpawnJob_setExitCode(ProcessSpawnJob *job, i32 exitCode) { (*job).exitCode = exitCode; }
+;;GETTER
+static bool ProcessSpawnJob_done(const ProcessSpawnJob *job) { return (*job).done; }
+;;SETTER
+static fn ProcessSpawnJob_setDone(ProcessSpawnJob *job, bool done) { (*job).done = done; }
+
 /** Allocate and initialize an empty fixed-slot child-job table. */
 static ProcessSpawn *processSpawnCreate(u64 timeoutMs) {
     ProcessSpawn *self = Memory_alloc(TYPE_PROCESS_SPAWN_SINGLETON, sizeof(ProcessSpawn));
     if (!self)
         return nullptr;
-    (*self).pid = ZERO;
-    (*self).timeoutMs = timeoutMs;
-    (*self).exitCode = 0;
-    (*self).cancelFlag = false;
+    ProcessSpawn_setPid(self, ZERO);
+    ProcessSpawn_setTimeoutMs(self, timeoutMs);
+    ProcessSpawn_setExitCode(self, 0);
+    ProcessSpawn_setCancelFlag(self, false);
+    ProcessSpawnJob *jobs = ProcessSpawn_jobsMut(self);
     for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; i++) {
-        ProcessSpawnJob *job = &(*self).jobs[i];
-        (*job).pid = 0;
-        (*job).exitCode = 0;
-        (*job).done = true;
+        ProcessSpawnJob *job = &jobs[i];
+        ProcessSpawnJob_setPid(job, 0);
+        ProcessSpawnJob_setExitCode(job, 0);
+        ProcessSpawnJob_setDone(job, true);
     }
-    (*self).count = 0;
+    ProcessSpawn_setCount(self, 0);
     return self;
 }
 
 /** Reap each completed child once without blocking and update its slot and live count. */
 static bool processSpawnReapOnce(ProcessSpawn *self) {
     bool allDone = true;
+    ProcessSpawnJob *jobs = ProcessSpawn_jobsMut(self);
     for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; i++) {
-        ProcessSpawnJob *job = &(*self).jobs[i];
-        if ((*job).pid == 0 || (*job).done)
+        ProcessSpawnJob *job = &jobs[i];
+        i32 pid = ProcessSpawnJob_pid(job);
+        if (pid == 0 || ProcessSpawnJob_done(job))
             continue;
         i32 status = 0;
-        pid_t got = waitpid((pid_t)(*job).pid, &status, WNOHANG);
+        pid_t got = waitpid((pid_t)pid, &status, WNOHANG);
         if (got == 0) {
             allDone = false;
             continue;
         }
         if (got < 0) {
-            (*job).exitCode = -1;
-            (*job).done = true;
-            (*self).count -= 1;
+            ProcessSpawnJob_setExitCode(job, -1);
+            ProcessSpawnJob_setDone(job, true);
+            ProcessSpawn_setCount(self, ProcessSpawn_count(self) - 1);
             continue;
         }
         if (WIFEXITED(status))
-            (*job).exitCode = WEXITSTATUS(status);
+            ProcessSpawnJob_setExitCode(job, WEXITSTATUS(status));
         else if (WIFSIGNALED(status))
-            (*job).exitCode = -WTERMSIG(status);
+            ProcessSpawnJob_setExitCode(job, -WTERMSIG(status));
         else
-            (*job).exitCode = -1;
-        (*job).done = true;
-        (*self).count -= 1;
-        (*self).exitCode = (*job).exitCode;
+            ProcessSpawnJob_setExitCode(job, -1);
+        ProcessSpawnJob_setDone(job, true);
+        ProcessSpawn_setCount(self, ProcessSpawn_count(self) - 1);
+        ProcessSpawn_setExitCode(self, ProcessSpawnJob_exitCode(job));
     }
     return allDone;
 }
@@ -183,14 +207,15 @@ fn ProcessSpawn_free(ProcessSpawn *self) {
 /** Start argv[0] through posix_spawnp in a free job slot and record its pid and timeout. */
 bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs,
                         ProcessSpawn *dest) {
-    if (!argv || !(*argv) || !dest)
+    if (!argv || !argv[0] || !dest)
         return false;
-    if ((*dest).cancelFlag)
+    if (ProcessSpawn_isCancelFlag(dest))
         return false;
     ProcessSpawnJob *slot = nullptr;
+    ProcessSpawnJob *jobs = ProcessSpawn_jobsMut(dest);
     for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; i++) {
-        ProcessSpawnJob *job = &(*dest).jobs[i];
-        if ((*job).pid == 0 || (*job).done) {
+        ProcessSpawnJob *job = &jobs[i];
+        if (ProcessSpawnJob_pid(job) == 0 || ProcessSpawnJob_done(job)) {
             slot = job;
             break;
         }
@@ -199,15 +224,15 @@ bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs,
         return false;
     pid_t child = 0;
     char *const *args = (char *const*) argv;
-    i32 rc = posix_spawnp(&child, (*argv), nullptr, nullptr, args, environ);
+    i32 rc = posix_spawnp(&child, argv[0], nullptr, nullptr, args, environ);
     if (rc != 0)
         return false;
-    (*slot).pid = (i32) child;
-    (*slot).exitCode = 0;
-    (*slot).done = false;
-    (*dest).pid = (i32) child;
-    (*dest).timeoutMs = timeoutMs;
-    (*dest).count += 1;
+    ProcessSpawnJob_setPid(slot, (i32) child);
+    ProcessSpawnJob_setExitCode(slot, 0);
+    ProcessSpawnJob_setDone(slot, false);
+    ProcessSpawn_setPid(dest, (i32) child);
+    ProcessSpawn_setTimeoutMs(dest, timeoutMs);
+    ProcessSpawn_setCount(dest, ProcessSpawn_count(dest) + 1);
     return true;
 }
 
@@ -217,14 +242,14 @@ bool ProcessSpawn_poll(ProcessSpawn *self, u64 budgetNs) {
         return false;
     if (budgetNs > PROCESS_SPAWN_POLL_MAX_NS)
         budgetNs = PROCESS_SPAWN_POLL_MAX_NS;
-    if ((*self).cancelFlag)
+    if (ProcessSpawn_isCancelFlag(self))
         return processSpawnReapOnce(self);
     u64 start = processSpawnNowNs();
     for (;;) {
         bool allDone = processSpawnReapOnce(self);
         if (allDone)
             return true;
-        if ((*self).cancelFlag)
+        if (ProcessSpawn_isCancelFlag(self))
             return false;
         if (processSpawnNowNs() - start >= budgetNs)
             return false;
@@ -236,15 +261,18 @@ bool ProcessSpawn_poll(ProcessSpawn *self, u64 budgetNs) {
 fn ProcessSpawn_cancel(ProcessSpawn *self) {
     if (!self)
         return;
-    (*self).cancelFlag = true;
+    ProcessSpawn_setCancelFlag(self, true);
+    ProcessSpawnJob *jobs = ProcessSpawn_jobsMut(self);
     for (u32 i = 0; i < PROCESS_SPAWN_JOBS_MAX; i++) {
-        ProcessSpawnJob *job = &(*self).jobs[i];
-        if ((*job).pid != ZERO && !(*job).done)
-            kill((*job).pid, SIGTERM);
+        ProcessSpawnJob *job = &jobs[i];
+        i32 pid = ProcessSpawnJob_pid(job);
+        if (pid != ZERO && !ProcessSpawnJob_done(job))
+            kill(pid, SIGTERM);
     }
 }
 
 // SETTERS
+;;SETTER
 /** Replace the table's mirrored most-recent pid field. */
 fn ProcessSpawn_setPid(ProcessSpawn *self, i32 pid) {
     if (!self)
@@ -252,6 +280,7 @@ fn ProcessSpawn_setPid(ProcessSpawn *self, i32 pid) {
     (*self).pid = pid;
 }
 
+;;SETTER
 /** Replace the table's default timeout value in milliseconds. */
 fn ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs) {
     if (!self)
@@ -259,6 +288,7 @@ fn ProcessSpawn_setTimeoutMs(ProcessSpawn *self, u64 timeoutMs) {
     (*self).timeoutMs = timeoutMs;
 }
 
+;;SETTER
 /** Replace the table's mirrored last exit-code field. */
 fn ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode) {
     if (!self)
@@ -266,6 +296,7 @@ fn ProcessSpawn_setExitCode(ProcessSpawn *self, i32 exitCode) {
     (*self).exitCode = exitCode;
 }
 
+;;SETTER
 /** Set or clear the cancellation flag without signaling jobs. */
 fn ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag) {
     if (!self)
@@ -274,6 +305,7 @@ fn ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag) {
 }
 
 // GETTERS
+;;GETTER
 /** Return the most-recent pid field, or zero for a null table. */
 i32 ProcessSpawn_getPid(const ProcessSpawn *self) {
     if (!self)
@@ -281,6 +313,7 @@ i32 ProcessSpawn_getPid(const ProcessSpawn *self) {
     return (*self).pid;
 }
 
+;;GETTER
 /** Return the default timeout in milliseconds, or zero for a null table. */
 u64 ProcessSpawn_getTimeoutMs(const ProcessSpawn *self) {
     if (!self)
@@ -288,6 +321,7 @@ u64 ProcessSpawn_getTimeoutMs(const ProcessSpawn *self) {
     return (*self).timeoutMs;
 }
 
+;;GETTER
 /** Return the last reaped exit code, or zero for a null table. */
 i32 ProcessSpawn_getExitCode(const ProcessSpawn *self) {
     if (!self)
@@ -295,6 +329,7 @@ i32 ProcessSpawn_getExitCode(const ProcessSpawn *self) {
     return (*self).exitCode;
 }
 
+;;GETTER
 /** Return the cancellation state, treating a null table as cancelled. */
 bool ProcessSpawn_isCancelFlag(const ProcessSpawn *self) {
     if (!self)
@@ -302,11 +337,12 @@ bool ProcessSpawn_isCancelFlag(const ProcessSpawn *self) {
     return (*self).cancelFlag;
 }
 
+;;GETTER
 /** Return the number of child jobs not yet reaped, or zero for a null table. */
 u32 ProcessSpawn_getCount(const ProcessSpawn *self) {
     if (!self)
         return 0;
-    return (*self).count;
+    return ProcessSpawn_count(self);
 }
 
 /** Return a job slot's pid, or zero for a null table or out-of-range slot. */
@@ -315,8 +351,8 @@ i32 ProcessSpawn_getJobPid(const ProcessSpawn *self, u32 i) {
         return 0;
     if (i >= PROCESS_SPAWN_JOBS_MAX)
         return 0;
-    const ProcessSpawnJob *job = &(*self).jobs[i];
-    return (*job).pid;
+    const ProcessSpawnJob *job = &ProcessSpawn_jobsPtr(self)[i];
+    return ProcessSpawnJob_pid(job);
 }
 
 /** Return a job slot's exit code, or zero for a null table or out-of-range slot. */
@@ -325,8 +361,8 @@ i32 ProcessSpawn_getJobExitCode(const ProcessSpawn *self, u32 i) {
         return 0;
     if (i >= PROCESS_SPAWN_JOBS_MAX)
         return 0;
-    const ProcessSpawnJob *job = &(*self).jobs[i];
-    return (*job).exitCode;
+    const ProcessSpawnJob *job = &ProcessSpawn_jobsPtr(self)[i];
+    return ProcessSpawnJob_exitCode(job);
 }
 
 /** Return whether a job slot is marked done; invalid table or index defaults to true. */
@@ -335,6 +371,6 @@ bool ProcessSpawn_isJobDone(const ProcessSpawn *self, u32 i) {
         return true;
     if (i >= PROCESS_SPAWN_JOBS_MAX)
         return true;
-    const ProcessSpawnJob *job = &(*self).jobs[i];
-    return (*job).done;
+    const ProcessSpawnJob *job = &ProcessSpawn_jobsPtr(self)[i];
+    return ProcessSpawnJob_done(job);
 }

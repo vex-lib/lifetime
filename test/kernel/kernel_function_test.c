@@ -43,13 +43,28 @@ typedef struct TestRunContext {
     pthread_t threadId;
 } TestRunContext;
 
+;;SETTER
+static fn TestRunContext_setThreadId(TestRunContext *ctx, pthread_t threadId) {
+    (*ctx).threadId = threadId;
+}
+
+;;GETTER
+static _Atomic bool *TestRunContext_threadRanMut(TestRunContext *ctx) {
+    return &(*ctx).threadRan;
+}
+
+;;GETTER
+static _Atomic i32 *TestRunContext_counterMut(TestRunContext *ctx) {
+    return &(*ctx).counter;
+}
+
 /** Updates the run fixture from a worker thread to prove asynchronous execution. */
 static fn sampleRunFunction(any userdata) {
     TestRunContext *ctx = (TestRunContext*) userdata;
-    (*ctx).threadId = pthread_self();
-    atomic_store_explicit(&(*ctx).threadRan, true, memory_order_relaxed);
+    TestRunContext_setThreadId(ctx, pthread_self());
+    atomic_store_explicit(TestRunContext_threadRanMut(ctx), true, memory_order_relaxed);
     for (i32 i = 0; i < 5; i++) {
-        atomic_fetch_add_explicit(&(*ctx).counter, 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(TestRunContext_counterMut(ctx), 1, memory_order_relaxed);
         struct timespec ts = {0, 10000000L}; // 10ms
         nanosleep(&ts, nullptr);
     }
@@ -60,11 +75,21 @@ typedef struct TestEndContext {
     Kernel *receivedKernel;
 } TestEndContext;
 
+;;SETTER
+static fn TestEndContext_setReceivedKernel(TestEndContext *ctx, Kernel *kernel) {
+    (*ctx).receivedKernel = kernel;
+}
+
+;;GETTER
+static _Atomic i32 *TestEndContext_endCallsMut(TestEndContext *ctx) {
+    return &(*ctx).endCalls;
+}
+
 /** Records the kernel and call count observed by the end-hook fixture. */
 static fn sampleEndFunction(Kernel *kernel, any userdata) {
     TestEndContext *ctx = (TestEndContext*) userdata;
-    (*ctx).receivedKernel = kernel;
-    atomic_fetch_add_explicit(&(*ctx).endCalls, 1, memory_order_relaxed);
+    TestEndContext_setReceivedKernel(ctx, kernel);
+    atomic_fetch_add_explicit(TestEndContext_endCallsMut(ctx), 1, memory_order_relaxed);
 }
 
 i32 main() {

@@ -73,6 +73,17 @@ typedef struct {
 
 static win_ctx_t *g_winCtx = nullptr;
 
+;;GETTER
+static Window *WinCtx_window(const win_ctx_t *ctx) { return (*ctx).window; }
+;;GETTER
+static Loop *WinCtx_loopMut(win_ctx_t *ctx) { return &(*ctx).loop; }
+;;GETTER
+static i32 WinCtx_frames(const win_ctx_t *ctx) { return (*ctx).frames; }
+;;SETTER
+static fn WinCtx_setFrames(win_ctx_t *ctx, i32 v) { (*ctx).frames = v; }
+;;GETTER
+static i32 WinCtx_frameBudget(const win_ctx_t *ctx) { return (*ctx).frameBudget; }
+
 // --- Input listeners: echo everything the pipeline produces. ---
 
 static fn on_key_down(any self, i32 keyEvent, u64 nanos) {
@@ -87,7 +98,7 @@ static fn on_key_up(any self, i32 keyEvent, u64 nanos) {
            Key_lastHoldDurationNanos(Key_code(keyEvent)) / 1e6,
            Key_taps(Key_code(keyEvent)));
     if (Key_code(keyEvent) == KEY_ESCAPE && g_winCtx)
-        Loop_stop(&(*g_winCtx).loop); // Esc exits the tour
+        Loop_stop(WinCtx_loopMut(g_winCtx)); // Esc exits the tour
 }
 
 /** Reports mouse-button presses with the current pointer position. */
@@ -132,15 +143,18 @@ static const TouchHandler g_touchListener = {
 static fn win_tick(any userdata) {
     win_ctx_t *ctx = userdata;
     Window_pollEvents();
-    Window_dispatchEvents((*ctx).window);
+    Window *w = WinCtx_window(ctx);
+    Window_dispatchEvents(w);
 
-    if (Window_shouldClose((*ctx).window)) {
-        Loop_stop(&(*ctx).loop);
+    if (Window_shouldClose(w)) {
+        Loop_stop(WinCtx_loopMut(ctx));
         return;
     }
-    (*ctx).frames++;
-    if ((*ctx).frameBudget > 0 && (*ctx).frames >= (*ctx).frameBudget)
-        Loop_stop(&(*ctx).loop);
+    i32 frames = WinCtx_frames(ctx) + 1;
+    WinCtx_setFrames(ctx, frames);
+    i32 budget = WinCtx_frameBudget(ctx);
+    if (budget > 0 && frames >= budget)
+        Loop_stop(WinCtx_loopMut(ctx));
 }
 
 // --- The synchronous chrome/policy CONTRACT. ---
@@ -308,23 +322,38 @@ static const chrome_step_t g_steps[] = {
 
 #define STEP_COUNT ((i32)(sizeof(g_steps) / sizeof(g_steps[0])))
 
+;;GETTER
+static bool ChromeStep_closable(const chrome_step_t *s) { return (*s).closable; }
+;;GETTER
+static bool ChromeStep_miniaturizable(const chrome_step_t *s) { return (*s).miniaturizable; }
+;;GETTER
+static bool ChromeStep_resizable(const chrome_step_t *s) { return (*s).resizable; }
+;;GETTER
+static bool ChromeStep_fullscreenButton(const chrome_step_t *s) { return (*s).fullscreen_button; }
+;;GETTER
+static i32 ChromeStep_undecorated(const chrome_step_t *s) { return (*s).undecorated; }
+;;GETTER
+static const char *ChromeStep_label(const chrome_step_t *s) { return (*s).label; }
+
 static const char *greenLabel(const chrome_step_t *step) {
-    if (!(*step).resizable)
+    if (!ChromeStep_resizable(step))
         return "hidden";
-    return (*step).fullscreen_button ? "fullscreen" : "zoom";
+    return ChromeStep_fullscreenButton(step) ? "fullscreen" : "zoom";
 }
 
 /** Applies one scripted window-chrome state to the live test window. */
 static fn applyStep(win_ctx_t *ctx, const chrome_step_t *step) {
-    Window_setClosable((*ctx).window, (*step).closable);
-    Window_setMiniaturizable((*ctx).window, (*step).miniaturizable);
-    Window_setResizable((*ctx).window, (*step).resizable);
-    Window_setFullscreenButton((*ctx).window, (*step).fullscreen_button);
-    if ((*step).undecorated >= 0)
-        Window_setUndecorated((*ctx).window, (*step).undecorated);
+    Window *w = WinCtx_window(ctx);
+    Window_setClosable(w, ChromeStep_closable(step));
+    Window_setMiniaturizable(w, ChromeStep_miniaturizable(step));
+    Window_setResizable(w, ChromeStep_resizable(step));
+    Window_setFullscreenButton(w, ChromeStep_fullscreenButton(step));
+    i32 undec = ChromeStep_undecorated(step);
+    if (undec >= 0)
+        Window_setUndecorated(w, undec);
     printf("step %2d/%d %s | red=%d yellow=%d green=%s\n",
-           ((*ctx).frames / STEP_FRAMES) + 1, STEP_COUNT, (*step).label,
-           Window_isClosable((*ctx).window), Window_isMiniaturizable((*ctx).window),
+           (WinCtx_frames(ctx) / STEP_FRAMES) + 1, STEP_COUNT, ChromeStep_label(step),
+           Window_isClosable(w), Window_isMiniaturizable(w),
            greenLabel(step));
 }
 
@@ -332,16 +361,18 @@ static fn applyStep(win_ctx_t *ctx, const chrome_step_t *step) {
 static fn tour_tick(any userdata) {
     win_ctx_t *ctx = userdata;
     Window_pollEvents();
-    Window_dispatchEvents((*ctx).window);
+    Window *w = WinCtx_window(ctx);
+    Window_dispatchEvents(w);
 
-    if (Window_shouldClose((*ctx).window)) {
-        Loop_stop(&(*ctx).loop);
+    if (Window_shouldClose(w)) {
+        Loop_stop(WinCtx_loopMut(ctx));
         return;
     }
-    i32 step = (*ctx).frames / STEP_FRAMES;
-    if (step < STEP_COUNT && (*ctx).frames % STEP_FRAMES == 0)
+    i32 frames = WinCtx_frames(ctx);
+    i32 step = frames / STEP_FRAMES;
+    if (step < STEP_COUNT && frames % STEP_FRAMES == 0)
         applyStep(ctx, &g_steps[step]);
-    (*ctx).frames++;
+    WinCtx_setFrames(ctx, frames + 1);
 }
 
 /** Runs the bounded sequence of window chrome states used by the demo. */

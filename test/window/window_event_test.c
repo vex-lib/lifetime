@@ -70,6 +70,37 @@ static Recorder g_rec;
 // Counts invocations of a slot whose stored context is null (context is data).
 static i32 g_nullOwnerHits;
 
+;;GETTER
+static i32 Recorder_fired(const Recorder *r) { return (*r).fired; }
+;;SETTER
+static fn Recorder_setFired(Recorder *r, i32 v) { (*r).fired = v; }
+;;SETTER
+static fn Recorder_setLastWindow(Recorder *r, Window *w) { (*r).lastWindow = w; }
+;;SETTER
+static fn Recorder_setResizedW(Recorder *r, i32 w) { (*r).resizedW = w; }
+;;SETTER
+static fn Recorder_setResizedH(Recorder *r, i32 h) { (*r).resizedH = h; }
+;;SETTER
+static fn Recorder_setMovedX(Recorder *r, i32 x) { (*r).movedX = x; }
+;;SETTER
+static fn Recorder_setMovedY(Recorder *r, i32 y) { (*r).movedY = y; }
+;;GETTER
+static i32 Recorder_movedCalls(const Recorder *r) { return (*r).movedCalls; }
+;;SETTER
+static fn Recorder_setMovedCalls(Recorder *r, i32 v) { (*r).movedCalls = v; }
+;;SETTER
+static fn Recorder_setFocused(Recorder *r, bool v) { (*r).focused = v; }
+;;SETTER
+static fn Recorder_setLastVisible(Recorder *r, bool v) { (*r).lastVisible = v; }
+;;GETTER
+static i32 Recorder_occludedCalls(const Recorder *r) { return (*r).occludedCalls; }
+;;SETTER
+static fn Recorder_setOccludedCalls(Recorder *r, i32 v) { (*r).occludedCalls = v; }
+;;GETTER
+static i32 Recorder_quitCalls(const Recorder *r) { return (*r).quitCalls; }
+;;SETTER
+static fn Recorder_setQuitCalls(Recorder *r, i32 v) { (*r).quitCalls = v; }
+
 // Null-guarding slot used to prove that a fire with a null stored context
 // still reaches the callback (the callback is responsible for its own guard).
 static fn onResizedNullOwnerRec(any self, Window *window, i32 width, i32 height) {
@@ -83,93 +114,93 @@ static fn onResizedNullOwnerRec(any self, Window *window, i32 width, i32 height)
 /** Records the resize callback's window and dimensions in the fixture. */
 static fn onResizedRec(any self, Window *window, i32 width, i32 height) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).resizedW = width;
-    (*r).resizedH = height;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setResizedW(r, width);
+    Recorder_setResizedH(r, height);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records the move callback's window and top-left coordinates in the fixture. */
 static fn onMovedRec(any self, Window *window, i32 x, i32 y) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).movedX = x;
-    (*r).movedY = y;
-    (*r).movedCalls++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setMovedX(r, x);
+    Recorder_setMovedY(r, y);
+    Recorder_setMovedCalls(r, Recorder_movedCalls(r) + 1);
 }
 
 /** Records delivery of the fullscreen callback and its window argument. */
 static fn onFullscreenRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records delivery of the minimized callback and its window argument. */
 static fn onMinimizedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records delivery of the restored callback and its window argument. */
 static fn onRestoredRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records delivery of the pressed callback and its window argument. */
 static fn onPressedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records focus acquisition and the associated window. */
 static fn onFocusGainedRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).focused = true;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFocused(r, true);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records focus loss and the associated window. */
 static fn onFocusLostRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).focused = false;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFocused(r, false);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records delivery of the zoom-filled callback and its window argument. */
 static fn onZoomFilledRec(any self, Window *window) {
     Recorder *r = self;
-    (*r).lastWindow = window;
-    (*r).fired++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setFired(r, Recorder_fired(r) + 1);
 }
 
 /** Records the occlusion callback's window and visibility state. */
 static fn onOcclusionRec(any self, Window *window, bool visible) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).lastVisible = visible;
-    (*r).occludedCalls++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setLastVisible(r, visible);
+    Recorder_setOccludedCalls(r, Recorder_occludedCalls(r) + 1);
 }
 
 /** Records a quit request and answers that the window may close. */
 static bool onQuitAllowRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).quitCalls++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setQuitCalls(r, Recorder_quitCalls(r) + 1);
     return true;
 }
 
 /** Records a quit request and answers that the window must remain open. */
 static bool onQuitVetoRec(any self, Window *window) {
     Recorder *r = (Recorder*) self;
-    (*r).lastWindow = window;
-    (*r).quitCalls++;
+    Recorder_setLastWindow(r, window);
+    Recorder_setQuitCalls(r, Recorder_quitCalls(r) + 1);
     return false;
 }
 

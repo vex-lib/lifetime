@@ -73,19 +73,44 @@ struct TrafficLight {
     NSRect lightBase[TRAFFIC_LIGHT_COUNT];
 };
 
+;;GETTER
+static NSWindow *TrafficLight_window(const TrafficLight *self) { return (*self).window; }
+;;SETTER
+static fn TrafficLight_setWindow(TrafficLight *self, NSWindow *w) { (*self).window = w; }
+;;GETTER
+static bool TrafficLight_lightVisibleAt(const TrafficLight *self, i32 i) { return (*self).lightVisible[i]; }
+;;SETTER
+static fn TrafficLight_setLightVisibleAt(TrafficLight *self, i32 i, bool v) { (*self).lightVisible[i] = v; }
+;;GETTER
+static NSRect TrafficLight_lightBaseAt(const TrafficLight *self, i32 i) { return (*self).lightBase[i]; }
+;;SETTER
+static fn TrafficLight_setLightBaseAt(TrafficLight *self, i32 i, NSRect r) { (*self).lightBase[i] = r; }
+;;GETTER
+static f32 TrafficLight_lightOX(const TrafficLight *self) { return (*self).lightOX; }
+;;SETTER
+static fn TrafficLight_setLightOX(TrafficLight *self, f32 v) { (*self).lightOX = v; }
+;;GETTER
+static f32 TrafficLight_lightOY(const TrafficLight *self) { return (*self).lightOY; }
+;;SETTER
+static fn TrafficLight_setLightOY(TrafficLight *self, f32 v) { (*self).lightOY = v; }
+;;GETTER
+static bool TrafficLight_lightBaseSet(const TrafficLight *self) { return (*self).lightBaseSet; }
+;;SETTER
+static fn TrafficLight_setLightBaseSet(TrafficLight *self, bool v) { (*self).lightBaseSet = v; }
+
 /** Creates a traffic-light adapter for the supplied native window handle. */
 TrafficLight *TrafficLight_create(any nsWindowHandle) {
     TrafficLight *self = (TrafficLight*) calloc(1, sizeof(TrafficLight));
     if (self == nullptr)
         return nullptr;
 
-    (*self).window = (__bridge NSWindow*) nsWindowHandle;
-    (*self).lightVisible[TRAFFIC_LIGHT_CLOSE] = true;
-    (*self).lightVisible[TRAFFIC_LIGHT_MINIATURIZE] = true;
-    (*self).lightVisible[TRAFFIC_LIGHT_ZOOM] = true;
-    (*self).lightOX = 0.0f;
-    (*self).lightOY = 0.0f;
-    (*self).lightBaseSet = false;
+    TrafficLight_setWindow(self, (__bridge NSWindow*) nsWindowHandle);
+    TrafficLight_setLightVisibleAt(self, TRAFFIC_LIGHT_CLOSE, true);
+    TrafficLight_setLightVisibleAt(self, TRAFFIC_LIGHT_MINIATURIZE, true);
+    TrafficLight_setLightVisibleAt(self, TRAFFIC_LIGHT_ZOOM, true);
+    TrafficLight_setLightOX(self, 0.0f);
+    TrafficLight_setLightOY(self, 0.0f);
+    TrafficLight_setLightBaseSet(self, false);
     return self;
 }
 
@@ -98,35 +123,37 @@ fn TrafficLight_destroy(TrafficLight *self) {
 /** Recomputes the traffic-light buttons' base positions from the native window. */
 fn TrafficLight_resetBase(TrafficLight *self) {
     if (self != nullptr)
-        (*self).lightBaseSet = false;
+        TrafficLight_setLightBaseSet(self, false);
 }
 
 /** Applies the adapter's current visibility, position, and f32ing settings. */
 fn TrafficLight_refresh(TrafficLight *self) {
-    if (self == nullptr || (*self).window == nil)
+    if (self == nullptr || TrafficLight_window(self) == nil)
         return;
 
     @autoreleasepool {
-        NSWindow *nsw = (*self).window;
+        NSWindow *nsw = TrafficLight_window(self);
         NSButton *buttons[TRAFFIC_LIGHT_COUNT];
         buttons[TRAFFIC_LIGHT_CLOSE] = [nsw standardWindowButton:NSWindowCloseButton];
         buttons[TRAFFIC_LIGHT_MINIATURIZE] = [nsw standardWindowButton:NSWindowMiniaturizeButton];
         buttons[TRAFFIC_LIGHT_ZOOM] = [nsw standardWindowButton:NSWindowZoomButton];
 
-        if (!(*self).lightBaseSet) {
+        if (!TrafficLight_lightBaseSet(self)) {
             for (i32 i = 0; i < TRAFFIC_LIGHT_COUNT; i++)
-                (*self).lightBase[i] = buttons[i] ? [buttons[i] frame] : NSZeroRect;
-            (*self).lightBaseSet = true;
+                TrafficLight_setLightBaseAt(self, i, buttons[i] ? [buttons[i] frame] : NSZeroRect);
+            TrafficLight_setLightBaseSet(self, true);
         }
 
         for (i32 i = 0; i < TRAFFIC_LIGHT_COUNT; i++) {
             if (buttons[i] == nil)
                 continue;
-            [buttons[i] setHidden:(*self).lightVisible[i] ? NO : YES];
-            if ((*self).lightVisible[i] && !NSIsEmptyRect((*self).lightBase[i])) {
-                NSPoint origin = (*self).lightBase[i].origin;
-                origin.x += (CGFloat) (*self).lightOX;
-                origin.y += (CGFloat) (*self).lightOY;
+            bool vis = TrafficLight_lightVisibleAt(self, i);
+            [buttons[i] setHidden:vis ? NO : YES];
+            NSRect base = TrafficLight_lightBaseAt(self, i);
+            if (vis && !NSIsEmptyRect(base)) {
+                NSPoint origin = base.origin;
+                origin.x += (CGFloat) TrafficLight_lightOX(self);
+                origin.y += (CGFloat) TrafficLight_lightOY(self);
                 [buttons[i] setFrameOrigin:origin];
             }
         }
@@ -137,7 +164,7 @@ fn TrafficLight_refresh(TrafficLight *self) {
 fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, bool visible) {
     if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
         return;
-    (*self).lightVisible[button] = visible;
+    TrafficLight_setLightVisibleAt(self, button, visible);
     TrafficLight_refresh(self);
 }
 
@@ -145,29 +172,29 @@ fn TrafficLight_setButtonVisible(TrafficLight *self, TrafficLightButton button, 
 bool TrafficLight_isButtonVisible(const TrafficLight *self, TrafficLightButton button) {
     if (self == nullptr || (i32) button < 0 || button >= TRAFFIC_LIGHT_COUNT)
         return false;
-    return (*self).lightVisible[button];
+    return TrafficLight_lightVisibleAt(self, button);
 }
 
 /** Sets the header-relative position used by the adapter. */
 fn TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y) {
-    if (self == nullptr || (*self).window == nil)
+    if (self == nullptr || TrafficLight_window(self) == nil)
         return;
 
     @autoreleasepool {
-        NSWindow *nsw = (*self).window;
+        NSWindow *nsw = TrafficLight_window(self);
         NSButton *close = [nsw standardWindowButton:NSWindowCloseButton];
         if (close == nil)
             return;
-        if (!(*self).lightBaseSet)
+        if (!TrafficLight_lightBaseSet(self))
             TrafficLight_refresh(self);
-        NSRect base = (*self).lightBase[TRAFFIC_LIGHT_CLOSE];
+        NSRect base = TrafficLight_lightBaseAt(self, TRAFFIC_LIGHT_CLOSE);
         if (NSIsEmptyRect(base))
             return;
         CGFloat h = [[nsw contentView] bounds].size.height;
         CGFloat wantX = (CGFloat) x;
         CGFloat wantY = h - (CGFloat) y - base.size.height;
-        (*self).lightOX = (f32) (wantX - base.origin.x);
-        (*self).lightOY = (f32) (wantY - base.origin.y);
+        TrafficLight_setLightOX(self, (f32) (wantX - base.origin.x));
+        TrafficLight_setLightOY(self, (f32) (wantY - base.origin.y));
         TrafficLight_refresh(self);
     }
 }
@@ -176,15 +203,15 @@ fn TrafficLight_setHeaderPosition(TrafficLight *self, f32 x, f32 y) {
 fn TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY) {
     f32 x = 0.0f;
     f32 y = 0.0f;
-    if (self != nullptr && (*self).window != nil) {
+    if (self != nullptr && TrafficLight_window(self) != nil) {
         @autoreleasepool {
-            NSWindow *nsw = (*self).window;
+            NSWindow *nsw = TrafficLight_window(self);
             NSButton *close = [nsw standardWindowButton:NSWindowCloseButton];
-            NSRect base = (*self).lightBase[TRAFFIC_LIGHT_CLOSE];
-            if (close != nil && (*self).lightBaseSet && !NSIsEmptyRect(base)) {
+            NSRect base = TrafficLight_lightBaseAt(self, TRAFFIC_LIGHT_CLOSE);
+            if (close != nil && TrafficLight_lightBaseSet(self) && !NSIsEmptyRect(base)) {
                 CGFloat h = [[nsw contentView] bounds].size.height;
-                CGFloat curX = base.origin.x + (CGFloat) (*self).lightOX;
-                CGFloat curY = base.origin.y + (CGFloat) (*self).lightOY;
+                CGFloat curX = base.origin.x + (CGFloat) TrafficLight_lightOX(self);
+                CGFloat curY = base.origin.y + (CGFloat) TrafficLight_lightOY(self);
                 x = (f32) curX;
                 y = (f32) (h - curY - base.size.height);
             }
@@ -198,11 +225,11 @@ fn TrafficLight_getHeaderPosition(const TrafficLight *self, f32 *outX, f32 *outY
 
 /** Enables or disables f32ing behavior for the native traffic-light buttons. */
 fn TrafficLight_setFloating(TrafficLight *self, bool f32ing) {
-    if (self == nullptr || (*self).window == nil)
+    if (self == nullptr || TrafficLight_window(self) == nil)
         return;
 
     @autoreleasepool {
-        NSWindow *nsw = (*self).window;
+        NSWindow *nsw = TrafficLight_window(self);
         NSWindowStyleMask mask = [nsw styleMask];
         if (f32ing) {
             [nsw setStyleMask:(mask | NSWindowStyleMaskFullSizeContentView)];
@@ -213,7 +240,7 @@ fn TrafficLight_setFloating(TrafficLight *self, bool f32ing) {
             [nsw setTitlebarAppearsTransparent:NO];
             [nsw setTitleVisibility:NSWindowTitleVisible];
         }
-        (*self).lightBaseSet = false;
+        TrafficLight_setLightBaseSet(self, false);
         TrafficLight_refresh(self);
     }
 }

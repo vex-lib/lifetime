@@ -92,6 +92,71 @@ Process *Process_2(ProcessEntry entry, any context) {
     return Process_3(nullptr, entry, context);
 }
 
+;;GETTER
+static _Atomic(ProcessEntry) *Process_entryMut(Process *self) {
+    return &(*self).entry;
+}
+
+;;GETTER
+static const _Atomic(ProcessEntry) *Process_entryPtr(const Process *self) {
+    return &(*self).entry;
+}
+
+;;GETTER
+static _Atomic(any) *Process_contextMut(Process *self) {
+    return &(*self).context;
+}
+
+;;GETTER
+static const _Atomic(any) *Process_contextPtr(const Process *self) {
+    return &(*self).context;
+}
+
+;;GETTER
+static _Atomic(any) *Process_hotMut(Process *self) {
+    return &(*self).hot;
+}
+
+;;GETTER
+static const _Atomic(any) *Process_hotPtr(const Process *self) {
+    return &(*self).hot;
+}
+
+;;GETTER
+static _Atomic(const char*) *Process_nameMut(Process *self) {
+    return &(*self).name;
+}
+
+;;GETTER
+static const _Atomic(const char*) *Process_namePtr(const Process *self) {
+    return &(*self).name;
+}
+
+;;GETTER
+static atomic_bool *Process_occupiedMut(Process *self) {
+    return &(*self).occupied;
+}
+
+;;GETTER
+static atomic_bool *Process_inFlightMut(Process *self) {
+    return &(*self).inFlight;
+}
+
+;;GETTER
+static const atomic_bool *Process_inFlightPtr(const Process *self) {
+    return &(*self).inFlight;
+}
+
+;;GETTER
+static atomic_uint *Process_invocationCountMut(Process *self) {
+    return &(*self).invocationCount;
+}
+
+;;GETTER
+static const atomic_uint *Process_invocationCountPtr(const Process *self) {
+    return &(*self).invocationCount;
+}
+
 /** Allocates a process whose callback, name, and context are borrowed. */
 Process *Process_3(const char *name, ProcessEntry entry, any context) {
     if (!entry)
@@ -99,13 +164,13 @@ Process *Process_3(const char *name, ProcessEntry entry, any context) {
     Process *self = (Process*) calloc(1, sizeof(Process));
     if (!self)
         return nullptr;
-    atomic_init(&(*self).entry, entry);
-    atomic_init(&(*self).context, context);
-    atomic_init(&(*self).hot, nullptr);
-    atomic_init(&(*self).name, name);
-    atomic_init(&(*self).occupied, false);
-    atomic_init(&(*self).inFlight, false);
-    atomic_init(&(*self).invocationCount, 0);
+    atomic_init(Process_entryMut(self), entry);
+    atomic_init(Process_contextMut(self), context);
+    atomic_init(Process_hotMut(self), nullptr);
+    atomic_init(Process_nameMut(self), name);
+    atomic_init(Process_occupiedMut(self), false);
+    atomic_init(Process_inFlightMut(self), false);
+    atomic_init(Process_invocationCountMut(self), 0);
     return self;
 }
 
@@ -115,16 +180,16 @@ ProcessResult Process_run(Process *self, i32 *exitStatus) {
     if (!self || !exitStatus)
         return PROCESS_INVALID;
     bool expected = false;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).occupied, &expected, true,
+    if (!atomic_compare_exchange_strong_explicit(Process_occupiedMut(self), &expected, true,
                                                  memory_order_acquire, memory_order_relaxed))
         return PROCESS_BUSY;
-    ProcessEntry entry = atomic_load_explicit(&(*self).entry, memory_order_relaxed);
-    any context = atomic_load_explicit(&(*self).context, memory_order_relaxed);
-    atomic_store_explicit(&(*self).inFlight, true, memory_order_release);
+    ProcessEntry entry = atomic_load_explicit(Process_entryMut(self), memory_order_relaxed);
+    any context = atomic_load_explicit(Process_contextMut(self), memory_order_relaxed);
+    atomic_store_explicit(Process_inFlightMut(self), true, memory_order_release);
     *exitStatus = (*entry)(context);
-    atomic_fetch_add_explicit(&(*self).invocationCount, 1, memory_order_relaxed);
-    atomic_store_explicit(&(*self).inFlight, false, memory_order_release);
-    atomic_store_explicit(&(*self).occupied, false, memory_order_release);
+    atomic_fetch_add_explicit(Process_invocationCountMut(self), 1, memory_order_relaxed);
+    atomic_store_explicit(Process_inFlightMut(self), false, memory_order_release);
+    atomic_store_explicit(Process_occupiedMut(self), false, memory_order_release);
     return PROCESS_OK;
 }
 
@@ -133,7 +198,7 @@ bool Process_free(Process *self) {
     if (!self)
         return false;
     bool expected = false;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).occupied, &expected, true,
+    if (!atomic_compare_exchange_strong_explicit(Process_occupiedMut(self), &expected, true,
                                                  memory_order_acquire, memory_order_relaxed))
         return false;
     free(self);
@@ -147,13 +212,13 @@ ProcessResult Process_replace(Process *self, ProcessEntry entry, any context, an
     if (!self || !entry)
         return PROCESS_INVALID;
     bool expected = false;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).occupied, &expected, true,
+    if (!atomic_compare_exchange_strong_explicit(Process_occupiedMut(self), &expected, true,
                                                  memory_order_acquire, memory_order_relaxed))
         return PROCESS_BUSY;
-    atomic_store_explicit(&(*self).entry, entry, memory_order_relaxed);
-    atomic_store_explicit(&(*self).context, context, memory_order_relaxed);
-    atomic_store_explicit(&(*self).hot, hot, memory_order_relaxed);
-    atomic_store_explicit(&(*self).occupied, false, memory_order_release);
+    atomic_store_explicit(Process_entryMut(self), entry, memory_order_relaxed);
+    atomic_store_explicit(Process_contextMut(self), context, memory_order_relaxed);
+    atomic_store_explicit(Process_hotMut(self), hot, memory_order_relaxed);
+    atomic_store_explicit(Process_occupiedMut(self), false, memory_order_release);
     return PROCESS_OK;
 }
 
@@ -163,11 +228,11 @@ ProcessResult Process_setName(Process *self, const char *name) {
     if (!self)
         return PROCESS_INVALID;
     bool expected = false;
-    if (!atomic_compare_exchange_strong_explicit(&(*self).occupied, &expected, true,
+    if (!atomic_compare_exchange_strong_explicit(Process_occupiedMut(self), &expected, true,
                                                  memory_order_acquire, memory_order_relaxed))
         return PROCESS_BUSY;
-    atomic_store_explicit(&(*self).name, name, memory_order_relaxed);
-    atomic_store_explicit(&(*self).occupied, false, memory_order_release);
+    atomic_store_explicit(Process_nameMut(self), name, memory_order_relaxed);
+    atomic_store_explicit(Process_occupiedMut(self), false, memory_order_release);
     return PROCESS_OK;
 }
 
@@ -175,35 +240,35 @@ ProcessResult Process_setName(Process *self, const char *name) {
 ;;GETTER
 /** Reports whether the callback is currently executing. */
 bool Process_isRunning(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).inFlight, memory_order_acquire) : false;
+    return self ? atomic_load_explicit(Process_inFlightPtr(self), memory_order_acquire) : false;
 }
 
 ;;GETTER
 /** Returns the number of callbacks that completed. */
 u32 Process_getInvocationCount(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).invocationCount, memory_order_relaxed) : 0;
+    return self ? atomic_load_explicit(Process_invocationCountPtr(self), memory_order_relaxed) : 0;
 }
 
 ;;GETTER
 /** Returns the currently installed entry, or nullptr for a null process. */
 ProcessEntry Process_getEntry(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).entry, memory_order_relaxed) : nullptr;
+    return self ? atomic_load_explicit(Process_entryPtr(self), memory_order_relaxed) : nullptr;
 }
 
 ;;GETTER
 /** Returns the borrowed callback context, or nullptr for a null process. */
 any Process_getContext(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).context, memory_order_relaxed) : nullptr;
+    return self ? atomic_load_explicit(Process_contextPtr(self), memory_order_relaxed) : nullptr;
 }
 
 ;;GETTER
 /** Returns the associated hot handle; this association does not pin its module. */
 any Process_getHot(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).hot, memory_order_relaxed) : nullptr;
+    return self ? atomic_load_explicit(Process_hotPtr(self), memory_order_relaxed) : nullptr;
 }
 
 ;;GETTER
 /** Returns the borrowed process name, or nullptr for a null process. */
 const char *Process_getName(const Process *self) {
-    return self ? atomic_load_explicit(&(*self).name, memory_order_relaxed) : nullptr;
+    return self ? atomic_load_explicit(Process_namePtr(self), memory_order_relaxed) : nullptr;
 }

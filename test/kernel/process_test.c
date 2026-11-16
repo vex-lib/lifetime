@@ -31,6 +31,36 @@ typedef struct TestCall {
     i32 exitStatus;
 } TestCall;
 
+;;SETTER
+static fn TestCall_setThread(TestCall *call, pthread_t thread) {
+    (*call).thread = thread;
+}
+
+;;GETTER
+static atomic_bool *TestCall_enteredMut(TestCall *call) {
+    return &(*call).entered;
+}
+
+;;GETTER
+static atomic_bool *TestCall_releaseMut(TestCall *call) {
+    return &(*call).release;
+}
+
+;;SETTER
+static fn TestCall_setResult(TestCall *call, ProcessResult result) {
+    (*call).result = result;
+}
+
+;;GETTER
+static Process *TestCall_process(const TestCall *call) {
+    return (*call).process;
+}
+
+;;GETTER
+static i32 *TestCall_exitStatusMut(TestCall *call) {
+    return &(*call).exitStatus;
+}
+
 /** Returns the original entry's context value or its null-context sentinel. */
 static i32 original(any context) {
     return context ? *(i32*) context : 11;
@@ -71,9 +101,9 @@ static bool waitFor(atomic_bool *flag) {
 /** Holds a process invocation until the test releases its bounded rendezvous. */
 static i32 heldEntry(any context) {
     TestCall *call = (TestCall*) context;
-    (*call).thread = pthread_self();
-    atomic_store_explicit(&(*call).entered, true, memory_order_release);
-    if (!waitFor(&(*call).release))
+    TestCall_setThread(call, pthread_self());
+    atomic_store_explicit(TestCall_enteredMut(call), true, memory_order_release);
+    if (!waitFor(TestCall_releaseMut(call)))
         _Exit(2);
     return 77;
 }
@@ -81,7 +111,7 @@ static i32 heldEntry(any context) {
 /** Runs the held process callback on the test's worker thread. */
 static any worker(any context) {
     TestCall *call = (TestCall*) context;
-    (*call).result = Process_run((*call).process, &(*call).exitStatus);
+    TestCall_setResult(call, Process_run(TestCall_process(call), TestCall_exitStatusMut(call)));
     return nullptr;
 }
 

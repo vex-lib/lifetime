@@ -28,34 +28,76 @@ typedef struct FakeApp {
     bool stopOnInput;
 } FakeApp;
 
-static bool fOpen(any ctx) { (*((Fake*) ctx)).opens++; return true; }
-static fn fClose(any ctx) { (*((Fake*) ctx)).closes++; }
+;;GETTER
+static i32 Fake_opens(const Fake *f) { return (*f).opens; }
+;;SETTER
+static fn Fake_setOpens(Fake *f, i32 v) { (*f).opens = v; }
+;;GETTER
+static i32 Fake_closes(const Fake *f) { return (*f).closes; }
+;;SETTER
+static fn Fake_setCloses(Fake *f, i32 v) { (*f).closes = v; }
+;;GETTER
+static i32 Fake_presents(const Fake *f) { return (*f).presents; }
+;;SETTER
+static fn Fake_setPresents(Fake *f, i32 v) { (*f).presents = v; }
+;;GETTER
+static i32 Fake_polls(const Fake *f) { return (*f).polls; }
+;;SETTER
+static fn Fake_setPolls(Fake *f, i32 v) { (*f).polls = v; }
+;;SETTER
+static fn Fake_setMouse(Fake *f, i32 v) { (*f).mouse = v; }
+;;GETTER
+static bytes Fake_w(const Fake *f) { return (*f).w; }
+;;GETTER
+static bytes Fake_h(const Fake *f) { return (*f).h; }
+;;GETTER
+static bool Fake_pending(const Fake *f) { return (*f).pending; }
+;;SETTER
+static fn Fake_setPending(Fake *f, bool v) { (*f).pending = v; }
+;;GETTER
+static CommandLineEvent Fake_next(const Fake *f) { return (*f).next; }
+
+;;GETTER
+static i32 FakeApp_draws(const FakeApp *a) { return (*a).draws; }
+;;SETTER
+static fn FakeApp_setDraws(FakeApp *a, i32 v) { (*a).draws = v; }
+;;GETTER
+static i32 FakeApp_inputs(const FakeApp *a) { return (*a).inputs; }
+;;SETTER
+static fn FakeApp_setInputs(FakeApp *a, i32 v) { (*a).inputs = v; }
+;;GETTER
+static bool FakeApp_stopOnInput(const FakeApp *a) { return (*a).stopOnInput; }
+
+static bool fOpen(any ctx) { Fake *f = (Fake*) ctx; Fake_setOpens(f, Fake_opens(f) + 1); return true; }
+static fn fClose(any ctx) { Fake *f = (Fake*) ctx; Fake_setCloses(f, Fake_closes(f) + 1); }
 static bool fSize(any ctx, bytes *w, bytes *h) {
     Fake *f = (Fake*) ctx;
-    *w = (*f).w; *h = (*f).h;
-    return (*f).w > 0 && (*f).h > 0;
+    bytes fw = Fake_w(f);
+    bytes fh = Fake_h(f);
+    *w = fw; *h = fh;
+    return fw > 0 && fh > 0;
 }
 static bool fPresent(any ctx, const char *cells, bytes w, bytes h) {
     Fake *f = (Fake*) ctx;
     (discard) cells; (discard) w; (discard) h;
-    (*f).presents++;
+    Fake_setPresents(f, Fake_presents(f) + 1);
     return true;
 }
 static bool fPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     Fake *f = (Fake*) ctx;
     (discard) timeoutMs;
-    (*f).polls++;
-    if (!(*f).pending)
+    Fake_setPolls(f, Fake_polls(f) + 1);
+    if (!Fake_pending(f))
         return false;
-    (*f).pending = false;
-    *out = (*f).next;
+    Fake_setPending(f, false);
+    *out = Fake_next(f);
     return true;
 }
-static bool fMouse(any ctx, bool enabled) { (*((Fake*) ctx)).mouse = enabled ? 1 : 0; return true; }
+static bool fMouse(any ctx, bool enabled) { Fake_setMouse((Fake*) ctx, enabled ? 1 : 0); return true; }
 
 static bool aDraw(any ctx, CommandLine *line) {
     FakeApp *a = (FakeApp*) ctx;
-    (*a).draws++;
+    FakeApp_setDraws(a, FakeApp_draws(a) + 1);
     char *cells = CommandLine_getCells(line);
     if (cells != nullptr)
         memset(cells, '.', CommandLine_getWidth(line) * CommandLine_getHeight(line));
@@ -64,8 +106,8 @@ static bool aDraw(any ctx, CommandLine *line) {
 static bool aInput(any ctx, CommandLine *line, const CommandLineEvent *event) {
     FakeApp *a = (FakeApp*) ctx;
     (discard) event;
-    (*a).inputs++;
-    if ((*a).stopOnInput) {
+    FakeApp_setInputs(a, FakeApp_inputs(a) + 1);
+    if (FakeApp_stopOnInput(a)) {
         CommandLine_stop(line);
         return false;
     }

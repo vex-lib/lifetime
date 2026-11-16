@@ -129,6 +129,26 @@ static CommandLineKey ncMapKey(i32 ch) {
     }
 }
 
+;;SETTER
+static fn CommandLineEvent_setKind(CommandLineEvent *out, CommandLineEventKind kind) {
+    (*out).kind = kind;
+}
+
+;;SETTER
+static fn CommandLineEvent_setX(CommandLineEvent *out, i32 x) {
+    (*out).x = x;
+}
+
+;;SETTER
+static fn CommandLineEvent_setY(CommandLineEvent *out, i32 y) {
+    (*out).y = y;
+}
+
+;;SETTER
+static fn CommandLineEvent_setKey(CommandLineEvent *out, i32 key) {
+    (*out).key = key;
+}
+
 static bool ncPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     (discard) ctx;
     if (!g_open || out == nullptr)
@@ -138,40 +158,40 @@ static bool ncPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     if (ch == ERR)
         return false;
     if (ch == KEY_RESIZE) {
-        (*out).kind = COMMANDLINE_EVENT_RESIZE;
+        CommandLineEvent_setKind(out, COMMANDLINE_EVENT_RESIZE);
         return true;
     }
     if (ch == KEY_MOUSE) {
         MEVENT ev;
         if (getmouse(&ev) != OK)
             return false;
-        (*out).x = ev.x;
-        (*out).y = ev.y;
+        CommandLineEvent_setX(out, ev.x);
+        CommandLineEvent_setY(out, ev.y);
         if ((ev.bstate & BUTTON4_PRESSED) != 0)
-            (*out).kind = COMMANDLINE_EVENT_WHEEL_UP;
+            CommandLineEvent_setKind(out, COMMANDLINE_EVENT_WHEEL_UP);
 #ifdef BUTTON5_PRESSED
         else if ((ev.bstate & BUTTON5_PRESSED) != 0)
-            (*out).kind = COMMANDLINE_EVENT_WHEEL_DOWN;
+            CommandLineEvent_setKind(out, COMMANDLINE_EVENT_WHEEL_DOWN);
 #endif
         else if ((ev.bstate & (BUTTON1_CLICKED | BUTTON1_PRESSED | BUTTON1_RELEASED)) != 0 ||
                  (ev.bstate & (BUTTON2_CLICKED | BUTTON3_CLICKED)) != 0)
-            (*out).kind = COMMANDLINE_EVENT_CLICK;
+            CommandLineEvent_setKind(out, COMMANDLINE_EVENT_CLICK);
         else
             return false;
         return true;
     }
     CommandLineKey key = ncMapKey(ch);
-    (*out).kind = COMMANDLINE_EVENT_KEY;
+    CommandLineEvent_setKind(out, COMMANDLINE_EVENT_KEY);
     if (key != COMMANDLINE_KEY_NONE) {
-        (*out).key = (i32) key;
+        CommandLineEvent_setKey(out, (i32) key);
     } else if (ch == '\n' || ch == KEY_ENTER) {
-        (*out).key = (i32) COMMANDLINE_KEY_ENTER;
+        CommandLineEvent_setKey(out, (i32) COMMANDLINE_KEY_ENTER);
     } else if (ch >= 32 && ch < 127) {
-        (*out).key = ch;
+        CommandLineEvent_setKey(out, ch);
     } else if (ch >= 1 && ch < 32) {
-        (*out).key = ch;   // control code (e.g. Ctrl-Q = 17)
+        CommandLineEvent_setKey(out, ch);   // control code (e.g. Ctrl-Q = 17)
     } else {
-        (*out).key = (i32) COMMANDLINE_KEY_UNKNOWN;
+        CommandLineEvent_setKey(out, (i32) COMMANDLINE_KEY_UNKNOWN);
     }
     return true;
 }
