@@ -2,17 +2,17 @@
 
 ## Constitution Link
 
-gist.md (`../../metadata/gists/preferences/gist.md`) is the compressed law list; all universal laws bind this repository. Read one on demand: `./tools/prefs law "<title>"`. Universal laws are inherited, never restated.
+gist.md (`../../../metadata/gists/preferences/gist.md`) is the compressed law list; all universal laws bind this repository. Read one on demand: `./tools/prefs law "<title>"`. Universal laws are inherited, never restated.
 
-Tier: lifetime (R0 Kernel Host). Owns: lifetimes, native OS windowing, process/application lifecycle, capability gating, memory substrate attestation, clock, window API. Borrows: nothing above itself.
+Tier: lifetime (Kernel Host). Owns: lifetimes, native OS windowing, process/application lifecycle, capability gating, memory substrate attestation, clock, window API. Borrows: nothing above itself.
 
 ## Exclusive Laws
 
 | Law Title | Scope | Enforcement |
-| **One-Seam Canvas Window Architecture Law** | R0 Kernel Host | Mandatory for `lifetime` |
-| **Continuous Real-Time Live Resize & Presentation Law** | R0 Kernel Host | Mandatory for `lifetime` |
-| **Present-On-Demand Law** | R0 Kernel Host | Mandatory for `lifetime` |
-| **R0 Freeze Law** | R0 Kernel Host | Mandatory for `lifetime` |
+| **One-Seam Canvas Window Architecture Law** | lifetime Kernel Host | Mandatory for `lifetime` |
+| **Continuous Real-Time Live Resize & Presentation Law** | lifetime Kernel Host | Mandatory for `lifetime` |
+| **Present-On-Demand Law** | lifetime Kernel Host | Mandatory for `lifetime` |
+| **Lifetime Freeze Law** | lifetime Kernel Host | Mandatory for `lifetime` |
 
 ### One-Seam Canvas Window Architecture Law
 
@@ -33,11 +33,11 @@ Tier: lifetime (R0 Kernel Host). Owns: lifetimes, native OS windowing, process/a
 
 * Windows present when the scene is dirty, not on a timer or fixed poll.
 
-### R0 Freeze Law
+### Lifetime Freeze Law
 
-* R0 (`lifetime` + `relational-engine`) is statically linked, never `dlopen`ed, never hot-swapped.
+* `lifetime` (`lifetime` + `re`) is statically linked, never `dlopen`ed, never hot-swapped.
 * Arena addresses stay put across every dylib generation, so modules borrow the same bytes in turn.
-* R0 changes only by versioned cold release (launcher stages, then `exec`s) with ABI check — no in-process R0 swap, ever.
+* `lifetime` changes only by versioned cold release (launcher stages, then `exec`s) with ABI check — no in-process swap, ever.
 * Kernel owns start/stop + registries + teardown order, never tick/draw.
 
 ## Repo-Local Extensions
