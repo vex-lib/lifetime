@@ -8,9 +8,9 @@
 #include <time.h>
 
 #include "lifetime/lifetime.h"
-#include "../../vexspoke/input/key.h"
-#include "../../vexspoke/input/mouse.h"
-#include "../../vexspoke/spoke/bespoke.h"
+#include "vexspoke/input/key.h"
+#include "vexspoke/input/mouse.h"
+#include "vexspoke/spoke/bespoke.h"
 
 ;;DEFINITION
 /**
