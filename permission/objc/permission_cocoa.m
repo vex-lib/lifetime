@@ -18,8 +18,8 @@
 // says and nothing more (the relaunch is the user's to make).
 
 #include "vex.h"
-#include "../permission.h"
-#include "../permission_backend.h"
+#include "permission/permission.h"
+#include "permission/permission_backend.h"
 
 #include <stdio.h>
 #include <string.h>
