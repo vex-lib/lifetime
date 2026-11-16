@@ -1,5 +1,5 @@
 #include "vex.h"
-#include "../capability/capability.h"
+#include "capability/capability.h"
 
 // following the directory going forward:
 // worktree > organization > repository > <directory tree> > file
