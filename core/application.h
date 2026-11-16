@@ -4,7 +4,7 @@
 #include "vex.h"
 #include <pthread.h>
 
-#include "../window/window.h"
+#include "window/window.h"
 
 // kernel/application.h — Executable-level manifest, window registry & hot-module slot.
 //

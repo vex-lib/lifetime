@@ -8,10 +8,10 @@
 
 #include "lifetime/lifetime.h"
 
-#include "../../vexspoke/input/key.h"
-#include "../../vexspoke/input/mouse.h"
-#include "../../vexspoke/input/touch.h"
-#include "../../vexspoke/system/system.h"
+#include "vexspoke/input/key.h"
+#include "vexspoke/input/mouse.h"
+#include "vexspoke/input/touch.h"
+#include "vexspoke/system/system.h"
 
 ;;DEFINITION
 /**
