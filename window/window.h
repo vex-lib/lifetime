@@ -4,9 +4,9 @@
 #include "vex.h"
 #include "lang/annotation.h"
 
-#include "../../vexspoke/event/keyhandler.h"
-#include "../../vexspoke/event/mousehandler.h"
-#include "../../vexspoke/event/touchhandler.h"
+#include "vexspoke/event/keyhandler.h"
+#include "vexspoke/event/mousehandler.h"
+#include "vexspoke/event/touchhandler.h"
 
 // window/window.h — platform-agnostic window API.
 //
@@ -38,7 +38,7 @@
 // unit completes struct Window with its real fields. The struct Window forward
 // typedef and the per-window lifecycle registry (WindowEvent) are owned by
 // window/window_event.h (the Single Class Per File Law).
-#include "../window/window_event.h"
+#include "window/window_event.h"
 
 typedef struct Panel Panel;
 
