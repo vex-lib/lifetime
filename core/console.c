@@ -1,8 +1,9 @@
 #include "vex.h"
 #include "console.h"
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 
@@ -31,17 +32,17 @@
  * SUMMARY:
  *   Session state machine for shell scripts and REPL-style interactions. Owns
  *   the session lifecycle (running/cancel/exitStatus) and borrows execution
- *   through a ConsoleIo fn-table seam (the Conflict Triage Law managed exception — wired to
+ *   through a ConsoleIo fn-table seam (the Conflict Triage Law managed exception, wired to
  *   R2 ProcessSpawn when that class lands).
  *
  *   No threads, no sockets, no blocking waits are owned by Console. The
  *   supervising Kernel thread drives Console_poll in bounded <=100ms slices
  *   with a cancel flag (the Bounded Wait Law). Console never touches a window.
  *
- * STRUCT FIELDS (Mirroring kernel/console.h — exactly this file's class):
+ * STRUCT FIELDS (Mirroring kernel/console.h, exactly this file's class):
  * ----------------------------------------------------------------------------
- *   char shell[CONSOLE_MAX_SHELL];          // command to run (default "/bin/sh")
- *   char workDir[CONSOLE_MAX_WORKDIR];      // working directory (default "")
+ *   utf8 shell[CONSOLE_MAX_SHELL];          // command to run (default "/bin/sh")
+ *   utf8 workDir[CONSOLE_MAX_WORKDIR];      // working directory (default "")
  *   ConsoleIo io;                           // injectable execution seam
  *   _Atomic bool cancel;                    // cancel flag (the Bounded Wait Law)
  *   bool running;                           // session active
@@ -90,14 +91,16 @@
  * ============================================================================
  */
 
-// ;;INTENTION("ConsoleIo seam wiring: when R2 ProcessSpawn lands,
-// Console_run calls io.spawn(shell, workDir).  Console_poll drives
-// io.reap in <=100ms non-blocking slices, with io.cancel firing
-// SIGTERM and the supervising thread observing completion via io.joined.
-// All io.fn-pointers are nullable — NULL degrades gracefully per the Cold-Strict, Hot-Minimal Validation Law.")
+/**
+ * ;;INTENTION("ConsoleIo seam wiring: when R2 ProcessSpawn lands,
+ * Console_run calls io.spawn(shell, workDir).  Console_poll drives
+ * io.reap in <=100ms non-blocking slices, with io.cancel firing
+ * SIGTERM and the supervising thread observing completion via io.joined.
+ * All io.fn-pointers are nullable, nullptr degrades gracefully per the Cold-Strict, Hot-Minimal Validation Law.")
+ */
 
 /** Copies a string into a bounded buffer and always terminates nonempty output. */
-static fn console_clamp_copy(char *dst, bytes cap, const char *src) {
+static fn console_clamp_copy(utf8 *dst, bytes cap, string src) {
     if (!dst || cap == 0)
         return;
     if (!src) {
@@ -107,51 +110,100 @@ static fn console_clamp_copy(char *dst, bytes cap, const char *src) {
     snprintf(dst, cap, "%s", src);
 }
 
-// CONSTRUCTORS (PUBLIC & PRIVATE)
+/** CONSTRUCTORS (PUBLIC & PRIVATE) */
 /** Creates a console configured to use the default shell. */
 Console *Console_0() {
     return Console_1("/bin/sh");
 }
 
 ;;GETTER
-static char *Console_shellMut(Console *self) { return (*self).shell; }
+static utf8 *Console_shellMut(Console *self)
+{
+    return (*self).shell;
+}
 ;;GETTER
-static char *Console_workDirMut(Console *self) { return (*self).workDir; }
+static utf8 *Console_workDirMut(Console *self)
+{
+    return (*self).workDir;
+}
 ;;GETTER
-static ConsoleIo *Console_ioMut(Console *self) { return &(*self).io; }
+static ConsoleIo *Console_ioMut(Console *self)
+{
+    return &(*self).io;
+}
 ;;GETTER
-static const ConsoleIo *Console_ioPtr(const Console *self) { return &(*self).io; }
+static const ConsoleIo *Console_ioPtr(const Console *self)
+{
+    return &(*self).io;
+}
 ;;GETTER
-static atomic_bool *Console_cancelMut(Console *self) { return &(*self).cancel; }
+static atomic_bool *Console_cancelMut(Console *self)
+{
+    return &(*self).cancel;
+}
 ;;GETTER
-static bool Console_running(const Console *self) { return (*self).running; }
+static bool Console_running(const Console *self)
+{
+    return (*self).running;
+}
 ;;SETTER
-static fn Console_setRunning(Console *self, bool v) { (*self).running = v; }
+static fn Console_setRunning(Console *self, bool v)
+{
+    (*self).running = v;
+}
 ;;GETTER
-static i32 Console_exitStatus(const Console *self) { return (*self).exitStatus; }
+static i32 Console_exitStatus(const Console *self)
+{
+    return (*self).exitStatus;
+}
 ;;SETTER
-static fn Console_setExitStatus(Console *self, i32 v) { (*self).exitStatus = v; }
+static fn Console_setExitStatus(Console *self, i32 v)
+{
+    (*self).exitStatus = v;
+}
 
 ;;GETTER
-static any ConsoleIo_ctx(const ConsoleIo *io) { return (*io).ctx; }
+static any ConsoleIo_ctx(const ConsoleIo *io)
+{
+    return (*io).ctx;
+}
 ;;SETTER
-static fn ConsoleIo_setCtx(ConsoleIo *io, any ctx) { (*io).ctx = ctx; }
+static fn ConsoleIo_setCtx(ConsoleIo *io, any ctx)
+{
+    (*io).ctx = ctx;
+}
 ;;GETTER
-static bool (*ConsoleIo_spawn(const ConsoleIo *io))(any, const char*, const char*) { return (*io).spawn; }
+static bool (*ConsoleIo_spawn(const ConsoleIo *io))(any, string , string )
+{
+    return (*io).spawn;
+}
 ;;GETTER
-static bool (*ConsoleIo_feed(const ConsoleIo *io))(any, const char*, bytes) { return (*io).feed; }
+static bool (*ConsoleIo_feed(const ConsoleIo *io))(any, string , bytes)
+{
+    return (*io).feed;
+}
 ;;GETTER
-static bool (*ConsoleIo_reap(const ConsoleIo *io))(any, char*, bytes, bytes*) { return (*io).reap; }
+static bool (*ConsoleIo_reap(const ConsoleIo *io))(any, utf8*, bytes, bytes*)
+{
+    return (*io).reap;
+}
 ;;GETTER
-static fn (*ConsoleIo_cancel(const ConsoleIo *io))(any) { return (*io).cancel; }
+static fn (*ConsoleIo_cancel(const ConsoleIo *io))(any)
+{
+    return (*io).cancel;
+}
 ;;GETTER
-static bool (*ConsoleIo_joined(const ConsoleIo *io))(const_any) { return (*io).joined; }
+static bool (*ConsoleIo_joined(const ConsoleIo *io))(const_any)
+{
+    return (*io).joined;
+}
 
 /** Allocates a stopped console and copies the supplied shell name. */
-Console *Console_1(const char *shell) {
-    Console *self = (Console*) calloc(1, sizeof(Console));
+Console *Console_1(string shell) {
+    Console *self = (Console*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(Console));
     if (!self)
         return nullptr;
+    memset(self, 0, sizeof(Console));
     console_clamp_copy(Console_shellMut(self), CONSOLE_MAX_SHELL, shell);
     Console_workDirMut(self)[0] = '\0';
     memset(Console_ioMut(self), 0, sizeof(ConsoleIo));
@@ -161,7 +213,7 @@ Console *Console_1(const char *shell) {
     return self;
 }
 
-// CORE FUNCTIONS (PUBLIC & PRIVATE)
+/** CORE FUNCTIONS (PUBLIC & PRIVATE) */
 /** Starts a session through the configured spawn callback if one is available. */
 bool Console_run(Console *self) {
     if (!self)
@@ -169,7 +221,7 @@ bool Console_run(Console *self) {
     if (Console_running(self))
         return false;
     ConsoleIo *io = Console_ioMut(self);
-    bool (*spawnFn)(any, const char*, const char*) = ConsoleIo_spawn(io);
+    bool (*spawnFn)(any, string , string ) = ConsoleIo_spawn(io);
     if (!spawnFn)
         return false;
 
@@ -181,20 +233,20 @@ bool Console_run(Console *self) {
 }
 
 /** Sends a byte span to the active session through its feed callback. */
-bool Console_writeInput(Console *self, const char *line, bytes len) {
+bool Console_writeInput(Console *self, string line, bytes len) {
     if (!self)
         return false;
     if (!Console_running(self))
         return false;
     ConsoleIo *io = Console_ioMut(self);
-    bool (*feedFn)(any, const char*, bytes) = ConsoleIo_feed(io);
+    bool (*feedFn)(any, string , bytes) = ConsoleIo_feed(io);
     if (!feedFn)
         return false;
     return feedFn(ConsoleIo_ctx(io), line, len);
 }
 
 /** Drains one output slice and clears running state when the seam reports joined. */
-bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
+bool Console_poll(Console *self, utf8 *out, bytes outCap, bytes *outLen) {
     if (!self)
         return false;
     if (outLen)
@@ -205,7 +257,7 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
         return true;
     }
     ConsoleIo *io = Console_ioMut(self);
-    bool (*reapFn)(any, char*, bytes, bytes*) = ConsoleIo_reap(io);
+    bool (*reapFn)(any, utf8*, bytes, bytes*) = ConsoleIo_reap(io);
     if (!reapFn) {
         if (out && outCap > 0)
             out[0] = '\0';
@@ -216,9 +268,8 @@ bool Console_poll(Console *self, char *out, bytes outCap, bytes *outLen) {
     if (outLen)
         *outLen = n;
     bool (*joinedFn)(const_any) = ConsoleIo_joined(io);
-    if (joinedFn && joinedFn(ConsoleIo_ctx(io))) {
+    if (joinedFn && joinedFn(ConsoleIo_ctx(io)))
         Console_setRunning(self, false);
-    }
     return ok;
 }
 
@@ -240,7 +291,7 @@ fn Console_free(Console *self) {
     if (Console_running(self))
         Console_cancel(self);
     memset(Console_ioMut(self), 0, sizeof(ConsoleIo));
-    free(self);
+    MemoryArena_free(Lifetime_arena(), self);
 }
 
 /** Returns whether a session is currently active. */
@@ -257,10 +308,10 @@ i32 Console_getExitStatus(const Console *self) {
     return Console_exitStatus(self);
 }
 
-// SETTERS (PUBLIC & PRIVATE)
+/** SETTERS (PUBLIC & PRIVATE) */
 ;;SETTER
 /** Copies the shell string into the console's bounded shell buffer. */
-fn Console_setShell(Console *self, const char *shell) {
+fn Console_setShell(Console *self, string shell) {
     if (!self)
         return;
     console_clamp_copy(Console_shellMut(self), CONSOLE_MAX_SHELL, shell);
@@ -268,7 +319,7 @@ fn Console_setShell(Console *self, const char *shell) {
 
 ;;SETTER
 /** Copies the working directory into the console's bounded path buffer. */
-fn Console_setWorkDir(Console *self, const char *workDir) {
+fn Console_setWorkDir(Console *self, string workDir) {
     if (!self)
         return;
     console_clamp_copy(Console_workDirMut(self), CONSOLE_MAX_WORKDIR, workDir);
@@ -288,10 +339,10 @@ fn Console_setIo(Console *self, const ConsoleIo *io, any ioCtx) {
     ConsoleIo_setCtx(slot, ioCtx);
 }
 
-// GETTERS (PUBLIC & PRIVATE)
+/** GETTERS (PUBLIC & PRIVATE) */
 ;;GETTER
 /** Returns the configured shell buffer, or nullptr for a null console. */
-const char *Console_getShell(const Console *self) {
+string Console_getShell(const Console *self) {
     if (!self)
         return nullptr;
     return (*self).shell;
@@ -299,7 +350,7 @@ const char *Console_getShell(const Console *self) {
 
 ;;GETTER
 /** Returns the configured working-directory buffer, or nullptr for null. */
-const char *Console_getWorkDir(const Console *self) {
+string Console_getWorkDir(const Console *self) {
     if (!self)
         return nullptr;
     return (*self).workDir;

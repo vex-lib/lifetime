@@ -3,29 +3,31 @@
 
 #include "vex.h"
 
-// kernel/commandline.h — R1 terminal-application host (the fourth process kind).
-//
-// The process taxonomy (the Vertical Integration Law) classifies by primary
-// contract: pixel surfaces are Application, stdio sessions are Console,
-// one-shot functions are Process, and a full-screen TERMINAL APPLICATION is
-// CommandLine. CommandLine is the terminal analog of Window — it owns the TTY
-// DEVICE (raw mode, alternate screen, colors, one cell grid, bounded input),
-// never widget semantics.
-//
-// Determinant (R3) owns cells, widgets and the reloadable view/command module;
-// TerminalApp (R3) composes it. CommandLine includes NO R3 header: it exposes a
-// dependency-free seam (an injectable CommandLineIo backend plus the owned cell
-// grid and normalized events) exactly as Console borrows ProcessSpawn through
-// ConsoleIo. The R5 application wires the toolkit to this seam.
-//
-// ONE RESIZE SURFACE: CommandLine_revalidate re-reads the device size, grows the
-// owned grid and presents once. Resize is ALWAYS honored and never deferred to
-// a "settle" — the table stakes for a live terminal UI.
-//
-// View swappability: CommandLine_setApp replaces the borrowed application seam
-// WITHOUT re-acquiring the terminal, so a hot-loaded view can be published in
-// the same process — the restart is never required. CommandLine owns device
-// lifetime; the host owns loaded-code lifetime (HotModule).
+/**
+ * kernel/commandline.h, R1 terminal-application host (the fourth process kind).
+ *
+ * The process taxonomy (the Vertical Integration Law) classifies by primary
+ * contract: pixel surfaces are Application, stdio sessions are Console,
+ * one-shot functions are Process, and a full-screen TERMINAL APPLICATION is
+ * CommandLine. CommandLine is the terminal analog of Window, it owns the TTY
+ * DEVICE (raw mode, alternate screen, colors, one cell grid, bounded input),
+ * never widget semantics.
+ *
+ * Determinant (R3) owns cells, widgets and the reloadable view/command module;
+ * TerminalApp (R3) composes it. CommandLine includes NO R3 header: it exposes a
+ * dependency-free seam (an injectable CommandLineIo backend plus the owned cell
+ * grid and normalized events) exactly as Console borrows ProcessSpawn through
+ * ConsoleIo. The R5 application wires the toolkit to this seam.
+ *
+ * ONE RESIZE SURFACE: CommandLine_revalidate re-reads the device size, grows the
+ * owned grid and presents once. Resize is ALWAYS honored and never deferred to
+ * a "settle", the table stakes for a live terminal UI.
+ *
+ * View swappability: CommandLine_setApp replaces the borrowed application seam
+ * WITHOUT re-acquiring the terminal, so a hot-loaded view can be published in
+ * the same process, the restart is never required. CommandLine owns device
+ * lifetime; the host owns loaded-code lifetime (HotModule).
+ */
 
 typedef struct CommandLine CommandLine;
 
@@ -33,7 +35,7 @@ typedef struct CommandLine CommandLine;
 #define COMMANDLINE_MIN_COLUMNS 20
 #define COMMANDLINE_MIN_ROWS 4
 
-// Host-normalized key vocabulary, independent of any ncurses numeric value.
+/** Host-normalized key vocabulary, independent of any ncurses numeric value. */
 typedef enum CommandLineKey {
     COMMANDLINE_KEY_NONE = 0,
     COMMANDLINE_KEY_UP,
@@ -61,158 +63,222 @@ typedef enum CommandLineEventKind {
     COMMANDLINE_EVENT_RESIZE
 } CommandLineEventKind;
 
-// One loop lifecycle, one word. `stop` moves RUNNING to CANCELLED; the loop
-// returns to IDLE when it winds down WITHOUT a stop request. A stop requested
-// while IDLE is discarded, so a fresh run() is never pre-cancelled by a stale
-// request — the flag pair that used to allow exactly that is gone. CANCELLED is
-// terminal for the device session: only CommandLine_open starts a new one.
+/**
+ * One loop lifecycle, one word. `stop` moves RUNNING to CANCELLED; the loop
+ * returns to IDLE when it winds down WITHOUT a stop request. A stop requested
+ * while IDLE is discarded, so a fresh run() is never pre-cancelled by a stale
+ * request, the flag pair that used to allow exactly that is gone. CANCELLED is
+ * terminal for the device session: only CommandLine_open starts a new one.
+ *
+ * COMMANDLINE_RUN_IDLE      - no loop active
+ * COMMANDLINE_RUN_RUNNING   - loop servicing events
+ * COMMANDLINE_RUN_CANCELLED - stop requested; loop observed and exited
+ */
 typedef enum CommandLineRunPhase {
-    COMMANDLINE_RUN_IDLE = 0,   // no loop active
-    COMMANDLINE_RUN_RUNNING,    // loop servicing events
-    COMMANDLINE_RUN_CANCELLED,  // stop requested; loop observed and exited
+    COMMANDLINE_RUN_IDLE = 0,
+    COMMANDLINE_RUN_RUNNING,
+    COMMANDLINE_RUN_CANCELLED,
     COMMANDLINE_RUN_COUNT
 } CommandLineRunPhase;
 
-// One normalized device event delivered on the owner thread. `key` holds a
-// CommandLineKey for special keys or the literal character code for text/control.
+/**
+ * One normalized device event delivered on the owner thread. `key` holds a
+ * CommandLineKey for special keys or the literal character code for text/control.
+ *
+ * i32 key - CommandLineKey or a printable/control code
+ * i32 x   - cell column for pointer events (0 otherwise)
+ * i32 y   - cell row for pointer events (0 otherwise)
+ */
 typedef struct CommandLineEvent {
     CommandLineEventKind kind;
-    i32 key;      // CommandLineKey or a printable/control code
-    i32 x;        // cell column for pointer events (0 otherwise)
-    i32 y;        // cell row for pointer events (0 otherwise)
+    i32 key;
+    i32 x;
+    i32 y;
 } CommandLineEvent;
 
-// Injectable device backend (the Conflict Triage Law managed exception). The
-// default backend is ncurses (commandline_ncurses.c); tests inject a fake so the
-// owner runs headless. Every fn-pointer is optional: NULL degrades safely.
-// `poll` waits at most timeoutMs (the Bounded Wait Law) and returns false when
-// no event arrived; it must never block unbounded.
+/**
+ * Injectable device backend (the Conflict Triage Law managed exception). The
+ * default backend is ncurses (commandline_ncurses.c); tests inject a fake so the
+ * owner runs headless. Every fn-pointer is optional: nullptr degrades safely.
+ * `poll` waits at most timeoutMs (the Bounded Wait Law) and returns false when
+ * no event arrived; it must never block unbounded.
+ *
+ * any ctx                              - borrowed backend state
+ * bool (*open)(any ctx)                - raw mode + alt screen + colors
+ * fn (*close)(any ctx)                 - restore the terminal
+ * bool (*size)(any ctx, bytes *outW, bytes *outH) - current cell geometry
+ * bool (*present)(any ctx, string cells, bytes width, bytes height) - one flush
+ * bool (*poll)(any ctx, i32 timeoutMs, CommandLineEvent *out) - bounded wait
+ * bool (*setMouse)(any ctx, bool enabled) - pointer reporting toggle
+ */
 typedef struct CommandLineIo {
-    any ctx;                                             // borrowed backend state
-    bool (*open)(any ctx);                               // raw mode + alt screen + colors
-    fn (*close)(any ctx);                              // restore the terminal
-    bool (*size)(any ctx, bytes *outW, bytes *outH);   // current cell geometry
-    bool (*present)(any ctx, const char *cells, bytes width, bytes height); // one flush
-    bool (*poll)(any ctx, i32 timeoutMs, CommandLineEvent *out); // bounded wait
-    bool (*setMouse)(any ctx, bool enabled);             // pointer reporting toggle
+    any ctx;
+    bool (*open)(any ctx);
+    fn (*close)(any ctx);
+    bool (*size)(any ctx, bytes *outW, bytes *outH);
+    bool (*present)(any ctx, string cells, bytes width, bytes height);
+    bool (*poll)(any ctx, i32 timeoutMs, CommandLineEvent *out);
+    bool (*setMouse)(any ctx, bool enabled);
 } CommandLineIo;
 
-// Borrowed application seam: the resident host's view/command code. CommandLine
-// never owns it; the host keeps it live and excludes callers before replacement.
-// `draw` fills the owned grid; `input` handles one normalized event; returning
-// false requests a clean stop. `detach` releases host bookkeeping for this app.
+/**
+ * Borrowed application seam: the resident host's view/command code. CommandLine
+ * never owns it; the host keeps it live and excludes callers before replacement.
+ * `draw` fills the owned grid; `input` handles one normalized event; returning
+ * false requests a clean stop. `detach` releases host bookkeeping for this app.
+ *
+ * any ctx                              - borrowed host state
+ * bool (*draw)(any ctx, CommandLine *line) - paint the grid
+ * bool (*input)(any ctx, CommandLine *line, const CommandLineEvent *event) - handle one event
+ * fn (*detach)(any ctx)                - optional release
+ */
 typedef struct CommandLineApp {
-    any ctx;                                                             // borrowed host state
-    bool (*draw)(any ctx, CommandLine *line);                            // paint the grid
-    bool (*input)(any ctx, CommandLine *line, const CommandLineEvent *event); // handle one event
-    fn (*detach)(any ctx);                                             // optional release
+    any ctx;
+    bool (*draw)(any ctx, CommandLine *line);
+    bool (*input)(any ctx, CommandLine *line, const CommandLineEvent *event);
+    fn (*detach)(any ctx);
 } CommandLineApp;
 
+/**
+ * utf8 title[COMMANDLINE_MAX_TITLE] - device title / window label
+ * CommandLineIo io                  - injected device backend
+ * bool explicitIo                   - false => default (ncurses) backend
+ * CommandLineApp app                - borrowed swappable application seam
+ * utf8 *cells                       - owned device framebuffer (width*height)
+ * bytes capacity                    - admitted grid byte capacity
+ * bytes width                       - columns
+ * bytes height                      - rows
+ * u64 generation                    - successful app publications
+ * bytes refusalCount                - epoch grid-capacity refusals
+ * atomic_uint run                   - CommandLineRunPhase
+ * bool opened                       - device acquired
+ * bool active                       - callback exclusion guard (owner thread)
+ */
 struct CommandLine {
-    char title[COMMANDLINE_MAX_TITLE];  // device title / window label
-    CommandLineIo io;                   // injected device backend
-    bool explicitIo;                    // false => default (ncurses) backend
-    CommandLineApp app;                 // borrowed swappable application seam
-    char *cells;                        // owned device framebuffer (width*height)
-    bytes capacity;                    // admitted grid byte capacity
-    bytes width;                       // columns
-    bytes height;                      // rows
-    u64 generation;                // successful app publications
-    bytes refusalCount;                // epoch grid-capacity refusals
-    atomic_uint run;                    // CommandLineRunPhase
-    bool opened;                        // device acquired
-    bool active;                        // callback exclusion guard (owner thread)
+    utf8 title[COMMANDLINE_MAX_TITLE];
+    CommandLineIo io;
+    bool explicitIo;
+    CommandLineApp app;
+    utf8 *cells;
+    bytes capacity;
+    bytes width;
+    bytes height;
+    u64 generation;
+    bytes refusalCount;
+    atomic_uint run;
+    bool opened;
+    bool active;
 };
 
-// --- Overloaded constructors (the Window chooser idiom) ---
-//   CommandLine()          -> default title "vex"
-//   CommandLine("title")   -> named
+/**
+ * --- Overloaded constructors (the Window chooser idiom) ---
+ * CommandLine()           to  default title "vex"
+ * CommandLine("title")    to  named
+ */
 CommandLine *CommandLine_0();
-CommandLine *CommandLine_1(const char *title);
+CommandLine *CommandLine_1(string title);
 
 #define COMMANDLINE_CHOOSER(_0, _1, NAME, ...) NAME
 #define CommandLine(...) COMMANDLINE_CHOOSER( \
     dummy __VA_OPT__(,) __VA_ARGS__, CommandLine_1, CommandLine_0 \
 )(__VA_ARGS__)
 
-// Free the CommandLine. Closes the device if still open (the Teardown Order Law).
+/** Free the CommandLine. Closes the device if still open (the Teardown Order Law). */
 fn CommandLine_free(CommandLine *self);
 
-// --- Device backend injection (cold; before open) ---
-// A NULL io clears any explicit backend and restores the default. Rejected
-// while open or active.
+/**
+ * --- Device backend injection (cold; before open) ---
+ * A nullptr io clears any explicit backend and restores the default. Rejected
+ * while open or active.
+ */
 bool CommandLine_setIo(CommandLine *self, const CommandLineIo *io);
 const CommandLineIo *CommandLine_getIo(const CommandLine *self);
 
-// --- Lifecycle ---
-// Acquire the device and allocate the owned grid. False when already open, or
-// when the backend has no open/size. Never re-acquires an open device.
+/**
+ * --- Lifecycle ---
+ * Acquire the device and allocate the owned grid. False when already open, or
+ * when the backend has no open/size. Never re-acquires an open device.
+ */
 bool CommandLine_open(CommandLine *self);
-// Restore the device and release the grid. No-op when closed. Never blocks.
+/** Restore the device and release the grid. No-op when closed. Never blocks. */
 fn CommandLine_close(CommandLine *self);
 
-// THE one resize surface: re-read the device size, grow the grid, re-clamp the
-// app and present once. Always honored; callers never defer it. False only when
-// the device/grid cannot be satisfied (uncounted) — a resize refusal is counted.
+/**
+ * THE one resize surface: re-read the device size, grow the grid, re-clamp the
+ * app and present once. Always honored; callers never defer it. False only when
+ * the device/grid cannot be satisfied (uncounted), a resize refusal is counted.
+ */
 bool CommandLine_revalidate(CommandLine *self);
 
-// Present the owned grid in ONE flush. False when closed or the sink failed; a
-// failed sink may have delivered a prefix and cannot be rolled back.
+/**
+ * Present the owned grid in ONE flush. False when closed or the sink failed; a
+ * failed sink may have delivered a prefix and cannot be rolled back.
+ */
 bool CommandLine_present(CommandLine *self);
 
-// --- Application seam (swappable view/command, no terminal reset) ---
-// Publish a borrowed app. Pauses+excludes first; rejects (false, preserves the
-// old app) on null draw, busy, or exhausted generation. Never resets the device.
+/**
+ * --- Application seam (swappable view/command, no terminal reset) ---
+ * Publish a borrowed app. Pauses+excludes first; rejects (false, preserves the
+ * old app) on null draw, busy, or exhausted generation. Never resets the device.
+ */
 bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app);
 bool CommandLine_hasApp(const CommandLine *self);
-// Detach the app (calls detach once). Safe when none attached.
+/** Detach the app (calls detach once). Safe when none attached. */
 bool CommandLine_detachApp(CommandLine *self);
 
-// --- Owner-thread loop ---
-// One non-blocking pass: bounded poll (0ms), deliver, draw, single present; a
-// resize event always revalidates. False when not open/no app or a callback failed.
+/**
+ * --- Owner-thread loop ---
+ * One non-blocking pass: bounded poll (0ms), deliver, draw, single present; a
+ * resize event always revalidates. False when not open/no app or a callback failed.
+ */
 bool CommandLine_tick(CommandLine *self);
-// Blocking terminal-application loop: tick until cancel/stop or a false result.
-// Returns the exit code (0 on clean stop). Requires an attached app.
+/**
+ * Blocking terminal-application loop: tick until cancel/stop or a false result.
+ * Returns the exit code (0 on clean stop). Requires an attached app.
+ */
 i32 CommandLine_run(CommandLine *self);
-// Thread-safe, idempotent stop request (flips cancel; the loop observes it).
+/** Thread-safe, idempotent stop request (flips cancel; the loop observes it). */
 fn CommandLine_stop(CommandLine *self);
 fn CommandLine_requestCancel(CommandLine *self);
 bool CommandLine_isRunning(const CommandLine *self);
-// One loop word, readable from any thread (snapshot semantics).
+/** One loop word, readable from any thread (snapshot semantics). */
 CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self);
 
-// --- Geometry / grid ---
+/** --- Geometry / grid --- */
 bytes CommandLine_getWidth(const CommandLine *self);
 bytes CommandLine_getHeight(const CommandLine *self);
 bytes CommandLine_getCapacity(const CommandLine *self);
-// Borrowed contiguous width*height cell grid; live until close/revalidate.
-char *CommandLine_getCells(CommandLine *self);
-const char *CommandLine_getCellsConst(const CommandLine *self);
-// Fill the grid with blanks. Paints nothing to the device until present.
+/** Borrowed contiguous width*height cell grid; live until close/revalidate. */
+utf8 *CommandLine_getCells(CommandLine *self);
+string CommandLine_getCellsConst(const CommandLine *self);
+/** Fill the grid with blanks. Paints nothing to the device until present. */
 bool CommandLine_clear(CommandLine *self);
 
-// --- Input ---
-// Bounded device poll (waits at most timeoutMs). False when no event arrived or
-// the backend is absent; *out is zeroed. Never blocks unbounded.
+/**
+ * --- Input ---
+ * Bounded device poll (waits at most timeoutMs). False when no event arrived or
+ * the backend is absent; *out is zeroed. Never blocks unbounded.
+ */
 bool CommandLine_poll(CommandLine *self, i32 timeoutMs, CommandLineEvent *out);
 bool CommandLine_setMouseReporting(CommandLine *self, bool enabled);
 
-// --- Telemetry / identity: symmetric setters & getters ---
-fn        CommandLine_setTitle(CommandLine *self, const char *title);
-const char *CommandLine_getTitle(const CommandLine *self);
+/** --- Telemetry / identity: symmetric setters & getters --- */
+fn        CommandLine_setTitle(CommandLine *self, string title);
+string CommandLine_getTitle(const CommandLine *self);
 u64    CommandLine_getGeneration(const CommandLine *self);
 bytes      CommandLine_exhaustionCount(const CommandLine *self);
 bool        CommandLine_isOpen(const CommandLine *self);
 bool        CommandLine_isActive(const CommandLine *self);
 bool        CommandLine_isCancelled(const CommandLine *self);
 
-// --- Projections (the toString Law) ---
-bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *outTruncated);
-bool CommandLine_toStringStruct(const CommandLine *self, char *dest, bytes cap, bool *outTruncated);
+/** --- Projections (the toString Law) --- */
+bool CommandLine_toString(const CommandLine *self, utf8 *dest, bytes cap, bool *outTruncated);
+bool CommandLine_toStringStruct(const CommandLine *self, utf8 *dest, bytes cap, bool *outTruncated);
 
-// The default ncurses backend (commandline_ncurses.c). Returned by value; owns
-// no state until opened. Exposed so an application can pre-set mouse policy.
+/**
+ * The default ncurses backend (commandline_ncurses.c). Returned by value; owns
+ * no state until opened. Exposed so an application can pre-set mouse policy.
+ */
 CommandLineIo CommandLine_defaultIo();
 
 #endif

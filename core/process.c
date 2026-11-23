@@ -1,7 +1,7 @@
 #include "vex.h"
 #include "process.h"
-
-#include <stdlib.h>
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 
 
 ;;DEFINITION
@@ -30,12 +30,12 @@
  *   are borrowed; code and data must remain live while referenced. No module
  *   pin, thread, or cancellation mechanism is created here.
  *
- * STRUCT FIELDS (Mirroring kernel/process.h — exactly this file's class):
+ * STRUCT FIELDS (Mirroring kernel/process.h, exactly this file's class):
  * ----------------------------------------------------------------------------
  *   _Atomic(ProcessEntry) entry;   // current callback
  *   _Atomic(any) context;        // borrowed callback data
  *   _Atomic(any) hot;            // borrowed association, NOT a module pin
- *   _Atomic(const char*) name;     // borrowed immutable label
+ *   _Atomic(string ) name;     // borrowed immutable label
  *   atomic_bool occupied;          // non-waiting admission gate
  *   atomic_bool inFlight;          // callback execution telemetry
  *   atomic_uint invocationCount;   // completed callbacks
@@ -81,7 +81,7 @@
  * ============================================================================
  */
 
-// CONSTRUCTORS (PUBLIC & PRIVATE)
+/** CONSTRUCTORS (PUBLIC & PRIVATE) */
 /** Creates a process using the supplied entry and no context or name. */
 Process *Process_1(ProcessEntry entry) {
     return Process_3(nullptr, entry, nullptr);
@@ -123,12 +123,12 @@ static const _Atomic(any) *Process_hotPtr(const Process *self) {
 }
 
 ;;GETTER
-static _Atomic(const char*) *Process_nameMut(Process *self) {
+static _Atomic(string) *Process_nameMut(Process *self) {
     return &(*self).name;
 }
 
 ;;GETTER
-static const _Atomic(const char*) *Process_namePtr(const Process *self) {
+static const _Atomic(string) *Process_namePtr(const Process *self) {
     return &(*self).name;
 }
 
@@ -158,12 +158,13 @@ static const atomic_uint *Process_invocationCountPtr(const Process *self) {
 }
 
 /** Allocates a process whose callback, name, and context are borrowed. */
-Process *Process_3(const char *name, ProcessEntry entry, any context) {
+Process *Process_3(string name, ProcessEntry entry, any context) {
     if (!entry)
         return nullptr;
-    Process *self = (Process*) calloc(1, sizeof(Process));
+    Process *self = (Process*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(Process));
     if (!self)
         return nullptr;
+    memset(self, 0, sizeof(Process));
     atomic_init(Process_entryMut(self), entry);
     atomic_init(Process_contextMut(self), context);
     atomic_init(Process_hotMut(self), nullptr);
@@ -174,7 +175,7 @@ Process *Process_3(const char *name, ProcessEntry entry, any context) {
     return self;
 }
 
-// CORE FUNCTIONS (PUBLIC & PRIVATE)
+/** CORE FUNCTIONS (PUBLIC & PRIVATE) */
 /** Invokes the entry once if the process is idle and reports its exit status. */
 ProcessResult Process_run(Process *self, i32 *exitStatus) {
     if (!self || !exitStatus)
@@ -201,11 +202,11 @@ bool Process_free(Process *self) {
     if (!atomic_compare_exchange_strong_explicit(Process_occupiedMut(self), &expected, true,
                                                  memory_order_acquire, memory_order_relaxed))
         return false;
-    free(self);
+    MemoryArena_free(Lifetime_arena(), self);
     return true;
 }
 
-// SETTERS (PUBLIC & PRIVATE)
+/** SETTERS (PUBLIC & PRIVATE) */
 ;;SETTER
 /** Replaces the entry, context, and borrowed hot association as one admission. */
 ProcessResult Process_replace(Process *self, ProcessEntry entry, any context, any hot) {
@@ -224,7 +225,7 @@ ProcessResult Process_replace(Process *self, ProcessEntry entry, any context, an
 
 ;;SETTER
 /** Updates the borrowed name when no invocation or replacement holds the gate. */
-ProcessResult Process_setName(Process *self, const char *name) {
+ProcessResult Process_setName(Process *self, string name) {
     if (!self)
         return PROCESS_INVALID;
     bool expected = false;
@@ -236,7 +237,7 @@ ProcessResult Process_setName(Process *self, const char *name) {
     return PROCESS_OK;
 }
 
-// GETTERS (PUBLIC & PRIVATE)
+/** GETTERS (PUBLIC & PRIVATE) */
 ;;GETTER
 /** Reports whether the callback is currently executing. */
 bool Process_isRunning(const Process *self) {
@@ -269,6 +270,6 @@ any Process_getHot(const Process *self) {
 
 ;;GETTER
 /** Returns the borrowed process name, or nullptr for a null process. */
-const char *Process_getName(const Process *self) {
+string Process_getName(const Process *self) {
     return self ? atomic_load_explicit(Process_namePtr(self), memory_order_relaxed) : nullptr;
 }

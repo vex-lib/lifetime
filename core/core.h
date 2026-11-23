@@ -1,7 +1,7 @@
 #ifndef CORE_CORE_H
 #define CORE_CORE_H
 
-// core/core.h — the R0 kernel-host directory door.
+/** core/core.h, the R0 kernel-host directory door. */
 
 #include "vex.h"
 #include "application.h"

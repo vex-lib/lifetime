@@ -1,9 +1,10 @@
 #include "vex.h"
 #include "kernel.h"
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 
 #include <pthread.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -49,7 +50,7 @@
  *   the event pump, and presentation live in graphvex's GfxLoop (the Vertical
  *   Integration Law / the Window Decoupling Law).
  *
- * STRUCT FIELDS (Mirroring kernel/kernel.h — exactly this file's class):
+ * STRUCT FIELDS (Mirroring kernel/kernel.h, exactly this file's class):
  * ----------------------------------------------------------------------------
  *   Lifetime lifetime;                          // Lifetime memory substrate (master + transient arenas)
  *   any arena;                                // opaque master arena (attested, never dereferenced)
@@ -159,132 +160,270 @@
 
 ;;INTENTION("Kernel struct is calloc-owned like Application_0; "
             "arenas are provider-owned opaque handles. Migrating the struct itself"
-            " into arena storage happens once the registries move to doubling arena slabs per the Dynamic Scalability & Anti-Hardcoding Law — keeps teardown order provable today per the Conflict Triage Law.")
+            " into arena storage happens once the registries move to doubling arena slabs per the Dynamic Scalability & Anti-Hardcoding Law, keeps teardown order provable today per the Conflict Triage Law.")
 
 ;;INTENTION("Kernel_runApplication starts the app, shows its windows, then"
             " blocks in Application_run's keep-alive parked loop until every "
             "window closes. graphvex's GfxLoop frame scheduler lands later and "
-            "layers on top — registering windows into the loop, driving the "
+            "layers on top, registering windows into the loop, driving the "
             "event pump, present-on-demand, and telemetry. The Kernel never "
             "owns the loop either way; hotcwap's Application owns the window "
             "end.")
 
 ;;INTENTION("The Terminal-Run Contract (the Conflict Triage Law): Kernel_runAll"
-            " ARMS the kernel — running=true + runThreadId set on the arming"
+            " ARMS the kernel, running=true + runThreadId set on the arming"
             " thread. After arming, Thread-0 registration is REFUSED with one"
             " stderr warn: the run loop applies only what it was given before"
             " run, so the arming thread cannot re-enter or mutate the registry"
             " it is currently iterating (the Tier-1 thread-safety half). Other"
             " threads may still register via the deferred-add mailbox (mutex-"
-            " guarded, growable realloc — a COLD path, never a steady-state"
+            " guarded, growable realloc, a COLD path, never a steady-state"
             " allocation), drained on Thread 0 by the run loop's next pass, so"
             " a hot-reloaded module / worker can spawn an Application mid-run"
             " on its own schedule. The registries are never copied to the"
-            " mailbox — the mailbox FEEDS the same arrays on the running"
+            " mailbox, the mailbox FEEDS the same arrays on the running"
             " thread, keeping all registry mutation single-threaded.")
 
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 ;;GETTER
-static Lifetime *Kernel_lifetimeMut(Kernel *self) { return &(*self).lifetime; }
+static Lifetime *Kernel_lifetimeMut(Kernel *self)
+{
+    return &(*self).lifetime;
+}
 ;;SETTER
-static fn Kernel_setLifetime(Kernel *self, Lifetime lt) { (*self).lifetime = lt; }
+static fn Kernel_setLifetime(Kernel *self, Lifetime lt)
+{
+    (*self).lifetime = lt;
+}
 ;;SETTER
-static fn Kernel_setArena(Kernel *self, any arena) { (*self).arena = arena; }
+static fn Kernel_setArena(Kernel *self, any arena)
+{
+    (*self).arena = arena;
+}
 ;;SETTER
-static fn Kernel_setArenaType(Kernel *self, u64 t) { (*self).arenaType = t; }
+static fn Kernel_setArenaType(Kernel *self, u64 t)
+{
+    (*self).arenaType = t;
+}
 ;;SETTER
-static fn Kernel_setTransientArena(Kernel *self, any arena) { (*self).transientArena = arena; }
+static fn Kernel_setTransientArena(Kernel *self, any arena)
+{
+    (*self).transientArena = arena;
+}
 ;;SETTER
-static fn Kernel_setTransientArenaType(Kernel *self, u64 t) { (*self).transientArenaType = t; }
+static fn Kernel_setTransientArenaType(Kernel *self, u64 t)
+{
+    (*self).transientArenaType = t;
+}
 ;;SETTER
-static fn Kernel_setApplicationCount(Kernel *self, u32 v) { (*self).applicationCount = v; }
+static fn Kernel_setApplicationCount(Kernel *self, u32 v)
+{
+    (*self).applicationCount = v;
+}
 ;;SETTER
-static fn Kernel_setProcessCount(Kernel *self, u32 v) { (*self).processCount = v; }
+static fn Kernel_setProcessCount(Kernel *self, u32 v)
+{
+    (*self).processCount = v;
+}
 ;;SETTER
-static fn Kernel_setConsoleCount(Kernel *self, u32 v) { (*self).consoleCount = v; }
+static fn Kernel_setConsoleCount(Kernel *self, u32 v)
+{
+    (*self).consoleCount = v;
+}
 ;;SETTER
-static fn Kernel_setCommandlineCount(Kernel *self, u32 v) { (*self).commandlineCount = v; }
+static fn Kernel_setCommandlineCount(Kernel *self, u32 v)
+{
+    (*self).commandlineCount = v;
+}
 ;;SETTER
-static fn Kernel_setApplicationAt(Kernel *self, u32 i, Application *a) { (*self).applications[i] = a; }
+static fn Kernel_setApplicationAt(Kernel *self, u32 i, Application *a)
+{
+    (*self).applications[i] = a;
+}
 ;;SETTER
-static fn Kernel_setProcessAt(Kernel *self, u32 i, Process *p) { (*self).processes[i] = p; }
+static fn Kernel_setProcessAt(Kernel *self, u32 i, Process *p)
+{
+    (*self).processes[i] = p;
+}
 ;;SETTER
-static fn Kernel_setConsoleAt(Kernel *self, u32 i, Console *c) { (*self).consoles[i] = c; }
+static fn Kernel_setConsoleAt(Kernel *self, u32 i, Console *c)
+{
+    (*self).consoles[i] = c;
+}
 ;;SETTER
-static fn Kernel_setCommandlineAt(Kernel *self, u32 i, CommandLine *cl) { (*self).commandlines[i] = cl; }
+static fn Kernel_setCommandlineAt(Kernel *self, u32 i, CommandLine *cl)
+{
+    (*self).commandlines[i] = cl;
+}
 ;;GETTER
-static KernelRunSlot *Kernel_runSlots(const Kernel *self) { return (*self).runSlots; }
+static KernelRunSlot *Kernel_runSlots(const Kernel *self)
+{
+    return (*self).runSlots;
+}
 ;;SETTER
-static fn Kernel_setRunSlots(Kernel *self, KernelRunSlot *s) { (*self).runSlots = s; }
+static fn Kernel_setRunSlots(Kernel *self, KernelRunSlot *s)
+{
+    (*self).runSlots = s;
+}
 ;;SETTER
-static fn Kernel_setRunCount(Kernel *self, u32 v) { (*self).runCount = v; }
+static fn Kernel_setRunCount(Kernel *self, u32 v)
+{
+    (*self).runCount = v;
+}
 ;;GETTER
-static u32 Kernel_runCap(const Kernel *self) { return (*self).runCap; }
+static u32 Kernel_runCap(const Kernel *self)
+{
+    return (*self).runCap;
+}
 ;;SETTER
-static fn Kernel_setRunCap(Kernel *self, u32 v) { (*self).runCap = v; }
+static fn Kernel_setRunCap(Kernel *self, u32 v)
+{
+    (*self).runCap = v;
+}
 ;;GETTER
-static KernelEndSlot *Kernel_endSlots(const Kernel *self) { return (*self).endSlots; }
+static KernelEndSlot *Kernel_endSlots(const Kernel *self)
+{
+    return (*self).endSlots;
+}
 ;;SETTER
-static fn Kernel_setEndSlots(Kernel *self, KernelEndSlot *s) { (*self).endSlots = s; }
+static fn Kernel_setEndSlots(Kernel *self, KernelEndSlot *s)
+{
+    (*self).endSlots = s;
+}
 ;;SETTER
-static fn Kernel_setEndCount(Kernel *self, u32 v) { (*self).endCount = v; }
+static fn Kernel_setEndCount(Kernel *self, u32 v)
+{
+    (*self).endCount = v;
+}
 ;;GETTER
-static u32 Kernel_endCap(const Kernel *self) { return (*self).endCap; }
+static u32 Kernel_endCap(const Kernel *self)
+{
+    return (*self).endCap;
+}
 ;;SETTER
-static fn Kernel_setEndCap(Kernel *self, u32 v) { (*self).endCap = v; }
+static fn Kernel_setEndCap(Kernel *self, u32 v)
+{
+    (*self).endCap = v;
+}
 ;;GETTER
 static _Atomic bool *Kernel_endHooksFiredMut(Kernel *self) { return &(*self).endHooksFired; }
 ;;GETTER
-static atomic_uint *Kernel_phaseMut(Kernel *self) { return &(*self).phase; }
+static atomic_uint *Kernel_phaseMut(Kernel *self)
+{
+    return &(*self).phase;
+}
 ;;GETTER
-static const atomic_uint *Kernel_phasePtr(const Kernel *self) { return &(*self).phase; }
+static const atomic_uint *Kernel_phasePtr(const Kernel *self)
+{
+    return &(*self).phase;
+}
 ;;GETTER
-static atomic_bool *Kernel_runningMut(Kernel *self) { return &(*self).running; }
+static atomic_bool *Kernel_runningMut(Kernel *self)
+{
+    return &(*self).running;
+}
 ;;GETTER
-static const atomic_bool *Kernel_runningPtr(const Kernel *self) { return &(*self).running; }
+static const atomic_bool *Kernel_runningPtr(const Kernel *self)
+{
+    return &(*self).running;
+}
 ;;GETTER
-static atomic_uintptr_t *Kernel_runThreadIdMut(Kernel *self) { return &(*self).runThreadId; }
+static atomic_uintptr_t *Kernel_runThreadIdMut(Kernel *self)
+{
+    return &(*self).runThreadId;
+}
 ;;GETTER
-static pthread_mutex_t *Kernel_addLockMut(Kernel *self) { return &(*self).addLock; }
+static pthread_mutex_t *Kernel_addLockMut(Kernel *self)
+{
+    return &(*self).addLock;
+}
 ;;GETTER
-static KernelDeferred *Kernel_deferred(const Kernel *self) { return (*self).deferred; }
+static KernelDeferred *Kernel_deferred(const Kernel *self)
+{
+    return (*self).deferred;
+}
 ;;SETTER
-static fn Kernel_setDeferred(Kernel *self, KernelDeferred *d) { (*self).deferred = d; }
+static fn Kernel_setDeferred(Kernel *self, KernelDeferred *d)
+{
+    (*self).deferred = d;
+}
 ;;GETTER
-static bytes Kernel_deferredCount(const Kernel *self) { return (*self).deferredCount; }
+static bytes Kernel_deferredCount(const Kernel *self)
+{
+    return (*self).deferredCount;
+}
 ;;SETTER
-static fn Kernel_setDeferredCount(Kernel *self, bytes v) { (*self).deferredCount = v; }
+static fn Kernel_setDeferredCount(Kernel *self, bytes v)
+{
+    (*self).deferredCount = v;
+}
 ;;GETTER
-static bytes Kernel_deferredCap(const Kernel *self) { return (*self).deferredCap; }
+static bytes Kernel_deferredCap(const Kernel *self)
+{
+    return (*self).deferredCap;
+}
 ;;SETTER
-static fn Kernel_setDeferredCap(Kernel *self, bytes v) { (*self).deferredCap = v; }
+static fn Kernel_setDeferredCap(Kernel *self, bytes v)
+{
+    (*self).deferredCap = v;
+}
 ;;GETTER
 static _Atomic bool *KernelRunSlot_threadLaunchedMut(KernelRunSlot *s) { return &(*s).threadLaunched; }
 ;;GETTER
-static pthread_t KernelRunSlot_thread(const KernelRunSlot *s) { return (*s).thread; }
+static thread KernelRunSlot_thread(const KernelRunSlot *s)
+{
+    return (*s).worker;
+}
 ;;GETTER
-static pthread_t *KernelRunSlot_threadMut(KernelRunSlot *s) { return &(*s).thread; }
+static thread *KernelRunSlot_threadMut(KernelRunSlot *s)
+{
+    return &(*s).worker;
+}
 ;;GETTER
 static _Atomic bool *KernelRunSlot_doneMut(KernelRunSlot *s) { return &(*s).done; }
 ;;GETTER
 static const _Atomic bool *KernelRunSlot_donePtr(const KernelRunSlot *s) { return &(*s).done; }
 ;;GETTER
-static KernelRunFn KernelRunSlot_fn(const KernelRunSlot *s) { return (*s).fn; }
+static KernelRunFn KernelRunSlot_fn(const KernelRunSlot *s)
+{
+    return (*s).fn;
+}
 ;;SETTER
-static fn KernelRunSlot_setFn(KernelRunSlot *s, KernelRunFn f) { (*s).fn = f; }
+static fn KernelRunSlot_setFn(KernelRunSlot *s, KernelRunFn f)
+{
+    (*s).fn = f;
+}
 ;;GETTER
-static any KernelRunSlot_userdata(const KernelRunSlot *s) { return (*s).userdata; }
+static any KernelRunSlot_userdata(const KernelRunSlot *s)
+{
+    return (*s).userdata;
+}
 ;;SETTER
-static fn KernelRunSlot_setUserdata(KernelRunSlot *s, any u) { (*s).userdata = u; }
+static fn KernelRunSlot_setUserdata(KernelRunSlot *s, any u)
+{
+    (*s).userdata = u;
+}
 ;;GETTER
-static KernelEndFn KernelEndSlot_fn(const KernelEndSlot *s) { return (*s).fn; }
+static KernelEndFn KernelEndSlot_fn(const KernelEndSlot *s)
+{
+    return (*s).fn;
+}
 ;;SETTER
-static fn KernelEndSlot_setFn(KernelEndSlot *s, KernelEndFn f) { (*s).fn = f; }
+static fn KernelEndSlot_setFn(KernelEndSlot *s, KernelEndFn f)
+{
+    (*s).fn = f;
+}
 ;;GETTER
-static any KernelEndSlot_userdata(const KernelEndSlot *s) { return (*s).userdata; }
+static any KernelEndSlot_userdata(const KernelEndSlot *s)
+{
+    return (*s).userdata;
+}
 ;;SETTER
-static fn KernelEndSlot_setUserdata(KernelEndSlot *s, any u) { (*s).userdata = u; }
+static fn KernelEndSlot_setUserdata(KernelEndSlot *s, any u)
+{
+    (*s).userdata = u;
+}
 
 /** Creates a kernel with the named default persistent and transient arena sizes. */
 Kernel *Kernel_0() {
@@ -296,16 +435,24 @@ Kernel *Kernel_1(bytes arenaBytes) {
     return Kernel_2(arenaBytes, KERNEL_TRANSIENT_DEFAULT);
 }
 
+static any kernelRealloc(any ptr, bytes numBytes)
+{
+    if (!ptr)
+        return MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, numBytes);
+
+    return MemoryArena_realloc(Lifetime_arena(), ptr, numBytes);
+}
+
 /** Allocates the supervisor and its persistent/transient lifetime arenas. */
 Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes) {
-    Kernel *self = (Kernel*) calloc(1, sizeof(Kernel));
+    Kernel *self = (Kernel*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(Kernel));
     if (!self)
         return nullptr;
-    // Create the Lifetime memory substrate directly via vexspoke's MemoryArena.
-    Lifetime lt = Lifetime_create(arenaBytes, transientBytes);
+    memset(self, 0, sizeof(Kernel));
+    Lifetime lt = Lifetime(arenaBytes, transientBytes);
     if (!Lifetime_isValid(&lt)) {
         Lifetime_destroy(&lt);
-        free(self);
+        MemoryArena_free(Lifetime_arena(), self);
         return nullptr;
     }
     Kernel_setLifetime(self, lt);
@@ -334,17 +481,17 @@ Kernel *Kernel_2(bytes arenaBytes, bytes transientBytes) {
     return self;
 }
 
-// Forward declare hook invoker
+/** Forward declare hook invoker */
 static fn kernelFireEndHooks(Kernel *self);
 static any kernelRunWorkerMain(any arg);
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 /** Stops admission and frees an idle, empty kernel; refuses while busy or registered. */
 bool Kernel_free(Kernel *self) {
     if (!self)
         return false;
     if (atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) != KERNEL_PHASE_READY) {
-        fprintf(stderr, "kernel: refusing free while a run is live or draining — stop and let it quiesce first\n");
+        fprint(stderr, "kernel: refusing free while a run is live or draining, stop and let it quiesce first");
         return false;
     }
     u32 appCount = Kernel_getApplicationCount(self);
@@ -352,16 +499,9 @@ bool Kernel_free(Kernel *self) {
     u32 conCount = Kernel_getConsoleCount(self);
     u32 clCount = Kernel_getCommandLineCount(self);
     if (appCount > 0 || procCount > 0 || conCount > 0 || clCount > 0) {
-        fprintf(stderr,
-                "kernel: %u app(s), %u process(es), %u console(s), %u commandline(s) still registered; remove before free\n",
-                appCount, procCount, conCount, clCount);
+        fprint(stderr, "kernel: ", appCount, " app(s), ", procCount, " process(es), ", conCount, " console(s), ", clCount, " commandline(s) still registered; remove before free");
         return false;
     }
-    // Fire end hooks BEFORE joining? No — AFTER: hooks release resources the
-    // workers may still touch, so quiescence precedes release (the Teardown
-    // Order Law). In READY phase no workers exist; Kernel_stop already fired
-    // the hooks in that path and the fire-once guard keeps this a no-op.
-    // Join any run worker threads
     u32 runCount = Kernel_getRunFunctionCount(self);
     KernelRunSlot *runSlots = Kernel_runSlots(self);
     for (u32 i = 0; i < runCount; i++) {
@@ -373,23 +513,18 @@ bool Kernel_free(Kernel *self) {
     }
     kernelFireEndHooks(self);
 
-    free(runSlots);
+    MemoryArena_free(Lifetime_arena(), runSlots);
     Kernel_setRunSlots(self, nullptr);
     Kernel_setRunCount(self, 0);
     Kernel_setRunCap(self, 0);
 
-    free(Kernel_endSlots(self));
+    MemoryArena_free(Lifetime_arena(), Kernel_endSlots(self));
     Kernel_setEndSlots(self, nullptr);
     Kernel_setEndCount(self, 0);
     Kernel_setEndCap(self, 0);
 
-    // No Vulkan teardown here: the device lifecycle (init/shutdown) is owned
-    // entirely by graphvex and driven through its own registration path.
-    // The Kernel never names Vk_* — see the Teardown Order Law: graphvex
-    // tears its device down before the arenas free below, ordered by whoever
-    // holds the GfxLoop registration, not by the supervisor.
     pthread_mutex_destroy(Kernel_addLockMut(self));
-    free(Kernel_deferred(self));
+    MemoryArena_free(Lifetime_arena(), Kernel_deferred(self));
     Kernel_setDeferred(self, nullptr);
     Kernel_setDeferredCount(self, 0);
     Kernel_setDeferredCap(self, 0);
@@ -412,7 +547,7 @@ bool Kernel_free(Kernel *self) {
     Kernel_setArena(self, nullptr);
     Kernel_setArenaType(self, 0);
     Lifetime_destroy(Kernel_lifetimeMut(self));
-    free(self);
+    MemoryArena_free(Lifetime_arena(), self);
     return true;
 }
 
@@ -427,11 +562,6 @@ fn Kernel_destroy(Kernel *self) {
 fn Kernel_stop(Kernel *self) {
     if (!self)
         return;
-    // LIVE RUN: claim teardown ownership once (RUNNING -> DRAINING). The
-    // winner stops the kinds and clears running so the reactor exits; the
-    // ARMING THREAD then joins the workers and fires the end hooks in its
-    // epilogue — never here, because hooks may release resources the workers
-    // still touch (the Teardown Order Law: quiescence precedes release).
     u32 expected = KERNEL_PHASE_RUNNING;
     if (atomic_compare_exchange_strong_explicit(Kernel_phaseMut(self), &expected, KERNEL_PHASE_DRAINING,
                                                 memory_order_acq_rel, memory_order_acquire)) {
@@ -456,13 +586,10 @@ fn Kernel_stop(Kernel *self) {
         }
         return;
     }
-    // NO RUN LIVE (READY): nothing to quiesce — fire the end hooks directly
-    // (the fire-once guard keeps repeated stops harmless).
     if (expected == KERNEL_PHASE_READY) {
         kernelFireEndHooks(self);
         return;
     }
-    // DRAINING: the arming thread already owns teardown; nothing to do.
 }
 
 /** Returns the atomic lifecycle phase, or READY for a null kernel. */
@@ -500,39 +627,43 @@ static fn kernelFireEndHooks(Kernel *self) {
 static any kernelRunWorkerMain(any arg) {
     KernelRunSlot *slot = (KernelRunSlot*) arg;
     KernelRunFn runFn = slot ? KernelRunSlot_fn(slot) : nullptr;
-    if (slot && runFn) {
+    if (slot && runFn)
         runFn(KernelRunSlot_userdata(slot));
-    }
-    if (slot) {
+    if (slot)
         atomic_store_explicit(KernelRunSlot_doneMut(slot), true, memory_order_relaxed);
-    }
     return nullptr;
 }
 
-// --- REGISTRY INTERNALS + DEFERRED MAILBOX -----------------------------------
-// The three Kernel_add* entry points split into (a) the Terminal-Run guard
-// and (b.sh) apply-internal peers that touch ONLY the registry arrays. The
-// guard lives at the public seam; the apply-internal peers are the sole
-// writers of the arrays. During a live run only the arming thread mutates
-// the registries (via drain), keeping iteration single-threaded per the
-// Tier-1 thread-safety half of the ;;INTENTION above.
+/**
+ * --- REGISTRY INTERNALS + DEFERRED MAILBOX -----------------------------------
+ * The three Kernel_add* entry points split into (a) the Terminal-Run guard
+ * and (b.sh) apply-internal peers that touch ONLY the registry arrays. The
+ * guard lives at the public seam; the apply-internal peers are the sole
+ * writers of the arrays. During a live run only the arming thread mutates
+ * the registries (via drain), keeping iteration single-threaded per the
+ * Tier-1 thread-safety half of the ;;INTENTION above.
+ */
 
 /** Reports whether the phase has left READY. */
 static bool kernelRunActive(const Kernel *self) {
     return atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) != KERNEL_PHASE_READY;
 }
 
-// DRAINING is owned by the arming thread: no registration from any thread,
-// and nothing may grow a registry/slot table a joining worker still points
-// into. Callers already warn on refusal.
+/**
+ * DRAINING is owned by the arming thread: no registration from any thread,
+ * and nothing may grow a registry/slot table a joining worker still points
+ * into. Callers already warn on refusal.
+ */
 /** Reports whether the kernel is in its teardown-owned draining phase. */
 static bool kernelDraining(const Kernel *self) {
     return atomic_load_explicit(Kernel_phasePtr(self), memory_order_acquire) == KERNEL_PHASE_DRAINING;
 }
 
-// Forward: start one app manifest non-blocking (defined below with the run
-// helpers; kernelApplyDeferred admits deferred adds and starts them like the
-// initial pass would).
+/**
+ * Forward: start one app manifest non-blocking (defined below with the run
+ * helpers; kernelApplyDeferred admits deferred adds and starts them like the
+ * initial pass would).
+ */
 static fn kernelStartApplication(Kernel *self, Application *a);
 
 /** Adds an application to the single-threaded registry if unique and within capacity. */
@@ -587,9 +718,11 @@ static bool kernelAddCommandLineInternal(Kernel *self, CommandLine *c) {
     return true;
 }
 
-// Post a pending add from ANY thread (mutex-guarded, growable realloc — cold
-// path, never steady-state). The drain on Thread 0 steals the whole batch in
-// one lock and re-owns the arrays for the rest of the pass.
+/**
+ * Post a pending add from ANY thread (mutex-guarded, growable realloc, cold
+ * path, never steady-state). The drain on Thread 0 steals the whole batch in
+ * one lock and re-owns the arrays for the rest of the pass.
+ */
 /** Queues a registration request in the mutex-protected deferred mailbox. */
 static bool kernelPostDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
     pthread_mutex_lock(Kernel_addLockMut(self));
@@ -598,10 +731,10 @@ static bool kernelPostDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
     KernelDeferred *def = Kernel_deferred(self);
     if (count == defCap) {
         bytes cap = defCap ? defCap * 2 : 4;
-        KernelDeferred *nx = (KernelDeferred*) realloc(def, cap * sizeof(KernelDeferred));
+        KernelDeferred *nx = (KernelDeferred*) kernelRealloc(def, cap * sizeof(KernelDeferred));
         if (!nx) {
             pthread_mutex_unlock(Kernel_addLockMut(self));
-            fprintf(stderr, "kernel: deferred-add mailbox grow failed (Kernel_add* dropped)\n");
+            fprint(stderr, "kernel: deferred-add mailbox grow failed (Kernel_add* dropped)");
             return false;
         }
         def = nx;
@@ -615,10 +748,12 @@ static bool kernelPostDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
     return true;
 }
 
-// Admit one pending add into the registry on the arming thread, then START
-// it exactly like the initial pass would: processes invoke one-shot, consoles
-// spawn their session, applications start + show their windows. A kind that
-// fails the dup/full/guards stays unregistered and silent.
+/**
+ * Admit one pending add into the registry on the arming thread, then START
+ * it exactly like the initial pass would: processes invoke one-shot, consoles
+ * spawn their session, applications start + show their windows. A kind that
+ * fails the dup/full/guards stays unregistered and silent.
+ */
 /** Applies one queued add on the run thread, registering and starting its kind. */
 static fn kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
     switch (kind) {
@@ -654,8 +789,10 @@ static fn kernelApplyDeferred(Kernel *self, KernelDeferredKind kind, any ptr) {
     }
 }
 
-// Steal the whole pending batch under the lock, then apply each entry OUTSIDE
-// the lock — the run loop keeps iterating its own registry, never the mailbox.
+/**
+ * Steal the whole pending batch under the lock, then apply each entry OUTSIDE
+ * the lock, the run loop keeps iterating its own registry, never the mailbox.
+ */
 /** Takes and applies the current deferred batch outside the mailbox lock. */
 static fn kernelDrainDeferred(Kernel *self) {
     pthread_mutex_lock(Kernel_addLockMut(self));
@@ -670,13 +807,15 @@ static fn kernelDrainDeferred(Kernel *self) {
         kernelApplyDeferred(self, batch[i].kind, batch[i].ptr);
 
     if (batch)
-        free(batch);
+        MemoryArena_free(Lifetime_arena(), batch);
 }
 
-// Teardown counterpart of the drain: steal the pending batch and DISCARD it.
-// The run ended (stop landed or all kinds done) — starting fresh work now
-// would outlive the stop, and DRAINING refuses new posts anyway, so anything
-// left was queued while RUNNING and never admitted. One warn per drop batch.
+/**
+ * Teardown counterpart of the drain: steal the pending batch and DISCARD it.
+ * The run ended (stop landed or all kinds done), starting fresh work now
+ * would outlive the stop, and DRAINING refuses new posts anyway, so anything
+ * left was queued while RUNNING and never admitted. One warn per drop batch.
+ */
 /** Discards pending additions after run completion and reports a dropped batch. */
 static fn kernelDropDeferred(Kernel *self) {
     pthread_mutex_lock(Kernel_addLockMut(self));
@@ -688,15 +827,17 @@ static fn kernelDropDeferred(Kernel *self) {
     pthread_mutex_unlock(Kernel_addLockMut(self));
 
     if (n > 0)
-        fprintf(stderr, "kernel: dropped %zu deferred add(s) — the run ended before admission\n", n);
+        fprint(stderr, "kernel: dropped ", n, " deferred add(s), the run ended before admission");
     if (batch)
-        free(batch);
+        MemoryArena_free(Lifetime_arena(), batch);
 }
 
-// Every registered kind reports done? Processes are done by construction
-// after the initial invoke pass (one-shot); consoles when their session
-// joined (Console_isRunning false); apps per the Application_isFinished
-// completion predicate (all windows closed or externally stopped).
+/**
+ * Every registered kind reports done? Processes are done by construction
+ * after the initial invoke pass (one-shot); consoles when their session
+ * joined (Console_isRunning false); apps per the Application_isFinished
+ * completion predicate (all windows closed or externally stopped).
+ */
 /** Checks application, console, and worker completion to decide reactor exit. */
 static bool kernelAllDone(const Kernel *self) {
     u32 appCount = Kernel_getApplicationCount(self);
@@ -727,9 +868,11 @@ static bool kernelAllDone(const Kernel *self) {
     return true;
 }
 
-// Start one app manifest NON-blocking: flip running, show every window. The
-// reactor supervises it to completion; the blocking Kernel_runApplication
-// path adds Application_run on top.
+/**
+ * Start one app manifest NON-blocking: flip running, show every window. The
+ * reactor supervises it to completion; the blocking Kernel_runApplication
+ * path adds Application_run on top.
+ */
 /** Begins an application and shows its registered windows without blocking. */
 static fn kernelStartApplication(Kernel *self, Application *a) {
     if (!a)
@@ -745,14 +888,16 @@ static fn kernelStartApplication(Kernel *self, Application *a) {
     }
 }
 
-// --- WORK DISPATCH ----------------------------------------------------------
-// The Kernel forwards work, it never does it: each registered kind is relayed
-// to its own run function. The frame loop, event pump, presentation, and
-// per-frame handler invocation live in graphvex's GfxLoop (the Vertical
-// Integration Law / the Window Decoupling Law). Kernel_runAll is the ONE
-// supervising entry: it ARMS (the Terminal-Run Contract), dispatches the
-// initial registrations, then runs a completion reactor until every kind is
-// done or Kernel_stop() lands.
+/**
+ * --- WORK DISPATCH ----------------------------------------------------------
+ * The Kernel forwards work, it never does it: each registered kind is relayed
+ * to its own run function. The frame loop, event pump, presentation, and
+ * per-frame handler invocation live in graphvex's GfxLoop (the Vertical
+ * Integration Law / the Window Decoupling Law). Kernel_runAll is the ONE
+ * supervising entry: it ARMS (the Terminal-Run Contract), dispatches the
+ * initial registrations, then runs a completion reactor until every kind is
+ * done or Kernel_stop() lands.
+ */
 
 /** Arms supervision, dispatches registered work, services it, then joins workers. */
 i32 Kernel_runAll(Kernel *self) {
@@ -763,14 +908,10 @@ i32 Kernel_runAll(Kernel *self) {
         && Kernel_getRunFunctionCount(self) == 0)
         return KERNEL_EXIT_NO_APPS;
 
-    // TERMINAL-RUN ARM: claim the run (READY -> RUNNING). From here the
-    // arming (Thread 0) thread can no longer register — all Kernel_add* on it
-    // are refused; other threads post into the deferred mailbox, drained on
-    // the next pass below. A second concurrent runAll is refused (one warn).
     u32 readyPhase = KERNEL_PHASE_READY;
     if (!atomic_compare_exchange_strong_explicit(Kernel_phaseMut(self), &readyPhase, KERNEL_PHASE_RUNNING,
                                                  memory_order_acq_rel, memory_order_acquire)) {
-        fprintf(stderr, "kernel: Kernel_run refused — a run is already live or draining\n");
+        fprint(stderr, "kernel: Kernel_run refused, a run is already live or draining");
         return KERNEL_EXIT_NO_APPS;
     }
     atomic_store_explicit(Kernel_runningMut(self), true, memory_order_relaxed);
@@ -778,7 +919,6 @@ i32 Kernel_runAll(Kernel *self) {
 
     i32 rc = KERNEL_EXIT_OK;
 
-    // One-shot invokables: run to completion on the arming thread.
     u32 procCount = Kernel_getProcessCount(self);
     for (u32 i = 0; i < procCount; i++) {
         Process *p = Kernel_getProcess(self, i);
@@ -791,7 +931,6 @@ i32 Kernel_runAll(Kernel *self) {
         }
     }
 
-    // Launch supervised run worker threads
     u32 runCount = Kernel_getRunFunctionCount(self);
     KernelRunSlot *runSlots = Kernel_runSlots(self);
     for (u32 i = 0; i < runCount; i++) {
@@ -804,15 +943,12 @@ i32 Kernel_runAll(Kernel *self) {
         }
     }
 
-    // Session pumps + windowed apps: start without blocking — the reactor
-    // below supervises them to completion.
     u32 conCount = Kernel_getConsoleCount(self);
     for (u32 i = 0; i < conCount; i++) {
         Console *c = Kernel_getConsole(self, i);
         if (c)
             (discard) Console_run(c);
     }
-    // Terminal applications: acquire the device, then drive it each pass below.
     u32 clCount = Kernel_getCommandLineCount(self);
     for (u32 i = 0; i < clCount; i++) {
         CommandLine *cl = Kernel_getCommandLine(self, i);
@@ -825,10 +961,6 @@ i32 Kernel_runAll(Kernel *self) {
 
     bridgeBespoke();
 
-    // COMPLETION REACTOR: drain deferred adds, pump OS events, supervise
-    // bounded console slices, ask app closed-state at a ~250ms cadence. 5ms
-    // per pass keeps teardown responsive (the Bounded Wait Law) without a
-    // busy spin.
     const struct timespec park = {0, 5000000L};
     u64 pass = 0;
     while (atomic_load_explicit(Kernel_runningPtr(self), memory_order_relaxed) && !kernelAllDone(self)) {
@@ -839,12 +971,9 @@ i32 Kernel_runAll(Kernel *self) {
         for (u32 i = 0; i < curAppCount; i++)
             Application_poll(Kernel_getApplication(self, i));
         bridgeBespokeCheck();
-        // Host-owned scratch dies at this frame boundary: module borrowers
-        // are excluded (their pass ran above), so no transient pointer
-        // survives into the next pass or across a swap.
         Lifetime_resetTransient(Kernel_getLifetime(self));
 
-        char buf[4096];
+        utf8 buf[4096];
         u32 curConCount = Kernel_getConsoleCount(self);
         for (u32 i = 0; i < curConCount; i++) {
             Console *c = Kernel_getConsole(self, i);
@@ -854,7 +983,6 @@ i32 Kernel_runAll(Kernel *self) {
             if (Console_poll(c, buf, sizeof(buf), &n) && n > 0)
                 (discard) fwrite(buf, 1, n, stdout);
         }
-        // Terminal applications: one non-blocking draw/resize/input pass each.
         u32 curClCount = Kernel_getCommandLineCount(self);
         for (u32 i = 0; i < curClCount; i++) {
             CommandLine *cl = Kernel_getCommandLine(self, i);
@@ -867,7 +995,7 @@ i32 Kernel_runAll(Kernel *self) {
                 Application *a = Kernel_getApplication(self, i);
                 if (!a)
                     continue;
-                Application_pollHot(a); // generation-driven hot swap, ~250ms
+                Application_pollHot(a);
                 if (Application_isFinished(a))
                     Application_stop(a);
             }
@@ -877,14 +1005,6 @@ i32 Kernel_runAll(Kernel *self) {
         pass++;
     }
 
-    // Reactor exit: the arming thread owns teardown. It stops every kind
-    // still live, JOINS the run workers (quiescence first), then fires the
-    // end functions — hooks release resources workers may still touch, so
-    // they run only after the last join (the Teardown Order Law). While
-    // DRAINING, Kernel_add* stays closed on every thread: no registration
-    // can grow a registry a joining worker still points into. The final
-    // drain is a best-effort straggler sweep; admitted adds run like the
-    // initial pass would. Then the phase returns to READY.
     appCount = Kernel_getApplicationCount(self);
     for (u32 i = 0; i < appCount; i++) {
         Application *a = Kernel_getApplication(self, i);
@@ -896,7 +1016,7 @@ i32 Kernel_runAll(Kernel *self) {
     for (u32 i = 0; i < clCount; i++) {
         CommandLine *cl = Kernel_getCommandLine(self, i);
         if (cl)
-            CommandLine_close(cl);   // restore the terminal before any join (the Teardown Order Law)
+            CommandLine_close(cl);
     }
     runCount = Kernel_getRunFunctionCount(self);
     runSlots = Kernel_runSlots(self);
@@ -934,9 +1054,11 @@ bool Kernel_runConsole(Kernel *self, Console *c) {
     return c ? Console_run(c) : false;
 }
 
-// Blocking terminal-application entry: attaches nothing, just runs the registered
-// CommandLine loop to completion on the calling thread. The 1-arity Kernel_run
-// reactor drives the same CommandLine with CommandLine_tick instead.
+/**
+ * Blocking terminal-application entry: attaches nothing, just runs the registered
+ * CommandLine loop to completion on the calling thread. The 1-arity Kernel_run
+ * reactor drives the same CommandLine with CommandLine_tick instead.
+ */
 /** Runs one CommandLine terminal-application loop; returns its exit code. */
 i32 Kernel_runCommandLine(Kernel *self, CommandLine *c) {
     (discard) self;
@@ -947,20 +1069,24 @@ i32 Kernel_runCommandLine(Kernel *self, CommandLine *c) {
     return CommandLine_run(c);
 }
 
-// The GfxLoop runner seat (the Vertical Integration Law: R1 owns fn-tables,
-// never links R3 and never names graphvex). Kernel_setGfxAppRunner installs
-// the demand-driven Application loop at boot; a null seat falls back to the
-// parked Application_run loop, so hotcwap compiles and links standalone with
-// zero graphvex symbols (no weak externs, no Mach-O undefined-symbol traps).
+/**
+ * The GfxLoop runner seat (the Vertical Integration Law: R1 owns fn-tables,
+ * never links R3 and never names graphvex). Kernel_setGfxAppRunner installs
+ * the demand-driven Application loop at boot; a null seat falls back to the
+ * parked Application_run loop, so hotcwap compiles and links standalone with
+ * zero graphvex symbols (no weak externs, no Mach-O undefined-symbol traps).
+ */
 
-// R1's half of the GfxLoop lifecycle contract (the Vertical Integration Law:
-// the Kernel never names Vk_* and graphvex never mirrors a Kernel/Application
-// layout). Completion predicate + per-pass servicing: the loop keeps running
-// until every window closes, and each ask f64s as the generation-driven
-// hot-reload poll (cheap generation compare at frame cadence).
-// File-local Lifetime for the GfxLoop-seat continue callback: the seat hands
-// only the Application to graphvex, so the Kernel arms this alongside the run
-// and clears it after. Single run at a time (Terminal-Run Contract).
+/**
+ * R1's half of the GfxLoop lifecycle contract (the Vertical Integration Law:
+ * the Kernel never names Vk_* and graphvex never mirrors a Kernel/Application
+ * layout). Completion predicate + per-pass servicing: the loop keeps running
+ * until every window closes, and each ask f64s as the generation-driven
+ * hot-reload poll (cheap generation compare at frame cadence).
+ * File-local Lifetime for the GfxLoop-seat continue callback: the seat hands
+ * only the Application to graphvex, so the Kernel arms this alongside the run
+ * and clears it after. Single run at a time (Terminal-Run Contract).
+ */
 static Lifetime *s_kernelLifetime = nullptr;
 
 /** Services application reload/events and reports whether it remains unfinished. */
@@ -971,20 +1097,20 @@ static bool kernelGfxAppContinues(any context) {
     Application_pollHot(a);
     Application_poll(a);
     bridgeBespokeCheck();
-    // GfxLoop-seat pass closes here: scratch borrowed during this frame dies
-    // before the next frame, never across frames or swaps.
     if (s_kernelLifetime)
         Lifetime_resetTransient(s_kernelLifetime);
     return !Application_isFinished(a);
 }
 
-// Thread-0 pump handed to graphvex's frame loop. A single native event is
-// mirrored into vexspoke's input rings — dispatching those rings
-// to registered listeners (the widget bridge) is a separate step. Without
-// this pass, a window that pumps events still never delivers a single click
-// or keystroke to any listener. Returning "more queued" lets the graphics loop
-// paint the current scroll position before accepting another event. hotcwap
-// owns the pump (the Window Decoupling Law); vexspoke owns ring dispatch (R2).
+/**
+ * Thread-0 pump handed to graphvex's frame loop. A single native event is
+ * mirrored into vexspoke's input rings, dispatching those rings
+ * to registered listeners (the widget bridge) is a separate step. Without
+ * this pass, a window that pumps events still never delivers a single click
+ * or keystroke to any listener. Returning "more queued" lets the graphics loop
+ * paint the current scroll position before accepting another event. hotcwap
+ * owns the pump (the Window Decoupling Law); vexspoke owns ring dispatch (R2).
+ */
 /** Polls one window event step, then dispatches queued key and mouse input. */
 static bool kernelGfxPump() {
     bool queued = Window_pollEventStep();
@@ -1000,10 +1126,6 @@ i32 Kernel_runApplication(Kernel *self, Application *a) {
     kernelStartApplication(self, a);
     bridgeBespoke();
 
-    // If a GfxLoop runner is installed in the seat, hand the application to
-    // the demand-driven frame scheduler loop: completion + hot servicing stay
-    // HERE (R1), the frame loop + Thread-0 event pump stay THERE (R3).
-    // Otherwise, fall back to hotcwap's parked loop.
     if (Kernel_getGfxAppRunner(self) != nullptr) {
         s_kernelLifetime = Kernel_getLifetime(self);
         i32 result = Kernel_getGfxAppRunner(self)(a, kernelGfxAppContinues, kernelGfxPump);
@@ -1017,21 +1139,23 @@ i32 Kernel_runApplication(Kernel *self, Application *a) {
     return KERNEL_EXIT_OK;
 }
 
-// --- APPLICATION REGISTRY ---
-// Registration is the PRE-arm contract: while Kernel_runAll is live, the
-// arming thread's adds are refused (one warn) and other threads' adds post
-// to the deferred mailbox, admitted on the running thread's next pass.
+/**
+ * --- APPLICATION REGISTRY ---
+ * Registration is the PRE-arm contract: while Kernel_runAll is live, the
+ * arming thread's adds are refused (one warn) and other threads' adds post
+ * to the deferred mailbox, admitted on the running thread's next pass.
+ */
 /** Registers now or defers the application add to the active run thread. */
 bool Kernel_addApplication(Kernel *self, Application *app) {
     if (!self || !app)
         return false;
     if (kernelDraining(self)) {
-        fprintf(stderr, "kernel: Kernel_addApplication refused while draining\n");
+        fprint(stderr, "kernel: Kernel_addApplication refused while draining");
         return false;
     }
     if (kernelRunActive(self)) {
         if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
-            fprintf(stderr, "kernel: Kernel_addApplication refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
+            fprint(stderr, "kernel: Kernel_addApplication refused on the arming thread while Kernel_run is live, register before Kernel_run(), or post from another thread");
             return false;
         }
         return kernelPostDeferred(self, KERNEL_DEFERRED_APPLICATION, app);
@@ -1056,18 +1180,18 @@ bool Kernel_removeApplication(Kernel *self, Application *app) {
     return false;
 }
 
-// --- PROCESS REGISTRY ---
+/** --- PROCESS REGISTRY --- */
 /** Registers now or defers the process add to the active run thread. */
 bool Kernel_addProcess(Kernel *self, Process *p) {
     if (!self || !p)
         return false;
     if (kernelDraining(self)) {
-        fprintf(stderr, "kernel: Kernel_addProcess refused while draining\n");
+        fprint(stderr, "kernel: Kernel_addProcess refused while draining");
         return false;
     }
     if (kernelRunActive(self)) {
         if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
-            fprintf(stderr, "kernel: Kernel_addProcess refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
+            fprint(stderr, "kernel: Kernel_addProcess refused on the arming thread while Kernel_run is live, register before Kernel_run(), or post from another thread");
             return false;
         }
         return kernelPostDeferred(self, KERNEL_DEFERRED_PROCESS, p);
@@ -1092,18 +1216,18 @@ bool Kernel_removeProcess(Kernel *self, Process *p) {
     return false;
 }
 
-// --- CONSOLE REGISTRY ---
+/** --- CONSOLE REGISTRY --- */
 /** Registers now or defers the console add to the active run thread. */
 bool Kernel_addConsole(Kernel *self, Console *c) {
     if (!self || !c)
         return false;
     if (kernelDraining(self)) {
-        fprintf(stderr, "kernel: Kernel_addConsole refused while draining\n");
+        fprint(stderr, "kernel: Kernel_addConsole refused while draining");
         return false;
     }
     if (kernelRunActive(self)) {
         if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
-            fprintf(stderr, "kernel: Kernel_addConsole refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
+            fprint(stderr, "kernel: Kernel_addConsole refused on the arming thread while Kernel_run is live, register before Kernel_run(), or post from another thread");
             return false;
         }
         return kernelPostDeferred(self, KERNEL_DEFERRED_CONSOLE, c);
@@ -1128,18 +1252,18 @@ bool Kernel_removeConsole(Kernel *self, Console *c) {
     return false;
 }
 
-// --- COMMANDLINE REGISTRY ---
+/** --- COMMANDLINE REGISTRY --- */
 /** Registers now or defers the terminal-application add to the active run thread. */
 bool Kernel_addCommandLine(Kernel *self, CommandLine *c) {
     if (!self || !c)
         return false;
     if (kernelDraining(self)) {
-        fprintf(stderr, "kernel: Kernel_addCommandLine refused while draining\n");
+        fprint(stderr, "kernel: Kernel_addCommandLine refused while draining");
         return false;
     }
     if (kernelRunActive(self)) {
         if ((pointer) pthread_self() == atomic_load_explicit(Kernel_runThreadIdMut(self), memory_order_relaxed)) {
-            fprintf(stderr, "kernel: Kernel_addCommandLine refused on the arming thread while Kernel_run is live — register before Kernel_run(), or post from another thread\n");
+            fprint(stderr, "kernel: Kernel_addCommandLine refused on the arming thread while Kernel_run is live, register before Kernel_run(), or post from another thread");
             return false;
         }
         return kernelPostDeferred(self, KERNEL_DEFERRED_COMMANDLINE, c);
@@ -1164,13 +1288,13 @@ bool Kernel_removeCommandLine(Kernel *self, CommandLine *c) {
     return false;
 }
 
-// --- RUN FUNCTIONS & END FUNCTIONS ---
+/** --- RUN FUNCTIONS & END FUNCTIONS --- */
 /** Adds a worker callback to be launched and joined by the next run. */
 bool Kernel_addRunFunction(Kernel *self, KernelRunFn fn, any userdata) {
     if (!self || !fn)
         return false;
     if (kernelRunActive(self)) {
-        fprintf(stderr, "kernel: Kernel_addRunFunction refused while a run is live or draining — worker slots must never grow under a joined thread\n");
+        fprint(stderr, "kernel: Kernel_addRunFunction refused while a run is live or draining, worker slots must never grow under a joined thread");
         return false;
     }
     u32 runCount = Kernel_getRunFunctionCount(self);
@@ -1178,7 +1302,7 @@ bool Kernel_addRunFunction(Kernel *self, KernelRunFn fn, any userdata) {
     KernelRunSlot *slots = Kernel_runSlots(self);
     if (runCount >= runCap) {
         u32 newCap = runCap ? runCap * 2 : 4;
-        KernelRunSlot *newSlots = (KernelRunSlot*) realloc(slots, newCap * sizeof(KernelRunSlot));
+        KernelRunSlot *newSlots = (KernelRunSlot*) kernelRealloc(slots, newCap * sizeof(KernelRunSlot));
         if (!newSlots)
             return false;
         slots = newSlots;
@@ -1199,7 +1323,7 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, any userdata) {
     if (!self || !fn)
         return false;
     if (kernelRunActive(self)) {
-        fprintf(stderr, "kernel: Kernel_addEndFunction refused while a run is live or draining — end slots must never grow under a firing loop\n");
+        fprint(stderr, "kernel: Kernel_addEndFunction refused while a run is live or draining, end slots must never grow under a firing loop");
         return false;
     }
     u32 endCount = Kernel_getEndFunctionCount(self);
@@ -1207,7 +1331,7 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, any userdata) {
     KernelEndSlot *slots = Kernel_endSlots(self);
     if (endCount >= endCap) {
         u32 newCap = endCap ? endCap * 2 : 4;
-        KernelEndSlot *newSlots = (KernelEndSlot*) realloc(slots, newCap * sizeof(KernelEndSlot));
+        KernelEndSlot *newSlots = (KernelEndSlot*) kernelRealloc(slots, newCap * sizeof(KernelEndSlot));
         if (!newSlots)
             return false;
         slots = newSlots;
@@ -1221,7 +1345,7 @@ bool Kernel_addEndFunction(Kernel *self, KernelEndFn fn, any userdata) {
     return true;
 }
 
-// GETTERS (PUBLIC & PRIVATE)
+/** GETTERS (PUBLIC & PRIVATE) */
 ;;GETTER
 /** Returns the number of registered run callbacks. */
 u32 Kernel_getRunFunctionCount(const Kernel *self) {
@@ -1262,7 +1386,8 @@ u32 Kernel_getApplications(const Kernel *self, Application **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
     u32 n = (*self).applicationCount;
-    if (n > cap) n = cap;
+    if (n > cap)
+        n = cap;
     for (u32 i = 0; i < n; i++)
         out[i] = (*self).applications[i];
     return n;
@@ -1310,7 +1435,8 @@ u32 Kernel_getProcesses(const Kernel *self, Process **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
     u32 n = (*self).processCount;
-    if (n > cap) n = cap;
+    if (n > cap)
+        n = cap;
     for (u32 i = 0; i < n; i++)
         out[i] = (*self).processes[i];
     return n;
@@ -1340,7 +1466,8 @@ u32 Kernel_getConsoles(const Kernel *self, Console **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
     u32 n = (*self).consoleCount;
-    if (n > cap) n = cap;
+    if (n > cap)
+        n = cap;
     for (u32 i = 0; i < n; i++)
         out[i] = (*self).consoles[i];
     return n;
@@ -1370,7 +1497,8 @@ u32 Kernel_getCommandLines(const Kernel *self, CommandLine **out, u32 cap) {
     if (!self || !out || cap == 0)
         return 0;
     u32 n = (*self).commandlineCount;
-    if (n > cap) n = cap;
+    if (n > cap)
+        n = cap;
     for (u32 i = 0; i < n; i++)
         out[i] = (*self).commandlines[i];
     return n;

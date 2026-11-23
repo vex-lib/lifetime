@@ -1,8 +1,9 @@
 #include "vex.h"
 #include "commandline.h"
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 
@@ -11,14 +12,14 @@
  * ============================================================================
  * DEFINITION: CommandLine
  * ============================================================================
- * The R1 terminal-application host — the fourth process kind. CommandLine owns
+ * The R1 terminal-application host, the fourth process kind. CommandLine owns
  * the TTY device for a full-screen terminal program: acquisition (raw mode,
  * alternate screen, colors), ONE owned cell grid, the single resize surface,
  * bounded normalized input, one present flush, and teardown. It is the
  * terminal analog of Window: a device resource, never widget semantics.
  *
  * Determinant (R3) owns cells, widgets and the reloadable view/command module;
- * TerminalApp (R3) composes it. This class includes no R3 header — the seam is
+ * TerminalApp (R3) composes it. This class includes no R3 header, the seam is
  * an injectable CommandLineIo backend plus the owned grid, mirroring how Console
  * borrows ProcessSpawn through ConsoleIo. The R5 application wires the toolkit.
  *
@@ -42,11 +43,11 @@
  * ============================================================================
  * STRUCT FIELDS (Mirroring kernel/commandline.h):
  * ----------------------------------------------------------------------------
- *   char title[128]        device title
+ *   utf8 title[128]        device title
  *   CommandLineIo io       injected device backend
  *   bool explicitIo        false => default (ncurses) backend
  *   CommandLineApp app     borrowed swappable application seam
- *   char *cells            owned device framebuffer (width*height)
+ *   utf8 *cells            owned device framebuffer (width*height)
  *   bytes capacity        admitted grid byte capacity
  *   bytes width, height   cell geometry
  *   u64 generation    successful app publications
@@ -88,76 +89,165 @@ static const bytes COMMANDLINE_DEFAULT_COLUMNS = 80;
 static const bytes COMMANDLINE_DEFAULT_ROWS = 24;
 
 ;;GETTER
-static bool CommandLine_explicitIo(const CommandLine *self) { return (*self).explicitIo; }
+static bool CommandLine_explicitIo(const CommandLine *self)
+{
+    return (*self).explicitIo;
+}
 ;;SETTER
-static fn CommandLine_setExplicitIo(CommandLine *self, bool v) { (*self).explicitIo = v; }
+static fn CommandLine_setExplicitIo(CommandLine *self, bool v)
+{
+    (*self).explicitIo = v;
+}
 ;;GETTER
-static CommandLineIo CommandLine_ioVal(const CommandLine *self) { return (*self).io; }
+static CommandLineIo CommandLine_ioVal(const CommandLine *self)
+{
+    return (*self).io;
+}
 ;;GETTER
-static CommandLineIo *CommandLine_ioMut(CommandLine *self) { return &(*self).io; }
+static CommandLineIo *CommandLine_ioMut(CommandLine *self)
+{
+    return &(*self).io;
+}
 ;;GETTER
-static const CommandLineIo *CommandLine_ioPtr(const CommandLine *self) { return &(*self).io; }
+static const CommandLineIo *CommandLine_ioPtr(const CommandLine *self)
+{
+    return &(*self).io;
+}
 ;;SETTER
-static fn CommandLine_setIoVal(CommandLine *self, CommandLineIo io) { (*self).io = io; }
+static fn CommandLine_setIoVal(CommandLine *self, CommandLineIo io)
+{
+    (*self).io = io;
+}
 ;;GETTER
-static bytes CommandLine_capacity(const CommandLine *self) { return (*self).capacity; }
+static bytes CommandLine_capacity(const CommandLine *self)
+{
+    return (*self).capacity;
+}
 ;;SETTER
-static fn CommandLine_setCapacity(CommandLine *self, bytes v) { (*self).capacity = v; }
+static fn CommandLine_setCapacity(CommandLine *self, bytes v)
+{
+    (*self).capacity = v;
+}
 ;;GETTER
-static char *CommandLine_cells(const CommandLine *self) { return (*self).cells; }
+static utf8 *CommandLine_cells(const CommandLine *self)
+{
+    return (*self).cells;
+}
 ;;SETTER
-static fn CommandLine_setCells(CommandLine *self, char *v) { (*self).cells = v; }
+static fn CommandLine_setCells(CommandLine *self, utf8 *v)
+{
+    (*self).cells = v;
+}
 ;;GETTER
-static bytes CommandLine_width(const CommandLine *self) { return (*self).width; }
+static bytes CommandLine_width(const CommandLine *self)
+{
+    return (*self).width;
+}
 ;;SETTER
-static fn CommandLine_setWidth(CommandLine *self, bytes v) { (*self).width = v; }
+static fn CommandLine_setWidth(CommandLine *self, bytes v)
+{
+    (*self).width = v;
+}
 ;;GETTER
-static bytes CommandLine_height(const CommandLine *self) { return (*self).height; }
+static bytes CommandLine_height(const CommandLine *self)
+{
+    return (*self).height;
+}
 ;;SETTER
-static fn CommandLine_setHeight(CommandLine *self, bytes v) { (*self).height = v; }
+static fn CommandLine_setHeight(CommandLine *self, bytes v)
+{
+    (*self).height = v;
+}
 ;;GETTER
-static bool CommandLine_opened(const CommandLine *self) { return (*self).opened; }
+static bool CommandLine_opened(const CommandLine *self)
+{
+    return (*self).opened;
+}
 ;;SETTER
-static fn CommandLine_setOpened(CommandLine *self, bool v) { (*self).opened = v; }
+static fn CommandLine_setOpened(CommandLine *self, bool v)
+{
+    (*self).opened = v;
+}
 ;;GETTER
-static bool CommandLine_active(const CommandLine *self) { return (*self).active; }
+static bool CommandLine_active(const CommandLine *self)
+{
+    return (*self).active;
+}
 ;;SETTER
-static fn CommandLine_setActive(CommandLine *self, bool v) { (*self).active = v; }
+static fn CommandLine_setActive(CommandLine *self, bool v)
+{
+    (*self).active = v;
+}
 ;;GETTER
 static _Atomic u32 *CommandLine_runMut(CommandLine *self) { return &(*self).run; }
 ;;GETTER
 static const _Atomic u32 *CommandLine_runPtr(const CommandLine *self) { return &(*self).run; }
 ;;GETTER
-static bytes CommandLine_refusalCount(const CommandLine *self) { return (*self).refusalCount; }
+static bytes CommandLine_refusalCount(const CommandLine *self)
+{
+    return (*self).refusalCount;
+}
 ;;SETTER
-static fn CommandLine_setRefusalCount(CommandLine *self, bytes v) { (*self).refusalCount = v; }
+static fn CommandLine_setRefusalCount(CommandLine *self, bytes v)
+{
+    (*self).refusalCount = v;
+}
 ;;GETTER
-static CommandLineApp CommandLine_appVal(const CommandLine *self) { return (*self).app; }
+static CommandLineApp CommandLine_appVal(const CommandLine *self)
+{
+    return (*self).app;
+}
 ;;GETTER
-static CommandLineApp *CommandLine_appMut(CommandLine *self) { return &(*self).app; }
+static CommandLineApp *CommandLine_appMut(CommandLine *self)
+{
+    return &(*self).app;
+}
 ;;SETTER
-static fn CommandLine_setAppVal(CommandLine *self, CommandLineApp app) { (*self).app = app; }
+static fn CommandLine_setAppVal(CommandLine *self, CommandLineApp app)
+{
+    (*self).app = app;
+}
 ;;GETTER
-static u64 CommandLine_generation(const CommandLine *self) { return (*self).generation; }
+static u64 CommandLine_generation(const CommandLine *self)
+{
+    return (*self).generation;
+}
 ;;SETTER
-static fn CommandLine_setGeneration(CommandLine *self, u64 v) { (*self).generation = v; }
+static fn CommandLine_setGeneration(CommandLine *self, u64 v)
+{
+    (*self).generation = v;
+}
 ;;GETTER
-static char *CommandLine_titleMut(CommandLine *self) { return (*self).title; }
+static utf8 *CommandLine_titleMut(CommandLine *self)
+{
+    return (*self).title;
+}
 ;;GETTER
-static const char *CommandLine_titlePtr(const CommandLine *self) { return (*self).title; }
+static string CommandLine_titlePtr(const CommandLine *self)
+{
+    return (*self).title;
+}
 
-// The effective backend: an injected io wins; otherwise the default (ncurses).
+/** The effective backend: an injected io wins; otherwise the default (ncurses). */
 static CommandLineIo cmdIo(const CommandLine *self) {
     return CommandLine_explicitIo(self) ? CommandLine_ioVal(self) : CommandLine_defaultIo();
 }
 
-// (Re)allocate the owned grid for width*height cells. Overflow-checked cold path.
+static any commandlineRealloc(any ptr, bytes numBytes)
+{
+    if (!ptr)
+        return MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, numBytes);
+
+    return MemoryArena_realloc(Lifetime_arena(), ptr, numBytes);
+}
+
+/** (Re)allocate the owned grid for width*height cells. Overflow-checked cold path. */
 static bool cmdAllocGrid(CommandLine *self, bytes width, bytes height) {
     if (width == 0 || height == 0 || height > SIZE_MAX / width)
         return false;
     bytes bytes = width * height;
     if (bytes > CommandLine_capacity(self)) {
-        char *next = (char*) realloc(CommandLine_cells(self), bytes);
+        utf8 *next = (utf8*) commandlineRealloc(CommandLine_cells(self), bytes);
         if (next == nullptr)
             return false;
         CommandLine_setCells(self, next);
@@ -173,10 +263,11 @@ CommandLine *CommandLine_0() {
     return CommandLine_1("vex");
 }
 
-CommandLine *CommandLine_1(const char *title) {
-    CommandLine *self = (CommandLine*) calloc(1, sizeof(CommandLine));
+CommandLine *CommandLine_1(string title) {
+    CommandLine *self = (CommandLine*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(CommandLine));
     if (self == nullptr)
         return nullptr;
+    memset(self, 0, sizeof(CommandLine));
     CommandLine_setTitle(self, title);
     return self;
 }
@@ -186,8 +277,8 @@ fn CommandLine_free(CommandLine *self) {
         return;
     if (CommandLine_opened(self))
         CommandLine_close(self);
-    free(CommandLine_cells(self));
-    free(self);
+    MemoryArena_free(Lifetime_arena(), CommandLine_cells(self));
+    MemoryArena_free(Lifetime_arena(), self);
 }
 
 bool CommandLine_setIo(CommandLine *self, const CommandLineIo *io) {
@@ -224,7 +315,7 @@ bool CommandLine_open(CommandLine *self) {
         return false;
     }
     CommandLine_setIoVal(self, io);
-    CommandLine_setExplicitIo(self, true);   // freeze the resolved backend for this session
+    CommandLine_setExplicitIo(self, true);
     bytes w = COMMANDLINE_DEFAULT_COLUMNS, h = COMMANDLINE_DEFAULT_ROWS;
     if (!io.size(io.ctx, &w, &h) || !cmdAllocGrid(self, w, h)) {
         io.close(io.ctx);
@@ -232,9 +323,6 @@ bool CommandLine_open(CommandLine *self) {
         return false;
     }
     CommandLine_setOpened(self, true);
-    // A device session owns one loop history: opening (never legal while a loop
-    // is live) starts the word fresh, so a cancelled session is revived only by
-    // an explicit close/reopen, never silently mid-session.
     atomic_store_explicit(CommandLine_runMut(self), COMMANDLINE_RUN_IDLE, memory_order_release);
     return true;
 }
@@ -245,7 +333,7 @@ fn CommandLine_close(CommandLine *self) {
     CommandLineIo io = CommandLine_ioVal(self);
     if (io.close != nullptr)
         io.close(io.ctx);
-    free(CommandLine_cells(self));
+    MemoryArena_free(Lifetime_arena(), CommandLine_cells(self));
     CommandLine_setCells(self, nullptr);
     CommandLine_setCapacity(self, 0);
     CommandLine_setWidth(self, 0);
@@ -285,7 +373,6 @@ bool CommandLine_revalidate(CommandLine *self) {
             CommandLine_setRefusalCount(self, rc + 1);
         return false;
     }
-    // A resize repaints in one step: redraw the app, then present once.
     CommandLineApp app = CommandLine_appVal(self);
     if (app.draw != nullptr) {
         CommandLine_setActive(self, true);
@@ -298,24 +385,13 @@ bool CommandLine_revalidate(CommandLine *self) {
 }
 
 bool CommandLine_present(CommandLine *self) {
-    char *cells = self ? CommandLine_cells(self) : nullptr;
+    utf8 *cells = self ? CommandLine_cells(self) : nullptr;
     if (self == nullptr || !CommandLine_opened(self) || cells == nullptr)
         return false;
     CommandLineIo io = CommandLine_ioVal(self);
     if (io.present == nullptr)
         return false;
     return io.present(io.ctx, cells, CommandLine_width(self), CommandLine_height(self));
-}
-
-bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app) {
-    if (self == nullptr || app == nullptr || CommandLineApp_draw(app) == nullptr || CommandLine_active(self)
-        || CommandLine_generation(self) == UINT64_MAX) {
-        THROW("CommandLine setApp: null draw, busy or generation overflow");
-        return false;
-    }
-    CommandLine_setAppVal(self, *app);
-    CommandLine_setGeneration(self, CommandLine_generation(self) + 1);
-    return true;
 }
 
 typedef bool (*CommandLine_DrawFn)(any ctx, CommandLine *line);
@@ -328,6 +404,17 @@ static const CommandLineApp *CommandLine_app(const CommandLine *self) {
 ;;GETTER
 static CommandLine_DrawFn CommandLineApp_draw(const CommandLineApp *app) {
     return (*app).draw;
+}
+
+bool CommandLine_setApp(CommandLine *self, const CommandLineApp *app) {
+    if (self == nullptr || app == nullptr || CommandLineApp_draw(app) == nullptr || CommandLine_active(self)
+        || CommandLine_generation(self) == UINT64_MAX) {
+        THROW("CommandLine setApp: null draw, busy or generation overflow");
+        return false;
+    }
+    CommandLine_setAppVal(self, *app);
+    CommandLine_setGeneration(self, CommandLine_generation(self) + 1);
+    return true;
 }
 
 bool CommandLine_hasApp(const CommandLine *self) {
@@ -360,7 +447,7 @@ bool CommandLine_tick(CommandLine *self) {
     CommandLineApp app = CommandLine_appVal(self);
     if (CommandLine_poll(self, 0, &ev)) {
         if (ev.kind == COMMANDLINE_EVENT_RESIZE)
-            return CommandLine_revalidate(self);   // revalidate draws + presents
+            return CommandLine_revalidate(self);
         if (app.input != nullptr) {
             CommandLine_setActive(self, true);
             bool ok = app.input(app.ctx, self, &ev);
@@ -400,7 +487,7 @@ i32 CommandLine_run(CommandLine *self) {
         if (CommandLine_poll(self, 50, &ev)) {
             if (ev.kind == COMMANDLINE_EVENT_RESIZE) {
                 if (!CommandLine_revalidate(self)) { rc = 1; break; }
-                continue;   // revalidate already drew + presented
+                continue;
             }
             if (app.input != nullptr) {
                 CommandLine_setActive(self, true);
@@ -420,8 +507,6 @@ i32 CommandLine_run(CommandLine *self) {
             break;
         }
     }
-    // A stop leaves CANCELLED visible; a failure exit returns to IDLE so the
-    // same device can be run again.
     expected = COMMANDLINE_RUN_RUNNING;
     atomic_compare_exchange_strong_explicit(CommandLine_runMut(self), &expected,
         COMMANDLINE_RUN_IDLE, memory_order_acq_rel, memory_order_relaxed);
@@ -447,14 +532,29 @@ CommandLineRunPhase CommandLine_getRunPhase(const CommandLine *self) {
     return (CommandLineRunPhase) atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire);
 }
 
-bytes CommandLine_getWidth(const CommandLine *self) { return self ? CommandLine_width(self) : 0; }
-bytes CommandLine_getHeight(const CommandLine *self) { return self ? CommandLine_height(self) : 0; }
-bytes CommandLine_getCapacity(const CommandLine *self) { return self ? CommandLine_capacity(self) : 0; }
-char *CommandLine_getCells(CommandLine *self) { return self ? CommandLine_cells(self) : nullptr; }
-const char *CommandLine_getCellsConst(const CommandLine *self) { return self ? CommandLine_cells(self) : nullptr; }
+bytes CommandLine_getWidth(const CommandLine *self)
+{
+    return self ? CommandLine_width(self) : 0;
+}
+bytes CommandLine_getHeight(const CommandLine *self)
+{
+    return self ? CommandLine_height(self) : 0;
+}
+bytes CommandLine_getCapacity(const CommandLine *self)
+{
+    return self ? CommandLine_capacity(self) : 0;
+}
+utf8 *CommandLine_getCells(CommandLine *self)
+{
+    return self ? CommandLine_cells(self) : nullptr;
+}
+string CommandLine_getCellsConst(const CommandLine *self)
+{
+    return self ? CommandLine_cells(self) : nullptr;
+}
 
 bool CommandLine_clear(CommandLine *self) {
-    char *cells = self ? CommandLine_cells(self) : nullptr;
+    utf8 *cells = self ? CommandLine_cells(self) : nullptr;
     if (self == nullptr || cells == nullptr)
         return false;
     memset(cells, ' ', CommandLine_width(self) * CommandLine_height(self));
@@ -481,29 +581,44 @@ bool CommandLine_setMouseReporting(CommandLine *self, bool enabled) {
     return io.setMouse(io.ctx, enabled);
 }
 
-fn CommandLine_setTitle(CommandLine *self, const char *title) {
+fn CommandLine_setTitle(CommandLine *self, string title) {
     if (self == nullptr)
         return;
-    const char *src = title ? title : "vex";
+    string src = title ? title : "vex";
     bytes n = strlen(src);
     bytes cap = sizeof(((CommandLine) {0}).title);
     if (n >= cap)
         n = cap - 1;
-    char *buf = CommandLine_titleMut(self);
+    utf8 *buf = CommandLine_titleMut(self);
     memcpy(buf, src, n);
     buf[n] = '\0';
 }
 
-const char *CommandLine_getTitle(const CommandLine *self) { return self ? CommandLine_titlePtr(self) : "vex"; }
-u64 CommandLine_getGeneration(const CommandLine *self) { return self ? CommandLine_generation(self) : 0; }
-bytes CommandLine_exhaustionCount(const CommandLine *self) { return self ? CommandLine_refusalCount(self) : 0; }
-bool CommandLine_isOpen(const CommandLine *self) { return self && CommandLine_opened(self); }
-bool CommandLine_isActive(const CommandLine *self) { return self && CommandLine_active(self); }
+string CommandLine_getTitle(const CommandLine *self)
+{
+    return self ? CommandLine_titlePtr(self) : "vex";
+}
+u64 CommandLine_getGeneration(const CommandLine *self)
+{
+    return self ? CommandLine_generation(self) : 0;
+}
+bytes CommandLine_exhaustionCount(const CommandLine *self)
+{
+    return self ? CommandLine_refusalCount(self) : 0;
+}
+bool CommandLine_isOpen(const CommandLine *self)
+{
+    return self && CommandLine_opened(self);
+}
+bool CommandLine_isActive(const CommandLine *self)
+{
+    return self && CommandLine_active(self);
+}
 bool CommandLine_isCancelled(const CommandLine *self) {
     return self && atomic_load_explicit(CommandLine_runPtr(self), memory_order_acquire) == COMMANDLINE_RUN_CANCELLED;
 }
 
-bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *outTruncated) {
+bool CommandLine_toString(const CommandLine *self, utf8 *dest, bytes cap, bool *outTruncated) {
     if (outTruncated != nullptr)
         *outTruncated = false;
     if (dest == nullptr || cap == 0) {
@@ -526,6 +641,6 @@ bool CommandLine_toString(const CommandLine *self, char *dest, bytes cap, bool *
     return !cut;
 }
 
-bool CommandLine_toStringStruct(const CommandLine *self, char *dest, bytes cap, bool *outTruncated) {
+bool CommandLine_toStringStruct(const CommandLine *self, utf8 *dest, bytes cap, bool *outTruncated) {
     return CommandLine_toString(self, dest, cap, outTruncated);
 }

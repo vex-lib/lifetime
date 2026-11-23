@@ -1,6 +1,6 @@
 #include "vex.h"
 #include "process_spawn.h"
-// Lifetime host; bounded child-job ABI preserved.
+/** Lifetime host; bounded child-job ABI preserved. */
 
 #include <signal.h>
 #include <spawn.h>
@@ -9,8 +9,9 @@
 #include <unistd.h>
 
 #include "re/nio/mem.h"
+#include "nio/lifetime_memory.h"
 
-extern char **environ;
+extern utf8 **environ;
 
 ;;DEFINITION
 /**
@@ -19,7 +20,7 @@ extern char **environ;
  * ============================================================================
  * A bounded child-process job table in R0 Lifetime: fixed slots
  * (PROCESS_SPAWN_JOBS_MAX), per-job pid/exit/done rows, table-level mirrors,
- * a cancel flag, and a timeout — zero steady-state allocation, no threads.
+ * a cancel flag, and a timeout, zero steady-state allocation, no threads.
  * Spawns via posix_spawnp (never system(), never a blocking waitpid, never
  * UINT64_MAX); poll reaps with WNOHANG in ~1ms slices up to a 100ms budget,
  * and cancel raises the flag and SIGTERMs unfinished jobs. This is the
@@ -35,7 +36,7 @@ extern char **environ;
  * ============================================================================
  * A bounded child-process job table in R0 Lifetime. Fixed slots
  * (PROCESS_SPAWN_JOBS_MAX), per-job pid/exit/done rows, table-level
- * mirrors, cancel flag, and timeout — zero steady-state allocation, no
+ * mirrors, cancel flag, and timeout, zero steady-state allocation, no
  * threads. Spawns via posix_spawnp (never system(), never a blocking
  * waitpid, never UINT64_MAX): ProcessSpawn_poll reaps with WNOHANG in
  * ~1ms slices up to budgetNs clamped to PROCESS_SPAWN_POLL_MAX_NS
@@ -45,7 +46,7 @@ extern char **environ;
  * popen/libav links. Reaping decrements the live count exactly once; completed
  * slots are reusable. Destruction requires the caller to finish reaping jobs.
  *
- * STRUCT FIELDS (Mirroring core/process_spawn.h — exactly this file's class):
+ * STRUCT FIELDS (Mirroring core/process_spawn.h, exactly this file's class):
  * ----------------------------------------------------------------------------
  *   ProcessSpawn {
  *     i32 pid;                                // most recent child pid
@@ -56,7 +57,7 @@ extern char **environ;
  *     u32 count;                             // live jobs (0..JOBS_MAX)
  *   }
  *
- * SLOT RECORD (ProcessSpawnJob — Single Class Per File Law, zero behavior):
+ * SLOT RECORD (ProcessSpawnJob, Single Class Per File Law, zero behavior):
  * ----------------------------------------------------------------------------
  *   i32 pid;       // child pid (> 0 tracked, 0 = slot free)
  *   i32 exitCode;  // WEXITSTATUS / -signal once done
@@ -92,8 +93,10 @@ extern char **environ;
  * ============================================================================
  */
 
-// core/process_spawn.c — ProcessSpawn port. posix_spawnp launch, WNOHANG
-// reap slices, SIGTERM cancel. No system(), no blocking wait, no threads.
+/**
+ * core/process_spawn.c, ProcessSpawn port. posix_spawnp launch, WNOHANG
+ * reap slices, SIGTERM cancel. No system(), no blocking wait, no threads.
+ */
 
 /** Read monotonic time in nanoseconds for bounded child polling. */
 static u64 processSpawnNowNs() {
@@ -111,29 +114,64 @@ static fn processSpawnSleepSlice() {
 }
 
 ;;GETTER
-static ProcessSpawnJob *ProcessSpawn_jobsMut(ProcessSpawn *self) { return (*self).jobs; }
+static ProcessSpawnJob *ProcessSpawn_jobsMut(ProcessSpawn *self)
+{
+    return (*self).jobs;
+}
 ;;GETTER
-static const ProcessSpawnJob *ProcessSpawn_jobsPtr(const ProcessSpawn *self) { return (*self).jobs; }
+static const ProcessSpawnJob *ProcessSpawn_jobsPtr(const ProcessSpawn *self)
+{
+    return (*self).jobs;
+}
 ;;GETTER
-static u32 ProcessSpawn_count(const ProcessSpawn *self) { return (*self).count; }
+static u32 ProcessSpawn_count(const ProcessSpawn *self)
+{
+    return (*self).count;
+}
 ;;SETTER
-static fn ProcessSpawn_setCount(ProcessSpawn *self, u32 count) { (*self).count = count; }
+static fn ProcessSpawn_setCount(ProcessSpawn *self, u32 count)
+{
+    (*self).count = count;
+}
 ;;GETTER
-static i32 ProcessSpawnJob_pid(const ProcessSpawnJob *job) { return (*job).pid; }
+static i32 ProcessSpawnJob_pid(const ProcessSpawnJob *job)
+{
+    return (*job).pid;
+}
 ;;SETTER
-static fn ProcessSpawnJob_setPid(ProcessSpawnJob *job, i32 pid) { (*job).pid = pid; }
+static fn ProcessSpawnJob_setPid(ProcessSpawnJob *job, i32 pid)
+{
+    (*job).pid = pid;
+}
 ;;GETTER
-static i32 ProcessSpawnJob_exitCode(const ProcessSpawnJob *job) { return (*job).exitCode; }
+static i32 ProcessSpawnJob_exitCode(const ProcessSpawnJob *job)
+{
+    return (*job).exitCode;
+}
 ;;SETTER
-static fn ProcessSpawnJob_setExitCode(ProcessSpawnJob *job, i32 exitCode) { (*job).exitCode = exitCode; }
+static fn ProcessSpawnJob_setExitCode(ProcessSpawnJob *job, i32 exitCode)
+{
+    (*job).exitCode = exitCode;
+}
 ;;GETTER
-static bool ProcessSpawnJob_done(const ProcessSpawnJob *job) { return (*job).done; }
+static bool ProcessSpawnJob_done(const ProcessSpawnJob *job)
+{
+    return (*job).done;
+}
 ;;SETTER
-static fn ProcessSpawnJob_setDone(ProcessSpawnJob *job, bool done) { (*job).done = done; }
+static fn ProcessSpawnJob_setDone(ProcessSpawnJob *job, bool done)
+{
+    (*job).done = done;
+}
 
-/** Allocate and initialize an empty fixed-slot child-job table. */
-static ProcessSpawn *processSpawnCreate(u64 timeoutMs) {
-    ProcessSpawn *self = Memory_alloc(TYPE_PROCESS_SPAWN_SINGLETON, sizeof(ProcessSpawn));
+/**
+ * Allocates and initializes an empty fixed-slot child-job table.
+ * @param timeoutMs default spawn budget in milliseconds
+ * @return allocated ProcessSpawn table, or nullptr on exhaustion
+ */
+;;CONSTRUCTOR
+static ProcessSpawn *ProcessSpawn_init(u64 timeoutMs) {
+    ProcessSpawn *self = Memory_alloc(TYPE_PROCESS_SPAWN_SINGLETON, Lifetime_arena(), sizeof(ProcessSpawn));
     if (!self)
         return nullptr;
     ProcessSpawn_setPid(self, ZERO);
@@ -185,18 +223,18 @@ static bool processSpawnReapOnce(ProcessSpawn *self) {
     return allDone;
 }
 
-// CONSTRUCTORS
+/** CONSTRUCTORS */
 /** Construct a process-spawn table with a zero default timeout. */
 ProcessSpawn *ProcessSpawn_0() {
-    return processSpawnCreate(0);
+    return ProcessSpawn_init(0);
 }
 
 /** Construct a process-spawn table with the supplied default timeout. */
 ProcessSpawn *ProcessSpawn_1(u64 timeoutMs) {
-    return processSpawnCreate(timeoutMs);
+    return ProcessSpawn_init(timeoutMs);
 }
 
-// CORE FUNCTIONS
+/** CORE FUNCTIONS */
 /** Release the table allocation; callers must first stop and reap its child jobs. */
 fn ProcessSpawn_free(ProcessSpawn *self) {
     if (!self)
@@ -205,7 +243,7 @@ fn ProcessSpawn_free(ProcessSpawn *self) {
 }
 
 /** Start argv[0] through posix_spawnp in a free job slot and record its pid and timeout. */
-bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs,
+bool ProcessSpawn_spawn(string const *argv, u64 timeoutMs,
                         ProcessSpawn *dest) {
     if (!argv || !argv[0] || !dest)
         return false;
@@ -223,7 +261,7 @@ bool ProcessSpawn_spawn(const char *const *argv, u64 timeoutMs,
     if (!slot)
         return false;
     pid_t child = 0;
-    char *const *args = (char *const*) argv;
+    utf8 *const *args = (utf8 *const*) argv;
     i32 rc = posix_spawnp(&child, argv[0], nullptr, nullptr, args, environ);
     if (rc != 0)
         return false;
@@ -271,7 +309,7 @@ fn ProcessSpawn_cancel(ProcessSpawn *self) {
     }
 }
 
-// SETTERS
+/** SETTERS */
 ;;SETTER
 /** Replace the table's mirrored most-recent pid field. */
 fn ProcessSpawn_setPid(ProcessSpawn *self, i32 pid) {
@@ -304,7 +342,7 @@ fn ProcessSpawn_setCancelFlag(ProcessSpawn *self, bool cancelFlag) {
     (*self).cancelFlag = cancelFlag;
 }
 
-// GETTERS
+/** GETTERS */
 ;;GETTER
 /** Return the most-recent pid field, or zero for a null table. */
 i32 ProcessSpawn_getPid(const ProcessSpawn *self) {

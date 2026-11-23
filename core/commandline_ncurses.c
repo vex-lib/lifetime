@@ -17,7 +17,7 @@
  * and its callers never see ncurses. Owns the terminal screen for the process
  * (single `SCREEN`), enters cbreak/no-echo/keypad with hidden cursor and color
  * pairs, and restores the terminal on close. No widget, grid or app state lives
- * here — only device I/O.
+ * here, only device I/O.
  * ============================================================================
  */
 
@@ -84,7 +84,7 @@ static bool ncSize(any ctx, bytes *outW, bytes *outH) {
     return true;
 }
 
-static bool ncPresent(any ctx, const char *cells, bytes width, bytes height) {
+static bool ncPresent(any ctx, string cells, bytes width, bytes height) {
     (discard) ctx;
     if (!g_open || cells == nullptr || width == 0 || height == 0)
         return false;
@@ -189,7 +189,7 @@ static bool ncPoll(any ctx, i32 timeoutMs, CommandLineEvent *out) {
     } else if (ch >= 32 && ch < 127) {
         CommandLineEvent_setKey(out, ch);
     } else if (ch >= 1 && ch < 32) {
-        CommandLineEvent_setKey(out, ch);   // control code (e.g. Ctrl-Q = 17)
+        CommandLineEvent_setKey(out, ch);
     } else {
         CommandLineEvent_setKey(out, (i32) COMMANDLINE_KEY_UNKNOWN);
     }
