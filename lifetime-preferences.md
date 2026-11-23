@@ -1,4 +1,4 @@
-# lifetime — Repo-Local Living Preferences
+# lifetime, Repo-Local Living Preferences
 
 ## Constitution Link
 
@@ -37,16 +37,16 @@ Tier: lifetime (Kernel Host). Owns: lifetimes, native OS windowing, process/appl
 
 * `lifetime` (`lifetime` + `re`) is statically linked, never `dlopen`ed, never hot-swapped.
 * Arena addresses stay put across every dylib generation, so modules borrow the same bytes in turn.
-* `lifetime` changes only by versioned cold release (launcher stages, then `exec`s) with ABI check — no in-process swap, ever.
+* `lifetime` changes only by versioned cold release (launcher stages, then `exec`s) with ABI check, no in-process swap, ever.
 * Kernel owns start/stop + registries + teardown order, never tick/draw.
 
 ## Repo-Local Extensions
 
-* None — no managed exceptions to universal laws.
+* None, no managed exceptions to universal laws.
 
 ## Readiness Cross-Reference
 
 * Feature readiness: lifetime readiness gist.
 * Open blockers: ecosystem blockers gist.
-* Proof lawbook: `tests/test-preferences.md` — `./tools/prefs test "<title>"`.
-* Evidence ledger: `metadata/gists/test-checklist.md` — `python3 tools/test_checklist.py check`.
+* Proof lawbook: `tests/test-preferences.md`, `./tools/prefs test "<title>"`.
+* Evidence ledger: `metadata/gists/test-checklist.md`, `python3 tools/test_checklist.py check`.
