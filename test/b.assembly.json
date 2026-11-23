@@ -1,0 +1,81 @@
+{
+  "application": {
+    "id": "org.vexgraph.vexc.lifetime_test",
+    "name": "lifetime_test",
+    "displayName": "lifetime_test",
+    "version": "0.1.0",
+    "type": "cli",
+    "authors": [
+      "vexgraph"
+    ],
+    "publisher": "vexgraph",
+    "description": "Consolidated automated owner suite for vex/lifetime",
+    "license": "MIT",
+    "homepage": "",
+    "icon": ""
+  },
+  "build": {
+    "entry": "lifetime_test.c",
+    "sources": [
+      "lifetime_test.c",
+      "../capability/capability.c",
+      "../core/application.c",
+      "../core/commandline.c",
+      "../core/commandline_ncurses.c",
+      "../core/console.c",
+      "../core/kernel.c",
+      "../nio/lifetime_memory.c",
+      "../core/process.c",
+      "../core/process_spawn.c",
+      "../lifetime/clock.c",
+      "../lifetime/lifetime.c",
+      "../permission/permission.c",
+      "../permission/objc/permission_cocoa.m",
+      "../window/traffic_light_cocoa.m",
+      "../window/window.c",
+      "../window/window_cocoa.m",
+      "../window/window_event.c",
+      "../../re/io/file/hot_file.c",
+      "../../re/primitive/vex-string.c",
+      "../../re/nio/mem.c",
+      "../../re/nio/pool.c",
+      "../../re/nio/arena.c",
+      "../../re/nio/transient.c",
+      "../../re/atomic/spin_lock.c",
+      "../../re/struct/ring.c",
+      "../../vexspoke/engine/loop.c",
+      "../../vexspoke/input/focus.c",
+      "../../vexspoke/input/key.c",
+      "../../vexspoke/input/mouse.c",
+      "../../vexspoke/input/touch.c",
+      "../../vexspoke/spoke/bespoke.c",
+      "../../vexspoke/nio/vexspoke_memory.c",
+      "../../vexspoke/system/system.c",
+      "../../vexspoke/time/nanotime.c"
+    ],
+    "includes": [
+      ".",
+      "lifetime",
+      "re",
+      "../lib"
+    ],
+    "dependencies": [],
+    "defines": [],
+    "options": [
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-idirafter",
+      "../../vexspoke"
+    ],
+    "link": "executable"
+  },
+  "payload": {
+    "files": []
+  },
+  "targets": {},
+  "formats": [
+    "portable"
+  ],
+  "statePolicy": "clean"
+}
