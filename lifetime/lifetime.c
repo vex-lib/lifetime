@@ -22,7 +22,7 @@
 ;;OVERVIEW
 /**
  * ============================================================================
- * CLASS: Lifetime (spoke/lifetime.c — defined in spoke/lifetime.h)
+ * CLASS: Lifetime (spoke/lifetime.c, defined in spoke/lifetime.h)
  * ============================================================================
  * SUMMARY:
  *   Provides the memory substrate for the R0 host kernel. Owns the master
@@ -38,7 +38,7 @@
  *   All allocations and bindings are validated through Lifetime_isLegit and
  *   Lifetime_isValid to ensure memory integrity across dynamic hot-reloads.
  *
- * STRUCT FIELDS (Mirroring spoke/lifetime.h — exactly this file's class):
+ * STRUCT FIELDS (Mirroring spoke/lifetime.h, exactly this file's class):
  * ----------------------------------------------------------------------------
  *   any persistentArena;    // master session arena (opaque any)
  *   any transientArena;     // per-tick scratch arena (opaque any)
@@ -85,37 +85,42 @@
  * ============================================================================
  */
 
-// Dynamic link symbols provided by the underlying memory runtime (pure any ABI).
-// hotcwap does NOT include nio/mem.h or any vexspoke header files.
-extern any MemoryArena_create(bytes totalBytes);
+/**
+ * Dynamic link symbols provided by the underlying memory runtime (pure any ABI).
+ * hotcwap does NOT include nio/mem.h or any vexspoke header files.
+ */
+extern any MemoryArena_1(bytes totalBytes);
 extern fn MemoryArena_destroy(any arena);
 extern fn MemoryArena_freeAll(any arena);
 extern any MemoryArena_alloc(any arena, u64 typeId, bytes numBytes);
 extern fn MemoryArena_free(any arena, any ptr);
 
-// CONSTRUCTORS (PUBLIC & PRIVATE)
-/** Creates persistent and transient arenas, substituting defaults for zero sizes. */
-Lifetime Lifetime_create(bytes persistentBytes, bytes transientBytes) {
+/**
+ * Creates persistent and transient arenas, substituting 64 MiB defaults for zero sizes.
+ * @param persistentBytes byte capacity for the persistent arena (0 uses default)
+ * @param transientBytes  byte capacity for the transient arena (0 uses default)
+ * @return initialized Lifetime record, or zeroed on failure
+ */
+;;CONSTRUCTOR
+Lifetime Lifetime_2(bytes persistentBytes, bytes transientBytes) {
     Lifetime lt = {0};
     if (persistentBytes == 0)
         persistentBytes = 64 * 1024 * 1024;
     if (transientBytes == 0)
         transientBytes = 64 * 1024 * 1024;
 
-    any p = MemoryArena_create(persistentBytes);
+    any p = MemoryArena_1(persistentBytes);
     if (!Lifetime_isLegit(p)) {
-        if (p != nullptr) {
+        if (p != nullptr)
             MemoryArena_destroy(p);
-        }
         return lt;
     }
 
-    any t = MemoryArena_create(transientBytes);
+    any t = MemoryArena_1(transientBytes);
     if (!Lifetime_isLegit(t)) {
         MemoryArena_destroy(p);
-        if (t != nullptr) {
+        if (t != nullptr)
             MemoryArena_destroy(t);
-        }
         return lt;
     }
 
@@ -145,21 +150,16 @@ Lifetime Lifetime_bind(any persistentArena, any transientArena,
     return lt;
 }
 
-// CORE FUNCTIONS (PUBLIC & PRIVATE)
+/** CORE FUNCTIONS (PUBLIC & PRIVATE) */
 /** Checks non-null, 16-byte alignment, and the minimum user-address threshold. */
 bool Lifetime_isLegit(const_any ptr) {
-    if (ptr == nullptr) {
+    if (ptr == nullptr)
         return false;
-    }
     pointer addr = (pointer) ptr;
-    // 16-byte arena alignment doctrine
-    if ((addr & 15) != 0) {
+    if ((addr & 15) != 0)
         return false;
-    }
-    // Guard page avoidance: valid user-space pointer must be >= 64KB (0x10000)
-    if (addr < 0x10000ULL) {
+    if (addr < 0x10000ULL)
         return false;
-    }
     return true;
 }
 
@@ -215,22 +215,17 @@ static fn Lifetime_setRelationalRaw(Lifetime *lifetime, any relational) {
 
 /** Validates both arena handles, their attestations, and an optional relational root. */
 bool Lifetime_isValid(const Lifetime *lifetime) {
-    if (lifetime == nullptr) {
+    if (lifetime == nullptr)
         return false;
-    }
-    if (!Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime))) {
+    if (!Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime)))
         return false;
-    }
-    if (!Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime))) {
+    if (!Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime)))
         return false;
-    }
-    if (Lifetime_persistentType(lifetime) == 0 || Lifetime_transientType(lifetime) == 0) {
+    if (Lifetime_persistentType(lifetime) == 0 || Lifetime_transientType(lifetime) == 0)
         return false;
-    }
     any relational = Lifetime_relationalRaw(lifetime);
-    if (relational != nullptr && !Lifetime_isLegit(relational)) {
+    if (relational != nullptr && !Lifetime_isLegit(relational))
         return false;
-    }
     return true;
 }
 
@@ -240,17 +235,15 @@ fn Lifetime_destroy(Lifetime *lifetime) {
         return;
     any transientArena = Lifetime_transientArenaRaw(lifetime);
     if (transientArena != nullptr) {
-        if (Lifetime_isLegit(transientArena)) {
+        if (Lifetime_isLegit(transientArena))
             MemoryArena_destroy(transientArena);
-        }
         Lifetime_setTransientArena(lifetime, nullptr);
         Lifetime_setTransientType(lifetime, 0);
     }
     any persistentArena = Lifetime_persistentArenaRaw(lifetime);
     if (persistentArena != nullptr) {
-        if (Lifetime_isLegit(persistentArena)) {
+        if (Lifetime_isLegit(persistentArena))
             MemoryArena_destroy(persistentArena);
-        }
         Lifetime_setPersistentArena(lifetime, nullptr);
         Lifetime_setPersistentType(lifetime, 0);
     }
@@ -269,9 +262,8 @@ any Lifetime_allocPersistent(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_persistentArenaRaw(lifetime)))
         return nullptr;
     any ptr = MemoryArena_alloc(Lifetime_persistentArenaRaw(lifetime), typeId, Bytes);
-    if (!Lifetime_isLegit(ptr)) {
+    if (!Lifetime_isLegit(ptr))
         return nullptr;
-    }
     return ptr;
 }
 
@@ -280,9 +272,8 @@ any Lifetime_allocTransient(Lifetime *lifetime, u64 typeId, bytes Bytes) {
     if (lifetime == nullptr || !Lifetime_isLegit(Lifetime_transientArenaRaw(lifetime)))
         return nullptr;
     any ptr = MemoryArena_alloc(Lifetime_transientArenaRaw(lifetime), typeId, Bytes);
-    if (!Lifetime_isLegit(ptr)) {
+    if (!Lifetime_isLegit(ptr))
         return nullptr;
-    }
     return ptr;
 }
 
@@ -293,7 +284,7 @@ fn Lifetime_freePersistent(Lifetime *lifetime, any ptr) {
     MemoryArena_free(Lifetime_persistentArenaRaw(lifetime), ptr);
 }
 
-// ACCESSORS (PUBLIC)
+/** ACCESSORS (PUBLIC) */
 /** Gets the bound relational symbol root (null-safe). */
 any Lifetime_getRelational(const Lifetime *lifetime) {
     if (lifetime == nullptr)

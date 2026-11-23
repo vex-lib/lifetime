@@ -3,25 +3,27 @@
 
 #include "vex.h"
 
-// lifetime/clock.h — the R0 ground-truth clock.
-//
-// Single Class Per File Law: Clock.
-//
-// R0 owns time. Nanos come from CLOCK_MONOTONIC_RAW (raw hardware counter,
-// unslewed by NTP, never backwards) for frame ticks and loop(t) deltas.
-// Millis come from CLOCK_REALTIME (unix wall) for timestamps and logging.
-// Seconds (d64) is the single conversion site for App_frame(scene, t).
-// No pause/scale here — ground truth only. A paused/scaled view is a
-// vexspoke concern borrowing this tick, never a second clock.
-// Across a hot swap the host holds the clock, so time continues.
+/**
+ * lifetime/clock.h, the R0 ground-truth clock.
+ *
+ * Single Class Per File Law: Clock.
+ *
+ * R0 owns time. Nanos come from CLOCK_MONOTONIC_RAW (raw hardware counter,
+ * unslewed by NTP, never backwards) for frame ticks and loop(t) deltas.
+ * Millis come from CLOCK_REALTIME (unix wall) for timestamps and logging.
+ * Seconds (d64) is the single conversion site for App_frame(scene, t).
+ * No pause/scale here, ground truth only. A paused/scaled view is a
+ * vexspoke concern borrowing this tick, never a second clock.
+ * Across a hot swap the host holds the clock, so time continues.
+ */
 
-// Monotonic nanos since an arbitrary host epoch. Never decreases.
+/** Monotonic nanos since an arbitrary host epoch. Never decreases. */
 u64 Clock_nowNanos();
 
-// Unix wall millis since 1970-01-01T00:00:00Z. For timestamps, never deltas.
+/** Unix wall millis since 1970-01-01T00:00:00Z. For timestamps, never deltas. */
 u64 Clock_nowMillis();
 
-// Monotonic seconds (d64) for module frame functions. One conversion.
+/** Monotonic seconds (d64) for module frame functions. One conversion. */
 d64 Clock_nowSeconds();
 
 #endif

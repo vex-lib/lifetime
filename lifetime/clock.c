@@ -12,7 +12,7 @@
  * The R0 ground-truth clock. Nanos from CLOCK_MONOTONIC_RAW for frame ticks
  * (raw hardware counter, unslewed by NTP, never backwards). Millis from
  * CLOCK_REALTIME for unix wall timestamps. Seconds (d64) is the single
- * conversion site for module frame functions. No pause/scale — ground truth
+ * conversion site for module frame functions. No pause/scale, ground truth
  * only. The host holds the clock across hot swaps, so time continues.
  * Lives at R0 as a leaf host primitive.
  * ============================================================================
@@ -25,7 +25,7 @@
  * ============================================================================
  * the R0 ground-truth clock.
  *
- * STRUCT FIELDS: none — procedural (pure OS clock reads, no retained state)
+ * STRUCT FIELDS: none, procedural (pure OS clock reads, no retained state)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
