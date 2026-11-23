@@ -27,11 +27,11 @@
  * OS capability permission requests. Cross-platform contract: the kind exists
  * everywhere, the status is UNSUPPORTED where the host has no concept.
  *
- * STRUCT FIELDS: none — procedural (kind in, status/decision out)
+ * STRUCT FIELDS: none, procedural (kind in, status/decision out)
  *
  * PRIVATE HELPERS:
  * ----------------------------------------------------------------------------
- *   (none — the OS hooks live in the backend: objc/permission_cocoa.m)
+ *   (none, the OS hooks live in the backend: objc/permission_cocoa.m)
  *
  * FUNCTION REGISTRY:
  * ----------------------------------------------------------------------------
@@ -47,10 +47,10 @@
  * ============================================================================
  */
 
-// NAMES (portable)
+/** NAMES (portable) */
 ;;GETTER
 /** Returns the symbolic name for a permission kind, or the unknown label. */
-const char *Permission_kindName(PermissionKind kind) {
+string Permission_kindName(PermissionKind kind) {
     switch (kind) {
         case PERMISSION_SCREEN_CAPTURE: return "PERMISSION_SCREEN_CAPTURE";
         case PERMISSION_KEY_LISTEN:     return "PERMISSION_KEY_LISTEN";
@@ -71,7 +71,7 @@ const char *Permission_kindName(PermissionKind kind) {
 
 ;;GETTER
 /** Returns the symbolic name for a permission status, or the unknown label. */
-const char *Permission_statusName(PermissionStatus status) {
+string Permission_statusName(PermissionStatus status) {
     switch (status) {
         case PERMISSION_UNSUPPORTED:    return "UNSUPPORTED";
         case PERMISSION_NOT_DETERMINED: return "NOT_DETERMINED";
@@ -82,7 +82,7 @@ const char *Permission_statusName(PermissionStatus status) {
     }
 }
 
-// PUBLIC API (portable dispatch — bounds-checked once, then the backend decides)
+/** PUBLIC API (portable dispatch, bounds-checked once, then the backend decides) */
 /** Queries a permission through the platform backend, or reports unsupported. */
 PermissionStatus Permission_status(PermissionKind kind) {
     if ((i32) kind < 0 || kind >= PERMISSION_COUNT)
@@ -111,7 +111,7 @@ bool Permission_openSettings(PermissionKind kind) {
     return permissionBackendOpenSettings(kind);
 }
 
-// PORTABLE BACKEND (non-Apple): the kind exists, the host has no concept yet.
+/** PORTABLE BACKEND (non-Apple): the kind exists, the host has no concept yet. */
 #if !defined(VEX_PLATFORM_APPLE)
     /** Non-Apple fallback: reports every permission as unsupported. */
     PermissionStatus permissionBackendStatus(PermissionKind kind) {

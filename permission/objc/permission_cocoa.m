@@ -1,21 +1,23 @@
-// permission/objc/permission_cocoa.m — the macOS Permission backend.
-//
-// Implements the four permissionBackend* hooks (permission/permission_backend.h)
-// for the host.
-//   CoreGraphics / ApplicationServices : screen capture, key listening, event
-//       synthesis, accessibility (no bundle needed; queried directly).
-//   AVFoundation / Contacts / EventKit / Photos / CoreLocation /
-//       UserNotifications : camera, microphone, contacts, calendar, photos,
-//       location, notifications. These read a TCC status that is only defined
-//       for a signed process with an app identity, so every one of them is
-//       GUARDED by hostHasBundle(): a bare CLI (no Info.plist) answers
-//       PERMISSION_NOT_DETERMINED and NEVER touches the framework, which also
-//       keeps the owner test prompt-free and crash-free.
-//   AUTOMATION (needs a per-target decision) and FULL_DISK (no API at all):
-//       answer PERMISSION_UNSUPPORTED.
-//
-// This backend never relaunches or exits the process: it reports what the OS
-// says and nothing more (the relaunch is the user's to make).
+/**
+ * permission/objc/permission_cocoa.m, the macOS Permission backend.
+ *
+ * Implements the four permissionBackend* hooks (permission/permission_backend.h)
+ * for the host.
+ * CoreGraphics / ApplicationServices : screen capture, key listening, event
+ * synthesis, accessibility (no bundle needed; queried directly).
+ * AVFoundation / Contacts / EventKit / Photos / CoreLocation /
+ * UserNotifications : camera, microphone, contacts, calendar, photos,
+ * location, notifications. These read a TCC status that is only defined
+ * for a signed process with an app identity, so every one of them is
+ * GUARDED by hostHasBundle(): a bare CLI (no Info.plist) answers
+ * PERMISSION_NOT_DETERMINED and NEVER touches the framework, which also
+ * keeps the owner test prompt-free and crash-free.
+ * AUTOMATION (needs a per-target decision) and FULL_DISK (no API at all):
+ * answer PERMISSION_UNSUPPORTED.
+ *
+ * This backend never relaunches or exits the process: it reports what the OS
+ * says and nothing more (the relaunch is the user's to make).
+ */
 
 #include "vex.h"
 #include "permission/permission.h"
@@ -61,12 +63,12 @@
  * ============================================================================
  * macOS implementation of the permission backend hooks.
  *
- * STRUCT FIELDS: none — procedural (kind in, status/decision out)
+ * STRUCT FIELDS: none, procedural (kind in, status/decision out)
  *
  * PRIVATE HELPERS:
  * ----------------------------------------------------------------------------
  *   hostHasBundle()        : true when the process has an app identity (Info.plist)
- *   mapAV/mapCN/mapEK/mapPH/mapCL : framework status -> PermissionStatus
+ *   mapAV/mapCN/mapEK/mapPH/mapCL : framework status  to  PermissionStatus
  *
  * FUNCTION REGISTRY (the backend seam; public API lives in permission.c):
  *   - permissionBackendStatus(kind)
@@ -75,12 +77,12 @@
  *   - permissionBackendOpenSettings(kind)
  * ============================================================================
  */
-// Status reads that are only defined for an identified app.
+/** Status reads that are only defined for an identified app. */
 static bool hostHasBundle() {
     return [[NSBundle mainBundle] bundleIdentifier] != nil;
 }
 
-// --- Framework status -> PermissionStatus -----------------------------------
+/** --- Framework status  to  PermissionStatus ----------------------------------- */
 /** Maps an AVFoundation authorization value to the portable permission status. */
 static PermissionStatus mapAV(AVAuthorizationStatus status) {
     switch (status) {
@@ -105,9 +107,6 @@ static PermissionStatus mapCN(CNAuthorizationStatus status) {
 
 /** Maps an EventKit authorization value to the portable permission status. */
 static PermissionStatus mapEK(EKAuthorizationStatus status) {
-    // Named via if-chain: EKAuthorizationStatusAuthorized is deprecated (mac 14)
-    // in favor of FullAccess/WriteOnly, so we never name it — anything i16 of
-    // denied/restricted/undetermined is a grant.
     if (status == EKAuthorizationStatusDenied)
         return PERMISSION_DENIED;
     if (status == EKAuthorizationStatusRestricted)
@@ -131,9 +130,6 @@ static PermissionStatus mapPH(PHAuthorizationStatus status) {
 
 /** Maps a Core Location authorization value to the portable permission status. */
 static PermissionStatus mapCL(CLAuthorizationStatus status) {
-    // kCLAuthorizationStatusAuthorizedWhenInUse is iOS-only; on macOS the grant
-    // is AuthorizedAlways. kCLAuthorizationStatusAuthorized is deprecated, so it
-    // is never named.
     switch (status) {
         case kCLAuthorizationStatusAuthorizedAlways: return PERMISSION_GRANTED;
         case kCLAuthorizationStatusDenied:          return PERMISSION_DENIED;
@@ -143,13 +139,15 @@ static PermissionStatus mapCL(CLAuthorizationStatus status) {
     }
 }
 
-// Long-lived framework objects for the request calls (the prompt outlives the
-// function frame, so these must not be stack locals).
+/**
+ * Long-lived framework objects for the request calls (the prompt outlives the
+ * function frame, so these must not be stack locals).
+ */
 static CNContactStore *g_contactStore = nil;
 static EKEventStore    *g_eventStore = nil;
 static CLLocationManager *g_locationManager = nil;
 
-// --- Status per kind --------------------------------------------------------
+/** --- Status per kind -------------------------------------------------------- */
 static PermissionStatus statusCamera() {
     if (!hostHasBundle())
         return PERMISSION_NOT_DETERMINED;
@@ -195,7 +193,7 @@ static PermissionStatus statusLocation() {
     return mapCL([g_locationManager authorizationStatus]);
 }
 
-// --- Requests (fire-and-forget; the answer arrives later) -------------------
+/** --- Requests (fire-and-forget; the answer arrives later) ------------------- */
 static bool requestCamera() {
     if (!hostHasBundle())
         return false;
@@ -289,7 +287,7 @@ static bool requestNotifications() {
     return true;
 }
 
-// --- The backend hooks ------------------------------------------------------
+/** --- The backend hooks ------------------------------------------------------ */
 PermissionStatus permissionBackendStatus(PermissionKind kind) {
     switch (kind) {
         case PERMISSION_SCREEN_CAPTURE:
@@ -306,8 +304,8 @@ PermissionStatus permissionBackendStatus(PermissionKind kind) {
         case PERMISSION_CALENDAR:      return statusCalendar();
         case PERMISSION_PHOTOS:        return statusPhotos();
         case PERMISSION_LOCATION:      return statusLocation();
-        case PERMISSION_NOTIFICATIONS: return PERMISSION_NOT_DETERMINED; // async-only, no sync query
-        default:                       return PERMISSION_UNSUPPORTED;    // AUTOMATION, FULL_DISK
+        case PERMISSION_NOTIFICATIONS: return PERMISSION_NOT_DETERMINED;
+        default:                       return PERMISSION_UNSUPPORTED;
     }
 }
 
@@ -338,15 +336,17 @@ bool permissionBackendRequest(PermissionKind kind) {
     }
 }
 
-// macOS: a screen-capture grant binds only after the process relaunches.
-// Reported here; the relaunch is the user's to make (never ours).
+/**
+ * macOS: a screen-capture grant binds only after the process relaunches.
+ * Reported here; the relaunch is the user's to make (never ours).
+ */
 bool permissionBackendRequiresRestart(PermissionKind kind) {
     return kind == PERMISSION_SCREEN_CAPTURE;
 }
 
 /** Opens the appropriate System Settings privacy pane for the permission kind. */
 bool permissionBackendOpenSettings(PermissionKind kind) {
-    const char *pane = nullptr;
+    string pane = nullptr;
     switch (kind) {
         case PERMISSION_SCREEN_CAPTURE: pane = "Privacy_ScreenCapture"; break;
         case PERMISSION_KEY_LISTEN:
@@ -362,7 +362,7 @@ bool permissionBackendOpenSettings(PermissionKind kind) {
         case PERMISSION_FULL_DISK:      pane = "Privacy_AllFiles"; break;
         default:                        return false;
     }
-    char url[192];
+    utf8 url[192];
     i32 n = snprintf(url, sizeof url,
                      "x-apple.systempreferences:com.apple.preference.security?%s", pane);
     if (n <= 0 || (bytes) n >= sizeof url)
