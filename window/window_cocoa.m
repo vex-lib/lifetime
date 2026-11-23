@@ -1,27 +1,29 @@
-// window/window_cocoa.m — the AppKit window backend (the one ObjC file).
-//
-// vex's core is pure C23; this is the ONE file that talks to AppKit, because
-// NSWindow/NSApplication are ObjC objects and there is no pure-C way to
-// create them. Everything above this boundary stays C; everything here is
-// "dip into the OS, hand back a handle, pump the OS event queue".
-//
-// This is the FRESH window backend, rebuilt from scratch after the _trash-era
-// shim retired. It is deliberately LEAN: a window with bridges, and nothing
-// else. It creates and owns an NSWindow, mirrors the OS's size/move/focus/
-// monitor state into C-visible words, fires the per-window WindowEvent
-// lifecycle (quit veto, resized, fullscreen, minimized, restored, pressed,
-// focus, zoom), and routes OS input into the vexspoke Key/Mouse/Touch rings.
-// There is NO Vulkan, NO Metal, NO CAMetalLayer, NO board/pane compositing,
-// and NO present worker in this file — rendering is the render personal' job
-// (graphvex/darling) and reaches the screen through the content view and the
-// event bridges, exactly per the Window Decoupling Law (a Window is a dumb
-// surface + callback bridge, never a renderer).
-//
-// The GPU-era composite surface (boards, panes, worker present, software
-// frame present) is retained as thin INERT stubs at the bottom of this file
-// so the still-unmigrated darling compositor links; each carries an
-// ;;INTENTION marker. When darling migrates to the WindowEvent bridge, the
-// stubs and their window.h declarations retire together.
+/**
+ * window/window_cocoa.m, the AppKit window backend (the one ObjC file).
+ *
+ * vex's core is pure C23; this is the ONE file that talks to AppKit, because
+ * NSWindow/NSApplication are ObjC objects and there is no pure-C way to
+ * create them. Everything above this boundary stays C; everything here is
+ * "dip into the OS, hand back a handle, pump the OS event queue".
+ *
+ * This is the FRESH window backend, rebuilt from scratch after the _trash-era
+ * shim retired. It is deliberately LEAN: a window with bridges, and nothing
+ * else. It creates and owns an NSWindow, mirrors the OS's size/move/focus/
+ * monitor state into C-visible words, fires the per-window WindowEvent
+ * lifecycle (quit veto, resized, fullscreen, minimized, restored, pressed,
+ * focus, zoom), and routes OS input into the vexspoke Key/Mouse/Touch rings.
+ * There is NO Vulkan, NO Metal, NO CAMetalLayer, NO board/pane compositing,
+ * and NO present worker in this file, rendering is the render personal' job
+ * (graphvex/darling) and reaches the screen through the content view and the
+ * event bridges, exactly per the Window Decoupling Law (a Window is a dumb
+ * surface + callback bridge, never a renderer).
+ *
+ * The GPU-era composite surface (boards, panes, worker present, software
+ * frame present) is retained as thin INERT stubs at the bottom of this file
+ * so the still-unmigrated darling compositor links; each carries an
+ * ;;INTENTION marker. When darling migrates to the WindowEvent bridge, the
+ * stubs and their window.h declarations retire together.
+ */
 
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
@@ -32,8 +34,11 @@
 #import <stdatomic.h>
 
 #include "vex.h"
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 #include <math.h>
 
+#define LIFETIME_WINDOW_IMPLEMENTATION
 #include "window/window.h"
 #include "window/traffic_light.h"
 #include "input/focus.h"
@@ -56,7 +61,7 @@
  * and forwards window lifecycle state changes (geometry resize + move, minimize,
  * restore, fullscreen, key focus, and vetoable termination requests) through the
  * embedded WindowEvent registry on Thread 0. Geometry is reflected EVERY tracking
- * step — onResized(w,h) and onMoved(x,y) both fire the moment the window changes,
+ * step, onResized(w,h) and onMoved(x,y) both fire the moment the window changes,
  * not on settle.
  * ============================================================================
  */
@@ -73,10 +78,10 @@
  *   content view / event bridges. OS input is routed into the vexspoke device
  *   rings (tagged with this window's id); OS lifecycle (quit, resize, move,
  *   fullscreen, minimize, restore, press, focus, zoom) fires the embedded
- *   WindowEvent. Zero Vulkan, zero Metal, zero compositing — a Window is a
+ *   WindowEvent. Zero Vulkan, zero Metal, zero compositing, a Window is a
  *   dumb surface + callback bridge per the Window Decoupling Law.
  *
- * STRUCT FIELDS (Mirroring window/window.h incomplete tag — completed here):
+ * STRUCT FIELDS (Mirroring window/window.h incomplete tag, completed here):
  * ----------------------------------------------------------------------------
  *   NSWindow *nsWindow;           // AppKit window (we own it; releasedWhenClosed NO)
  *   WindowDelegate *delegate;     // per-window close/resize/focus delegate
@@ -106,14 +111,14 @@
  *
  * PRIVATE HELPERS (kept file-local, no external API):
  * ----------------------------------------------------------------------------
- *   WindowContentView : NSView      — flipped content view (top-left origin)
+ *   WindowContentView : NSView     , flipped content view (top-left origin)
  *     BOOL active;                  // unused; class exists for flipped geometry
  *   WindowAppDelegate : NSObject
  *     (implements applicationShouldTerminateAfterLastWindowClosed)
  *   WindowDelegate : NSObject <NSWindowDelegate>
  *     atomic_bool *shouldClosePtr;  // weak assignment into the owning handle
  *     Window *handlePtr;            // weak assignment back to the owning handle
- *   WindowSlot                      — id-registry slot record
+ *   WindowSlot                     , id-registry slot record
  *     NSWindow *window;             // OS window owning this id
  *     Window *handle;               // C handle owning that window
  *
@@ -150,7 +155,7 @@
  *   - Window_restore(window)
  *   - Window_toggleFullscreen(window)
  *   - Window_contentView(window)
- *   - Window_metalLayer(window)       : nullptr — no Metal here (;;INTENTION)
+ *   - Window_metalLayer(window)       : nullptr, no Metal here (;;INTENTION)
  *   - Window_present(window, frame)   : inert (;;INTENTION)
  *   - Window_workerPresentBegin(window) : inert (;;INTENTION)
  *   - Window_workerPresentEnd(window)   : inert (;;INTENTION)
@@ -264,11 +269,13 @@
 ;;INTENTION("GPU-era composite surface (attachPanes/resizePanes/compositePanes/compositeBoards/orderLayers/metalLayer/setGravityTopLeft/workerPresentBegin/workerPresentEnd/present) is retained as inert stubs so the still-unmigrated darling compositor keeps linking; zero Vulkan/Metal code lives in this file. They retire together with their window.h declarations once darling migrates onto the WindowEvent bridge (the Window Decoupling Law).")
 ;;INTENTION("presentMode/transparent/renderGeneration are pure atomic policy state (swapchain-rebuild tickets for a future render path), not GPU calls; no render logic exists here.")
 
-// Multi-tap window for d64-click style counting (legacy parity: 250ms).
+/** Multi-tap window for d64-click style counting (legacy parity: 250ms). */
 static const u64 kTapThresholdNanos = 250000000ULL;
 
-// Carbon virtual keycode -> KEY_* code. -1 = unmapped. Same table the legacy
-// macOSWindow built (physical F1-F12, not Fn-f64d media keys).
+/**
+ * Carbon virtual keycode  to  KEY_* code. -1 = unmapped. Same table the legacy
+ * macOSWindow built (physical F1-F12, not Fn-f64d media keys).
+ */
 static i32 macKeyMap[128] = {
     [0] = KEY_A,                   [1] = KEY_S,
     [2] = KEY_D,                   [3] = KEY_F,
@@ -311,19 +318,53 @@ static i32 macKeyMap[128] = {
     [125] = KEY_DOWN,              [126] = KEY_UP,
 };
 
-// Cursor-lock state. While locked the pointer is decoupled from motion and
-// re-warped to the anchor centre every pump pass; NSEvent deltas feed mouse.
+/**
+ * Cursor-lock state. While locked the pointer is decoupled from motion and
+ * re-warped to the anchor centre every pump pass; NSEvent deltas feed mouse.
+ */
 static bool s_cursorLocked = false;
 static CGPoint s_lockCenter = {0, 0};
 
 @class WindowDelegate;
 
-// The opaque handle handed back to C. Holds the NS objects we must keep alive
-// (window + delegate) plus every C-visible reflection word. `id` is the
-// engine's small window number (1..N; 0 is the broadcast reserved id) used to
-// tag input events and route them to per-window listeners. `lifecycle` is the
-// embedded WindowEvent — the app's OS-lifecycle bridge (the Window Decoupling
-// Law: the window publishes live state and callbacks; it never renders).
+/**
+ * Opaque AppKit window handle handed back to C.
+ * Holds the retained NS objects plus C-visible reflection words and the
+ * embedded WindowEvent lifecycle bridge (Window Decoupling Law: publishes live
+ * state and callbacks, never renders).
+ * NSWindow *nsWindow - owned AppKit window (releasedWhenClosed NO)
+ * WindowDelegate *delegate - per-window close/resize/focus delegate
+ * WindowEvent lifecycle - embedded OS lifecycle callback registry
+ * u32 id - engine window id (1..N, 0 is FOCUS_BROADCAST)
+ * _Atomic bool shouldClose - true once close requested
+ * _Atomic u64 sizeGeneration - resize-reflection counter
+ * _Atomic i32 cachedWidth - content width in native physical pixels
+ * _Atomic i32 cachedHeight - content height in native physical pixels
+ * d64 cachedScale - active backing scale factor
+ * d64 cachedX - top-left screen X
+ * d64 cachedY - top-left screen Y
+ * d64 cachedContentX - content top-left X below title bar
+ * d64 cachedContentY - content top-left Y below title bar
+ * _Atomic bool liveResizing - true during NSViewLiveResize
+ * _Atomic bool miniaturizing - true during genie minimize
+ * _Atomic i32 presentMode - pure-state present pacing policy
+ * _Atomic bool transparent - pure-state transparency request
+ * _Atomic u64 renderGeneration - policy-reflection rebuild ticket
+ * _Atomic bool enabled - false mutes all OS input for this window
+ * _Atomic bool keyEnabled - false makes canBecomeKeyWindow refuse (modal hold)
+ * bool lastFocused - focus-flip detection during the pump
+ * _Atomic u32 monitorId - CGDirectDisplayID mirror (0 unmapped)
+ * WindowCursorType cursorType - active OS cursor style
+ * TrafficLight *trafficLights - owned macOS traffic-light controller (nullptr if borderless)
+ * NSView *glView - draw view above contentView where presents land (layer.contents)
+ * any backdropView - NSVisualEffectView behind glView, or nullptr
+ * any glassView - macOS 26 NSGlassEffectView behind glView, or nullptr
+ * WindowLiquidGlassDesc liquidGlass - last-applied Liquid Glass descriptor
+ * WindowResizeRenderFn resizeRenderFn - synchronous resize-cadence render hook
+ * any resizeRenderUserdata - resize render hook userdata
+ * i32 undecoratedMode - WINDOW_DECORATED, WINDOW_UNDECORATED_NAKED, or WINDOW_UNDECORATED_BORDERLESS
+ * bool viewportFlushToTop - true when decorated viewport is flushed into top bar
+ */
 struct Window {
     NSWindow *nsWindow;
     WindowDelegate *delegate;
@@ -340,52 +381,55 @@ struct Window {
     d64 cachedContentY;
     _Atomic bool liveResizing;
     _Atomic bool miniaturizing;
-
-    // Pure-state reflection words (no GPU calls in this file).
     _Atomic i32 presentMode;
     _Atomic bool transparent;
     _Atomic u64 renderGeneration;
-
     _Atomic bool enabled;
-    _Atomic bool keyEnabled; // false = canBecomeKeyWindow refuses (held by a modal dialog)
+    _Atomic bool keyEnabled;
     bool lastFocused;
     _Atomic u32 monitorId;
     WindowCursorType cursorType;
-
-    // Traffic-light chrome lives in the segregated TrafficLight class (window/
-    // traffic_light.h); the window owns ONE instance and forwards the
-    // Window_macOS_* / setFloatingTrafficLights surface to it (the Single
-    // Class Per File Law). nullptr = never created (headless / BORDERLESS).
     TrafficLight *trafficLights;
-
-    // The draw view sits ABOVE the content view, so a backdrop-blur effect view
-    // can live behind it (behindWindow blur shows through the transparent parts).
-    NSView *glView;        // where presents land (layer.contents)
-    any backdropView;    // NSVisualEffectView, or nullptr
-    any glassView;       // macOS 26 NSGlassEffectView, or nullptr
-    WindowLiquidGlassDesc liquidGlass; // last-applied Liquid Glass descriptor
-
+    NSView *glView;
+    any backdropView;
+    any glassView;
+    WindowLiquidGlassDesc liquidGlass;
     WindowResizeRenderFn resizeRenderFn;
     any resizeRenderUserdata;
-
-    i32 undecoratedMode;     // WINDOW_DECORATED, WINDOW_UNDECORATED_NAKED, WINDOW_UNDECORATED_BORDERLESS
-    bool viewportFlushToTop; // true when decorated window has viewport flushed into top bar
+    i32 undecoratedMode;
+    bool viewportFlushToTop;
 };
 
 ;;GETTER
-static NSWindow *Window_nsWindow(const Window *w) { return (*w).nsWindow; }
+static NSWindow *Window_nsWindow(const Window *w)
+{
+    return (*w).nsWindow;
+}
 ;;SETTER
-static fn Window_setNsWindow(Window *w, NSWindow *v) { (*w).nsWindow = v; }
-;;GETTER
-static WindowDelegate *Window_delegate(const Window *w) { return (*w).delegate; }
+static fn Window_setNsWindow(Window *w, NSWindow *v)
+{
+    (*w).nsWindow = v;
+}
 ;;SETTER
-static fn Window_setDelegate(Window *w, WindowDelegate *v) { (*w).delegate = v; }
+static fn Window_setDelegate(Window *w, WindowDelegate *v)
+{
+    (*w).delegate = v;
+}
 ;;GETTER
-static WindowEvent *Window_lifecycleMut(Window *w) { return &(*w).lifecycle; }
+static WindowEvent *Window_lifecycleMut(Window *w)
+{
+    return &(*w).lifecycle;
+}
 ;;GETTER
-static u32 Window_idRaw(const Window *w) { return (*w).id; }
+static u32 Window_idRaw(const Window *w)
+{
+    return (*w).id;
+}
 ;;SETTER
-static fn Window_setIdRaw(Window *w, u32 v) { (*w).id = v; }
+static fn Window_setIdRaw(Window *w, u32 v)
+{
+    (*w).id = v;
+}
 ;;GETTER
 static _Atomic bool *Window_shouldCloseMut(Window *w) { return &(*w).shouldClose; }
 ;;GETTER
@@ -397,31 +441,57 @@ static const _Atomic u64 *Window_sizeGenerationPtr(const Window *w) { return &(*
 ;;GETTER
 static _Atomic i32 *Window_cachedWidthMut(Window *w) { return &(*w).cachedWidth; }
 ;;GETTER
-static const _Atomic i32 *Window_cachedWidthPtr(const Window *w) { return &(*w).cachedWidth; }
-;;GETTER
 static _Atomic i32 *Window_cachedHeightMut(Window *w) { return &(*w).cachedHeight; }
 ;;GETTER
-static const _Atomic i32 *Window_cachedHeightPtr(const Window *w) { return &(*w).cachedHeight; }
-;;GETTER
-static d64 Window_cachedScale(const Window *w) { return (*w).cachedScale; }
+static d64 Window_cachedScale(const Window *w)
+{
+    return (*w).cachedScale;
+}
 ;;SETTER
-static fn Window_setCachedScale(Window *w, d64 v) { (*w).cachedScale = v; }
+static fn Window_setCachedScale(Window *w, d64 v)
+{
+    (*w).cachedScale = v;
+}
 ;;GETTER
-static d64 Window_cachedX(const Window *w) { return (*w).cachedX; }
+static d64 Window_cachedX(const Window *w)
+{
+    return (*w).cachedX;
+}
 ;;SETTER
-static fn Window_setCachedX(Window *w, d64 v) { (*w).cachedX = v; }
+static fn Window_setCachedX(Window *w, d64 v)
+{
+    (*w).cachedX = v;
+}
 ;;GETTER
-static d64 Window_cachedY(const Window *w) { return (*w).cachedY; }
+static d64 Window_cachedY(const Window *w)
+{
+    return (*w).cachedY;
+}
 ;;SETTER
-static fn Window_setCachedY(Window *w, d64 v) { (*w).cachedY = v; }
+static fn Window_setCachedY(Window *w, d64 v)
+{
+    (*w).cachedY = v;
+}
 ;;GETTER
-static d64 Window_cachedContentX(const Window *w) { return (*w).cachedContentX; }
+static d64 Window_cachedContentX(const Window *w)
+{
+    return (*w).cachedContentX;
+}
 ;;SETTER
-static fn Window_setCachedContentX(Window *w, d64 v) { (*w).cachedContentX = v; }
+static fn Window_setCachedContentX(Window *w, d64 v)
+{
+    (*w).cachedContentX = v;
+}
 ;;GETTER
-static d64 Window_cachedContentY(const Window *w) { return (*w).cachedContentY; }
+static d64 Window_cachedContentY(const Window *w)
+{
+    return (*w).cachedContentY;
+}
 ;;SETTER
-static fn Window_setCachedContentY(Window *w, d64 v) { (*w).cachedContentY = v; }
+static fn Window_setCachedContentY(Window *w, d64 v)
+{
+    (*w).cachedContentY = v;
+}
 ;;GETTER
 static _Atomic bool *Window_liveResizingMut(Window *w) { return &(*w).liveResizing; }
 ;;GETTER
@@ -449,87 +519,171 @@ static _Atomic bool *Window_keyEnabledMut(Window *w) { return &(*w).keyEnabled; 
 ;;GETTER
 static const _Atomic bool *Window_keyEnabledPtr(const Window *w) { return &(*w).keyEnabled; }
 ;;GETTER
-static bool Window_lastFocused(const Window *w) { return (*w).lastFocused; }
+static bool Window_lastFocused(const Window *w)
+{
+    return (*w).lastFocused;
+}
 ;;SETTER
-static fn Window_setLastFocused(Window *w, bool v) { (*w).lastFocused = v; }
+static fn Window_setLastFocused(Window *w, bool v)
+{
+    (*w).lastFocused = v;
+}
 ;;GETTER
 static _Atomic u32 *Window_monitorIdMut(Window *w) { return &(*w).monitorId; }
 ;;GETTER
 static const _Atomic u32 *Window_monitorIdPtr(const Window *w) { return &(*w).monitorId; }
 ;;GETTER
-static WindowCursorType Window_cursorType(const Window *w) { return (*w).cursorType; }
+static WindowCursorType Window_cursorType(const Window *w)
+{
+    return (*w).cursorType;
+}
 ;;SETTER
-static fn Window_setCursorTypeRaw(Window *w, WindowCursorType v) { (*w).cursorType = v; }
+static fn Window_setCursorTypeRaw(Window *w, WindowCursorType v)
+{
+    (*w).cursorType = v;
+}
 ;;GETTER
-static TrafficLight *Window_trafficLights(const Window *w) { return (*w).trafficLights; }
+static TrafficLight *Window_trafficLights(const Window *w)
+{
+    return (*w).trafficLights;
+}
 ;;SETTER
-static fn Window_setTrafficLights(Window *w, TrafficLight *v) { (*w).trafficLights = v; }
+static fn Window_setTrafficLights(Window *w, TrafficLight *v)
+{
+    (*w).trafficLights = v;
+}
 ;;GETTER
-static NSView *Window_glView(const Window *w) { return (*w).glView; }
+static NSView *Window_glView(const Window *w)
+{
+    return (*w).glView;
+}
 ;;SETTER
-static fn Window_setGlView(Window *w, NSView *v) { (*w).glView = v; }
+static fn Window_setGlView(Window *w, NSView *v)
+{
+    (*w).glView = v;
+}
 ;;GETTER
-static any Window_backdropView(const Window *w) { return (*w).backdropView; }
+static any Window_backdropView(const Window *w)
+{
+    return (*w).backdropView;
+}
 ;;SETTER
-static fn Window_setBackdropView(Window *w, any v) { (*w).backdropView = v; }
+static fn Window_setBackdropView(Window *w, any v)
+{
+    (*w).backdropView = v;
+}
 ;;GETTER
-static any Window_glassView(const Window *w) { return (*w).glassView; }
+static any Window_glassView(const Window *w)
+{
+    return (*w).glassView;
+}
 ;;SETTER
-static fn Window_setGlassView(Window *w, any v) { (*w).glassView = v; }
+static fn Window_setGlassView(Window *w, any v)
+{
+    (*w).glassView = v;
+}
 ;;GETTER
-static WindowLiquidGlassDesc Window_liquidGlass(const Window *w) { return (*w).liquidGlass; }
-;;GETTER
-static const WindowLiquidGlassDesc *Window_liquidGlassPtr(const Window *w) { return &(*w).liquidGlass; }
+static WindowLiquidGlassDesc Window_liquidGlass(const Window *w)
+{
+    return (*w).liquidGlass;
+}
 ;;SETTER
-static fn Window_setLiquidGlass(Window *w, WindowLiquidGlassDesc v) { (*w).liquidGlass = v; }
+static fn Window_setLiquidGlass(Window *w, WindowLiquidGlassDesc v)
+{
+    (*w).liquidGlass = v;
+}
 ;;GETTER
-static WindowResizeRenderFn Window_resizeRenderFn(const Window *w) { return (*w).resizeRenderFn; }
+static WindowResizeRenderFn Window_resizeRenderFn(const Window *w)
+{
+    return (*w).resizeRenderFn;
+}
 ;;SETTER
-static fn Window_setResizeRenderFnRaw(Window *w, WindowResizeRenderFn v) { (*w).resizeRenderFn = v; }
+static fn Window_setResizeRenderFnRaw(Window *w, WindowResizeRenderFn v)
+{
+    (*w).resizeRenderFn = v;
+}
 ;;GETTER
-static any Window_resizeRenderUserdata(const Window *w) { return (*w).resizeRenderUserdata; }
+static any Window_resizeRenderUserdata(const Window *w)
+{
+    return (*w).resizeRenderUserdata;
+}
 ;;SETTER
-static fn Window_setResizeRenderUserdata(Window *w, any v) { (*w).resizeRenderUserdata = v; }
+static fn Window_setResizeRenderUserdata(Window *w, any v)
+{
+    (*w).resizeRenderUserdata = v;
+}
 ;;GETTER
-static i32 Window_undecoratedMode(const Window *w) { return (*w).undecoratedMode; }
+static i32 Window_undecoratedMode(const Window *w)
+{
+    return (*w).undecoratedMode;
+}
 ;;SETTER
-static fn Window_setUndecoratedMode(Window *w, i32 v) { (*w).undecoratedMode = v; }
+static fn Window_setUndecoratedMode(Window *w, i32 v)
+{
+    (*w).undecoratedMode = v;
+}
 ;;GETTER
-static bool Window_viewportFlushToTop(const Window *w) { return (*w).viewportFlushToTop; }
+static bool Window_viewportFlushToTop(const Window *w)
+{
+    return (*w).viewportFlushToTop;
+}
 ;;SETTER
-static fn Window_setViewportFlushToTopRaw(Window *w, bool v) { (*w).viewportFlushToTop = v; }
+static fn Window_setViewportFlushToTopRaw(Window *w, bool v)
+{
+    (*w).viewportFlushToTop = v;
+}
 
 ;;GETTER
-static const char *WindowDesc_title(const WindowDesc *d) { return (*d).title; }
+static string WindowDesc_title(const WindowDesc *d)
+{
+    return (*d).title;
+}
 ;;GETTER
-static i32 WindowDesc_width(const WindowDesc *d) { return (*d).width; }
+static i32 WindowDesc_width(const WindowDesc *d)
+{
+    return (*d).width;
+}
 ;;GETTER
-static i32 WindowDesc_height(const WindowDesc *d) { return (*d).height; }
+static i32 WindowDesc_height(const WindowDesc *d)
+{
+    return (*d).height;
+}
 ;;GETTER
-static i32 WindowDesc_x(const WindowDesc *d) { return (*d).x; }
+static i32 WindowDesc_x(const WindowDesc *d)
+{
+    return (*d).x;
+}
 ;;GETTER
-static i32 WindowDesc_y(const WindowDesc *d) { return (*d).y; }
+static i32 WindowDesc_y(const WindowDesc *d)
+{
+    return (*d).y;
+}
 ;;GETTER
-static bool WindowDesc_centered(const WindowDesc *d) { return (*d).centered; }
+static bool WindowDesc_centered(const WindowDesc *d)
+{
+    return (*d).centered;
+}
 ;;GETTER
-static bool WindowDesc_shown(const WindowDesc *d) { return (*d).shown; }
+static bool WindowDesc_shown(const WindowDesc *d)
+{
+    return (*d).shown;
+}
 
-// Window id registry: slot i holds the entries for engine id i (index = id,
-// slot 0 reserved for FOCUS_BROADCAST). Grows by doubling (the Dynamic
-// Scalability & Anti-Hardcoding Law — no fixed window ceiling; the pump and
-// the id scan are the only walkers, and live windows are few).
-typedef struct WindowSlot {
-    NSWindow *window;
-    Window *handle;
-} WindowSlot;
-
+/**
+ * Window id registry: slot i holds the entries for engine id i (index = id,
+ * slot 0 reserved for FOCUS_BROADCAST). Grows by doubling (the Dynamic
+ * Scalability & Anti-Hardcoding Law, no fixed window ceiling; the pump and
+ * the id scan are the only walkers, and live windows are few).
+ */
 static WindowSlot *s_refs = nullptr;
 static u32 s_refCap = 0;
 
-// Grow the NSWindow-to-handle registry geometrically and initialize new slots.
+/** Grow the NSWindow-to-handle registry geometrically and initialize new slots. */
 static bool windowRefsGrow() {
     u32 nextCap = (s_refCap == 0) ? 8u : s_refCap * 2u;
-    WindowSlot *grown = (WindowSlot*) realloc(s_refs, (bytes) nextCap * sizeof(WindowSlot));
+    WindowSlot *grown = s_refs
+        ? (WindowSlot*) MemoryArena_realloc(Lifetime_arena(), s_refs, (bytes) nextCap * sizeof(WindowSlot))
+        : (WindowSlot*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, (bytes) nextCap * sizeof(WindowSlot));
     if (grown == nullptr)
         return false;
     for (u32 i = s_refCap; i < nextCap; i++) {
@@ -541,7 +695,7 @@ static bool windowRefsGrow() {
     return true;
 }
 
-// Resolve an id for a newly created window, or 0 when the table cannot grow.
+/** Resolve an id for a newly created window, or 0 when the table cannot grow. */
 static u32 windowIdAcquire(NSWindow *window, Window *handle) {
     if (s_refCap == 0 && !windowRefsGrow())
         return FOCUS_BROADCAST;
@@ -564,7 +718,7 @@ static u32 windowIdAcquire(NSWindow *window, Window *handle) {
     return FOCUS_BROADCAST;
 }
 
-// Clear the registry slot after native delegates and input routes are detached.
+/** Clear the registry slot after native delegates and input routes are detached. */
 static fn windowIdRelease(u32 id) {
     if (id != FOCUS_BROADCAST && id < s_refCap) {
         s_refs[id].window = nil;
@@ -572,7 +726,7 @@ static fn windowIdRelease(u32 id) {
     }
 }
 
-// Reverse lookup: which engine id does this OS window carry? 0 if unknown.
+/** Reverse lookup: which engine id does this OS window carry? 0 if unknown. */
 static u32 windowIdOf(NSWindow *window) {
     if (window == nil)
         return FOCUS_BROADCAST;
@@ -591,19 +745,21 @@ static Window *windowHandleOf(NSWindow *window) {
     return nullptr;
 }
 
-// Flipped content view so sublayers and Cocoa geometry natively speak
-// TOP-LEFT coordinates (matching darling Container_resolve layout 1:1). Also
-// tracks live-resize start/end onto the handle so Window_isLiveResizing works
-// without any GPU state.
-// setFrameSize: override: the SYNCHRONOUS per-step resize seam. AppKit calls
-// setFrameSize: on the content view inside the live-resize tracking loop,
-// immediately after the window frame changes and BEFORE the compositor draws
-// the new bounds — the same beat the old VulkanView used. Firing the resize
-// hook here closes the one-step gap: windowDidResize: (post-display) and the
-// pump reflection remain as idempotent backups (windowRefreshSize no-ops when
-// the rounded size is unchanged), but the drag-step chase now runs at geometry
-// time, so layer frame + drawableSize + the forced present land in the same
-// composite pass as the moved edge.
+/**
+ * Flipped content view so sublayers and Cocoa geometry natively speak
+ * TOP-LEFT coordinates (matching darling Container_resolve layout 1:1). Also
+ * tracks live-resize start/end onto the handle so Window_isLiveResizing works
+ * without any GPU state.
+ * setFrameSize: override: the SYNCHRONOUS per-step resize seam. AppKit calls
+ * setFrameSize: on the content view inside the live-resize tracking loop,
+ * immediately after the window frame changes and BEFORE the compositor draws
+ * the new bounds, the same beat the old VulkanView used. Firing the resize
+ * hook here closes the one-step gap: windowDidResize: (post-display) and the
+ * pump reflection remain as idempotent backups (windowRefreshSize no-ops when
+ * the rounded size is unchanged), but the drag-step chase now runs at geometry
+ * time, so layer frame + drawableSize + the forced present land in the same
+ * composite pass as the moved edge.
+ */
 static fn windowRefreshSize(Window *window);
 static fn windowRefreshOrigin(Window *window);
 static CGFloat windowBackingScale(const Window *window);
@@ -621,28 +777,32 @@ static CGFloat windowBackingScale(const Window *window);
     [super setFrameSize:newSize];
     Window *w = windowHandleOf([self window]);
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
-        fprintf(stderr, "sf: %.0fx%.0f\n", newSize.width, newSize.height);
+        fprint(stderr, "sf: ", newSize.width, "x", newSize.height);
     if (w) {
         u64 previousSizeGeneration = Window_sizeGeneration(w);
         windowRefreshSize(w);
-        // Repaint the WHOLE frame on EVERY geometry step, no exceptions. The
-        // public resize event speaks rounded logical points, so a drag step
-        // that crosses no rounding boundary still moves the seam's native
-        // pixels and must repaint — and a step AppKit never marked as a live
-        // resize must repaint too. The sizeGeneration compare fires the hook
-        // exactly once per step: a rounded-point change already ran it inside
-        // windowRefreshSize, every other step (fractional or non-live) runs it
-        // here. The hook itself no-ops when the seam is already in sync, so a
-        // redundant call is cheap; dropping a step is what leaves the trailing
-        // edge stale (the Continuous Real-Time Live Resize Law).
+        /**
+         * Repaint the WHOLE frame on EVERY geometry step, no exceptions. The
+         * public resize event speaks rounded logical points, so a drag step
+         * that crosses no rounding boundary still moves the seam's native
+         * pixels and must repaint, and a step AppKit never marked as a live
+         * resize must repaint too. The sizeGeneration compare fires the hook
+         * exactly once per step: a rounded-point change already ran it inside
+         * windowRefreshSize, every other step (fractional or non-live) runs it
+         * here. The hook itself no-ops when the seam is already in sync, so a
+         * redundant call is cheap; dropping a step is what leaves the trailing
+         * edge stale (the Continuous Real-Time Live Resize Law).
+         */
         if (Window_sizeGeneration(w) == previousSizeGeneration &&
             !atomic_load_explicit(Window_miniaturizingMut(w), memory_order_relaxed) &&
             ![[self window] isMiniaturized] && Window_resizeRenderFn(w))
             Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
-        // A drag off the top or left edge changes BOTH the content size and
-        // the window origin in the same tracking tick; refresh the origin here
-        // so onMoved fires per step alongside onResized (windowDidMove: is the
-        // post-display backup, exactly as windowDidResize: is for size).
+        /**
+         * A drag off the top or left edge changes BOTH the content size and
+         * the window origin in the same tracking tick; refresh the origin here
+         * so onMoved fires per step alongside onResized (windowDidMove: is the
+         * post-display backup, exactly as windowDidResize: is for size).
+         */
         windowRefreshOrigin(w);
     }
 }
@@ -661,9 +821,11 @@ static CGFloat windowBackingScale(const Window *window);
     if (w) {
         atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
-        // Final geometry reconciliation only: each live step already publishes
-        // its current extent. The Frame hook no-ops when this size is unchanged;
-        // no frozen drawable, delayed rebuild or mandatory settle frame exists.
+        /**
+         * Final geometry reconciliation only: each live step already publishes
+         * its current extent. The Frame hook no-ops when this size is unchanged;
+         * no frozen drawable, delayed rebuild or mandatory settle frame exists.
+         */
         if (Window_resizeRenderFn(w))
             Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
     }
@@ -671,7 +833,7 @@ static CGFloat windowBackingScale(const Window *window);
 }
 @end
 
-// App-level delegate: lets the process end when the last window closes.
+/** App-level delegate: lets the process end when the last window closes. */
 @interface WindowAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
@@ -683,9 +845,11 @@ static CGFloat windowBackingScale(const Window *window);
 }
 @end
 
-// Window-level delegate: this is how we learn the user clicked the close
-// button, resized, zoomed, or used the green orb. The pointers are (assign)
-// because the delegate must not own our C struct.
+/**
+ * Window-level delegate: this is how we learn the user clicked the close
+ * button, resized, zoomed, or used the green orb. The pointers are (assign)
+ * because the delegate must not own our C struct.
+ */
 @interface WindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic, assign) atomic_bool *shouldClosePtr;
 @property(nonatomic, assign) Window *handlePtr;
@@ -729,7 +893,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
-        fprintf(stderr, "dr:\n");
+        fprint(stderr, "dr:");
     if (w) {
         windowRefreshSize(w);
         windowRefreshOrigin(w);
@@ -741,7 +905,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     Window *w = self.handlePtr;
     if (getenv("VEX_GEOMETRY_LOG") != nullptr)
-        fprintf(stderr, "dm:\n");
+        fprint(stderr, "dm:");
     if (w)
         windowRefreshOrigin(w);
 }
@@ -782,8 +946,10 @@ static CGFloat windowBackingScale(const Window *window);
         atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
         windowRefreshOrigin(w);
-        // Same settle beat as viewDidEndLiveResize: geometry changed while
-        // the live flag was set, so force one hook pass with it clear.
+        /**
+         * Same settle beat as viewDidEndLiveResize: geometry changed while
+         * the live flag was set, so force one hook pass with it clear.
+         */
         if (Window_resizeRenderFn(w))
             Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
         WindowEvent_fireRestored(Window_lifecycleMut(w), w);
@@ -827,8 +993,10 @@ static CGFloat windowBackingScale(const Window *window);
     }
 }
 
-// Zoom-to-fill (green button / d64-click titlebar): publish the lifecycle
-// event before AppKit performs the standard-frame change.
+/**
+ * Zoom-to-fill (green button / d64-click titlebar): publish the lifecycle
+ * event before AppKit performs the standard-frame change.
+ */
 /** Publish the zoom-fill lifecycle event before AppKit applies the target frame. */
 - (BOOL)windowShouldZoom:(NSWindow*) sender toFrame:(NSRect)newFrame {
     (discard) sender;
@@ -839,10 +1007,12 @@ static CGFloat windowBackingScale(const Window *window);
     return YES;
 }
 
-// Occlusion flip (buried under windows / minimized / hidden Space / ordered
-// out): publish the lifecycle event with current visibility. An ordered-out
-// window reads zero state bits, so it reports not-visible and the renderer
-// rests. The notification itself is the flip signal — no extra cache.
+/**
+ * Occlusion flip (buried under windows / minimized / hidden Space / ordered
+ * out): publish the lifecycle event with current visibility. An ordered-out
+ * window reads zero state bits, so it reports not-visible and the renderer
+ * rests. The notification itself is the flip signal, no extra cache.
+ */
 /** Publish whether the native window is currently visible to the user. */
 - (discard)windowDidChangeOcclusionState:(NSNotification*) notification {
     (discard) notification;
@@ -867,9 +1037,11 @@ static CGFloat windowBackingScale(const Window *window) {
     return (s > 0.0) ? s : 1.0;
 }
 
-// Resize reflection (Native Pixel Law): content dimensions are cached and
-// fired in native physical display pixels. On Retina/HiDPI screens, convertRectToBacking
-// provides the exact hardware pixel size. Thread 0 only.
+/**
+ * Resize reflection (Native Pixel Law): content dimensions are cached and
+ * fired in native physical display pixels. On Retina/HiDPI screens, convertRectToBacking
+ * provides the exact hardware pixel size. Thread 0 only.
+ */
 static fn windowRefreshSize(Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -897,10 +1069,6 @@ static fn windowRefreshSize(Window *window) {
             atomic_store_explicit(Window_cachedHeightMut(window), ch, memory_order_relaxed);
             atomic_fetch_add_explicit(Window_sizeGenerationMut(window), 1, memory_order_release);
             WindowEvent_fireResized(Window_lifecycleMut(window), window, cw, ch);
-            // Genie gate: never render+present while the WindowServer is
-            // warping the window into or out of the dock — the seam present
-            // would target a moving/occluded surface. The deminiaturize path
-            // re-enters here AFTER the warp, so restore still renders.
             if (!atomic_load_explicit(Window_miniaturizingMut(window), memory_order_relaxed)
                     && ![nsw isMiniaturized]
                     && Window_resizeRenderFn(window))
@@ -909,13 +1077,15 @@ static fn windowRefreshSize(Window *window) {
     }
 }
 
-// Move reflection: top-left screen coords (the same space Window_setLocation
-// speaks) plus the CONTENT top-left (below the title bar) cached for
-// Window_getContentOrigin. Fires onMoved only when the top-left actually
-// changed, so a renderer polling once per frame pays two compares. Called from
-// the per-step setFrameSize: seam (a top/left-edge resize moves the origin in
-// the same tracking tick), from windowDidMove: (post-display backup), and from
-// the pump reflection pass. Thread 0 only.
+/**
+ * Move reflection: top-left screen coords (the same space Window_setLocation
+ * speaks) plus the CONTENT top-left (below the title bar) cached for
+ * Window_getContentOrigin. Fires onMoved only when the top-left actually
+ * changed, so a renderer polling once per frame pays two compares. Called from
+ * the per-step setFrameSize: seam (a top/left-edge resize moves the origin in
+ * the same tracking tick), from windowDidMove: (post-display backup), and from
+ * the pump reflection pass. Thread 0 only.
+ */
 static fn windowRefreshOrigin(Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -944,8 +1114,10 @@ static fn windowRefreshOrigin(Window *window) {
     }
 }
 
-// Mirror the OS key-window into the focus word AND the WindowEvent focus
-// slots (flips only). Thread 0 only, called at the end of each pump pass.
+/**
+ * Mirror the OS key-window into the focus word AND the WindowEvent focus
+ * slots (flips only). Thread 0 only, called at the end of each pump pass.
+ */
 static fn windowRefreshFocus(Window *window, NSWindow *keyWindow) {
     if (window == nullptr || Window_nsWindow(window) == nil)
         return;
@@ -959,7 +1131,7 @@ static fn windowRefreshFocus(Window *window, NSWindow *keyWindow) {
     }
 }
 
-// Mirror the OS display assignment into the atomic word; 0 means unmapped.
+/** Mirror the OS display assignment into the atomic word; 0 means unmapped. */
 static u32 resolveMonitorId(Window *window) {
     if (window == nullptr)
         return 0;
@@ -972,7 +1144,7 @@ static u32 resolveMonitorId(Window *window) {
     }
 }
 
-// Resolve and publish the screen identity currently carrying this window.
+/** Resolve and publish the screen identity currently carrying this window. */
 static fn windowRefreshMonitor(Window *window) {
     if (window == nullptr)
         return;
@@ -980,38 +1152,56 @@ static fn windowRefreshMonitor(Window *window) {
     atomic_store_explicit(Window_monitorIdMut(window), next, memory_order_relaxed);
 }
 
-// Re-centre the cursor during the pump while locked, so the warp registers
-// before the next event loop exit.
+/**
+ * Re-centre the cursor during the pump while locked, so the warp registers
+ * before the next event loop exit.
+ */
 static fn recenterIfLocked() {
     if (s_cursorLocked)
         CGWarpMouseCursorPosition(s_lockCenter);
 }
 
-// Content-area coordinates (top-left origin) for a mouse event in physical pixels (Native Pixel Law).
-// Events that miss every window fall back to raw screen-space values.
-static fn mouseLocation(NSEvent *event, d64 *outX, d64 *outY) {
-    NSPoint p = [event locationInWindow];
+/** Reports whether a mouse event's location lies inside its target window's content view. */
+static bool mouseInContentBounds(NSEvent *event) {
     NSWindow *eventWindow = [event window];
-    CGFloat scale = 1.0;
-    if (eventWindow) {
-        scale = [eventWindow backingScaleFactor];
-        if (scale <= 0.0)
-            scale = 1.0;
-        NSView *cv = [eventWindow contentView];
-        if (cv != nil) {
-            NSPoint pt = [cv convertPoint:p fromView:nil];
-            *outX = (d64) pt.x * (d64) scale;
-            *outY = (d64) pt.y * (d64) scale;
-            return;
-        }
-        NSRect content = [eventWindow contentRectForFrameRect:[eventWindow frame]];
-        p.y = content.size.height - p.y;
+    if (eventWindow == nil)
+        return false;
+    NSView *cv = [eventWindow contentView];
+    if (cv == nil)
+        return false;
+    NSPoint pt = [cv convertPoint:[event locationInWindow] fromView:nil];
+    return NSPointInRect(pt, [cv bounds]);
+}
+
+/**
+ * Content-area coordinates (top-left origin) for a mouse event in physical pixels (Native Pixel Law).
+ * Events without an owning window report (-1, -1) instead of leaking raw screen-space coordinates.
+ */
+static fn mouseLocation(NSEvent *event, d64 *outX, d64 *outY) {
+    NSWindow *eventWindow = [event window];
+    if (eventWindow == nil) {
+        *outX = -1.0;
+        *outY = -1.0;
+        return;
     }
+    NSPoint p = [event locationInWindow];
+    CGFloat scale = [eventWindow backingScaleFactor];
+    if (scale <= 0.0)
+        scale = 1.0;
+    NSView *cv = [eventWindow contentView];
+    if (cv != nil) {
+        NSPoint pt = [cv convertPoint:p fromView:nil];
+        *outX = (d64) pt.x * (d64) scale;
+        *outY = (d64) pt.y * (d64) scale;
+        return;
+    }
+    NSRect content = [eventWindow contentRectForFrameRect:[eventWindow frame]];
+    p.y = content.size.height - p.y;
     *outX = (d64) p.x * (d64) scale;
     *outY = (d64) p.y * (d64) scale;
 }
 
-// Map an NSTouch phase onto the Touch_* action codes.
+/** Map an NSTouch phase onto the Touch_* action codes. */
 static i32 touchAction(NSTouchPhase phase) {
     if (phase & NSTouchPhaseBegan)
         return TOUCH_DOWN;
@@ -1022,9 +1212,11 @@ static i32 touchAction(NSTouchPhase phase) {
     return TOUCH_CANCEL;
 }
 
-// Feed one gesture/touch carrier event into input.Touch: resolve each active
-// touch into its slot (identity hash % TOUCH_MAX), normalize position into
-// content coords, and estimate pressure from the resting flag.
+/**
+ * Feed one gesture/touch carrier event into input.Touch: resolve each active
+ * touch into its slot (identity hash % TOUCH_MAX), normalize position into
+ * content coords, and estimate pressure from the resting flag.
+ */
 static fn dispatchTouches(NSEvent *event, u32 wid) {
     NSWindow *eventWindow = [event window];
     if (eventWindow == nil)
@@ -1052,15 +1244,16 @@ static fn dispatchTouches(NSEvent *event, u32 wid) {
     }
 }
 
-// Intercept-and-forward: read everything the engine cares about off each OS
-// event, push it into the input modules, then hand the event back to AppKit
-// so the responder chain keeps working. This is the Thread-0 producer side of
-// the input pipeline.
+/**
+ * Intercept-and-forward: read everything the engine cares about off each OS
+ * event, push it into the input modules, then hand the event back to AppKit
+ * so the responder chain keeps working. This is the Thread-0 producer side of
+ * the input pipeline.
+ */
 static fn routeEvent(NSEvent *event) {
     NSEventType type = [event type];
     u32 wid = windowIdOf([event window]);
 
-    // Disabled windows receive nothing: events never enter the device rings.
     Window *target = (wid != FOCUS_BROADCAST) ? windowHandleOf([event window]) : nullptr;
     if (target && !atomic_load_explicit(Window_enabledMut(target), memory_order_relaxed))
         return;
@@ -1094,21 +1287,17 @@ static fn routeEvent(NSEvent *event) {
         case NSEventTypeKeyUp: {
             NSEventModifierFlags flags = [event modifierFlags];
             bool cmd = (flags & NSEventModifierFlagCommand) != 0;
-            if (cmd != (Key_isDown(KEY_LEFT_SUPER) || Key_isDown(KEY_RIGHT_SUPER))) {
+            if (cmd != (Key_isDown(KEY_LEFT_SUPER) || Key_isDown(KEY_RIGHT_SUPER)))
                 Key_pushEvent(wid, KEY_LEFT_SUPER, cmd ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
-            }
             bool ctrl = (flags & NSEventModifierFlagControl) != 0;
-            if (ctrl != (Key_isDown(KEY_LEFT_CONTROL) || Key_isDown(KEY_RIGHT_CONTROL))) {
+            if (ctrl != (Key_isDown(KEY_LEFT_CONTROL) || Key_isDown(KEY_RIGHT_CONTROL)))
                 Key_pushEvent(wid, KEY_LEFT_CONTROL, ctrl ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
-            }
             bool alt = (flags & NSEventModifierFlagOption) != 0;
-            if (alt != (Key_isDown(KEY_LEFT_ALT) || Key_isDown(KEY_RIGHT_ALT))) {
+            if (alt != (Key_isDown(KEY_LEFT_ALT) || Key_isDown(KEY_RIGHT_ALT)))
                 Key_pushEvent(wid, KEY_LEFT_ALT, alt ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
-            }
             bool shift = (flags & NSEventModifierFlagShift) != 0;
-            if (shift != (Key_isDown(KEY_LEFT_SHIFT) || Key_isDown(KEY_RIGHT_SHIFT))) {
+            if (shift != (Key_isDown(KEY_LEFT_SHIFT) || Key_isDown(KEY_RIGHT_SHIFT)))
                 Key_pushEvent(wid, KEY_LEFT_SHIFT, shift ? KEY_ACTION_DOWN : KEY_ACTION_UP, kTapThresholdNanos);
-            }
             i16 macCode = [event keyCode];
             if (macCode >= 0 && macCode < 128) {
                 i32 stdKey = macKeyMap[macCode];
@@ -1129,9 +1318,6 @@ static fn routeEvent(NSEvent *event) {
         }
 
         case NSEventTypeScrollWheel: {
-            // A scroll can be the first event after entering the window. Feed
-            // its own pointer location before the wheel delta so hit-testing
-            // does not rely on an earlier MouseMoved event.
             d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
@@ -1146,6 +1332,8 @@ static fn routeEvent(NSEvent *event) {
         case NSEventTypeLeftMouseDown:
         case NSEventTypeRightMouseDown:
         case NSEventTypeOtherMouseDown: {
+            if (!mouseInContentBounds(event))
+                break;
             i32 button = (type == NSEventTypeLeftMouseDown) ? MOUSE_LEFT
                        : ((type == NSEventTypeRightMouseDown) ? MOUSE_RIGHT
                                                               : (i32) [event buttonNumber]);
@@ -1182,11 +1370,17 @@ static fn routeEvent(NSEvent *event) {
                 Mouse_pushMoveDeltaEvent(wid, [event deltaX] * (d64) scale, [event deltaY] * (d64) scale);
                 break;
             }
-            d64 x, y;
-            mouseLocation(event, &x, &y);
             if (type == NSEventTypeMouseMoved) {
-                Mouse_pushMoveEvent(wid, x, y);
-            } else {
+                if (mouseInContentBounds(event)) {
+                    d64 x, y;
+                    mouseLocation(event, &x, &y);
+                    Mouse_pushMoveEvent(wid, x, y);
+                } else {
+                    Mouse_pushMoveEvent(wid, -1.0, -1.0);
+                }
+            } else if ([event window] != nil) {
+                d64 x, y;
+                mouseLocation(event, &x, &y);
                 i32 button = (type == NSEventTypeLeftMouseDragged) ? MOUSE_LEFT
                            : ((type == NSEventTypeRightMouseDragged) ? MOUSE_RIGHT
                                                                       : (i32) [event buttonNumber]);
@@ -1206,17 +1400,21 @@ static fn routeEvent(NSEvent *event) {
     }
 }
 
-// Drain the OS event queue. Called every frame from the engine loop (the
-// "poll" half of poll-then-tick). Returns immediately; never blocks. After
-// the pump, mirror the OS's key window into the focus word so the rest of
-// the engine can ask "who is focused?" without touching AppKit.
+/**
+ * Drain the OS event queue. Called every frame from the engine loop (the
+ * "poll" half of poll-then-tick). Returns immediately; never blocks. After
+ * the pump, mirror the OS's key window into the focus word so the rest of
+ * the engine can ask "who is focused?" without touching AppKit.
+ */
 static NSWindow *sLastWindow = nil;
-// Key-window claim pending: set by Window_show/Window_focus, drained by the
-// pump once the app is active and the claim sticks.
+/**
+ * Key-window claim pending: set by Window_show/Window_focus, drained by the
+ * pump once the app is active and the claim sticks.
+ */
 static NSWindow *sPendingKeyWindow = nil;
-static WindowAppDelegate *sAppDelegate = nil; // one app delegate for the whole process
+static WindowAppDelegate *sAppDelegate = nil; /** one app delegate for the whole process */
 
-// Drain AppKit events non-blockingly, optionally stopping after one event.
+/** Drain AppKit events non-blockingly, optionally stopping after one event. */
 static bool windowPollEvents(bool singleStep) {
     bool more = false;
     @autoreleasepool {
@@ -1249,7 +1447,6 @@ static bool windowPollEvents(bool singleStep) {
             }
         }
 
-        // Reflection pass: size/move/focus/monitor mirroring per live window.
         NSWindow *keyWindow = [NSApp keyWindow];
         for (u32 i = 1; i < s_refCap; i++) {
             NSWindow *w = s_refs[i].window;
@@ -1260,32 +1457,28 @@ static bool windowPollEvents(bool singleStep) {
                 continue;
             windowRefreshSize(handle);
 
-            // Move reflection: top-left screen coords, same space
-            // Window_setLocation speaks; fires onMoved on a real change.
             windowRefreshOrigin(handle);
 
-            // Focus flip: mirror the OS spotlight into the WindowEvent slots.
             windowRefreshFocus(handle, keyWindow);
-            // Monitor mirror: resolve the carrying display, flip the atomic.
             windowRefreshMonitor(handle);
         }
     }
     return more;
 }
 
-// Drain the process-wide AppKit queue and refresh registered window state.
+/** Drain the process-wide AppKit queue and refresh registered window state. */
 fn Window_pollEvents() {
     (discard) windowPollEvents(false);
 }
 
-// Dispatch at most one AppKit event and report whether another remains queued.
+/** Dispatch at most one AppKit event and report whether another remains queued. */
 bool Window_pollEventStep() {
     return windowPollEvents(true);
 }
 
-// Wait for one process-wide AppKit event for the requested bounded interval.
+/** Wait for one process-wide AppKit event for the requested bounded interval. */
 fn Window_waitEvents(Window *window, i32 timeoutMs) {
-    (discard) window;   // the AppKit event pump is process-wide
+    (discard) window;
     @autoreleasepool {
         NSDate *until = timeoutMs > 0
             ? [NSDate dateWithTimeIntervalSinceNow:(d64) timeoutMs / 1000.0]
@@ -1304,9 +1497,11 @@ fn Window_waitEvents(Window *window, i32 timeoutMs) {
     }
 }
 
-// Key-gate window subclass: while a modal dialog holds its parent, the
-// parent's C flag flips and AppKit itself refuses it key — no focus flash,
-// no input gap, no yank-back. Render + ordering are untouched (only key).
+/**
+ * Key-gate window subclass: while a modal dialog holds its parent, the
+ * parent's C flag flips and AppKit itself refuses it key, no focus flash,
+ * no input gap, no yank-back. Render + ordering are untouched (only key).
+ */
 @interface VexWindow : NSWindow
 @property (assign, nonatomic) Window *vexHandle;
 @end
@@ -1320,8 +1515,10 @@ fn Window_waitEvents(Window *window, i32 timeoutMs) {
     return [super canBecomeKeyWindow];
 }
 
-// The standard titlebar strip height (points). A FullSizeContentView window
-// reports a zero titlebar inset, so fall back to the platform's ~28pt strip.
+/**
+ * The standard titlebar strip height (points). A FullSizeContentView window
+ * reports a zero titlebar inset, so fall back to the platform's ~28pt strip.
+ */
 - (CGFloat)vexTitlebarHeight {
     NSRect frame = self.frame;
     NSRect content = [self contentRectForFrameRect:frame];
@@ -1331,17 +1528,19 @@ fn Window_waitEvents(Window *window, i32 timeoutMs) {
     return h > 0.0 ? h : 28.0;
 }
 
-// Titlebar d64-click is the accessibility affordance Windows ships as the
-// maximize (square) button, and macOS ships as the green zoom. On a NAKED /
-// full-size-content window the title bar is transparent, so AppKit's own
-// d64-click target is nearly unhittable — catch it explicitly. A plain
-// d64-click zooms (fills the visible frame, the macOS maximize); an
-// Option-d64-click enters fullscreen. Both are no-ops if already there.
-//
-// The resize border keeps its own behavior: when the pointer is on an edge or
-// corner (the up-down / diagonal resize cursor), the d64-click stays a
-// directional resize and we do not intercept — only the title-bar interior
-// (normal cursor) maximizes.
+/**
+ * Titlebar d64-click is the accessibility affordance Windows ships as the
+ * maximize (square) button, and macOS ships as the green zoom. On a NAKED /
+ * full-size-content window the title bar is transparent, so AppKit's own
+ * d64-click target is nearly unhittable, catch it explicitly. A plain
+ * d64-click zooms (fills the visible frame, the macOS maximize); an
+ * Option-d64-click enters fullscreen. Both are no-ops if already there.
+ *
+ * The resize border keeps its own behavior: when the pointer is on an edge or
+ * corner (the up-down / diagonal resize cursor), the d64-click stays a
+ * directional resize and we do not intercept, only the title-bar interior
+ * (normal cursor) maximizes.
+ */
 static const CGFloat kWindowResizeBorderPoints = 6.0;
 
 /** Route titlebar d64-click gestures before ordinary AppKit event delivery. */
@@ -1366,13 +1565,15 @@ static const CGFloat kWindowResizeBorderPoints = 6.0;
 }
 @end
 
-// Build the NSWindow + C handle. Shared by every constructor. The window is
-// created HIDDEN — visibility is an explicit Window_show() decision, so
-// construct -> mutate -> show never flashes a half-configured window.
-// Initial placement also happens here (not via a post-creation move):
-// creating already-placed keeps AppKit's move tracker quiet — a
-// setFrameOrigin: on a never-shown window logs "move completed
-// without beginning".
+/**
+ * Build the NSWindow + C handle. Shared by every constructor. The window is
+ * created HIDDEN, visibility is an explicit Window_show() decision, so
+ * construct  to  mutate  to  show never flashes a half-configured window.
+ * Initial placement also happens here (not via a post-creation move):
+ * creating already-placed keeps AppKit's move tracker quiet, a
+ * setFrameOrigin: on a never-shown window logs "move completed
+ * without beginning".
+ */
 static Window *windowAlloc(const WindowDesc *desc) {
     @autoreleasepool {
         if (NSApp == nil)
@@ -1388,8 +1589,6 @@ static Window *windowAlloc(const WindowDesc *desc) {
                                 | NSWindowStyleMaskMiniaturizable
                                 | NSWindowStyleMaskResizable;
 
-        // Native Pixel Law: desc->width and desc->height are in native physical display pixels.
-        // Convert to AppKit user points using the target screen's backingScaleFactor.
         CGFloat scale = [NSScreen mainScreen] ? [[NSScreen mainScreen] backingScaleFactor] : 1.0;
         if (scale <= 0.0)
             scale = 1.0;
@@ -1425,33 +1624,26 @@ static Window *windowAlloc(const WindowDesc *desc) {
         [contentView setWantsLayer:YES];
         [window setContentView:contentView];
 
-        // A dedicated draw view on TOP of the content view. Presents land here;
-        // a backdrop-blur effect view (Window_setBackdropBlur) sits behind it.
         NSView *glView = [[NSView alloc] initWithFrame:contentView.bounds];
         [glView setWantsLayer:YES];
         [glView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [contentView addSubview:glView];
 
-        // Green traffic light enters native fullscreen.
         [window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
 
-        // Live resize never stretches preserved content (the Continuous
-        // Real-Time Live Resize Law).
         [window setPreservesContentDuringLiveResize:NO];
 
-        // Hover delivery: without this, MouseMoved only fires mid-drag and
-        // darling hover is dead on arrival. The Mouse ring gets every move.
         [window setAcceptsMouseMovedEvents:YES];
 
-        // Trackpad touch delivery: the content view must opt in.
         [window.contentView setAllowedTouchTypes:NSTouchTypeMaskDirect | NSTouchTypeMaskIndirect];
 
         WindowDelegate *delegate = [[WindowDelegate alloc] init];
         [window setDelegate:delegate];
 
-        Window *w = (Window*) calloc(1, sizeof(Window));
+        Window *w = (Window*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(Window));
         if (w == nullptr)
             return nullptr;
+        memset((any) w, 0, sizeof(Window));
         Window_setNsWindow(w, window);
         window.vexHandle = w;
         Window_setGlView(w, glView);
@@ -1485,9 +1677,7 @@ static Window *windowAlloc(const WindowDesc *desc) {
         Window_setLastFocused(w, false);
         atomic_store_explicit(Window_monitorIdMut(w), 0, memory_order_relaxed);
         Window_setCursorTypeRaw(w, WINDOW_CURSOR_DEFAULT);
-        // Traffic-light chrome controller (all three lights visible by default).
-        // Created against the NSWindow; nullptr only if calloc fails.
-        Window_setTrafficLights(w, TrafficLight_create((__bridge any) window));
+        Window_setTrafficLights(w, TrafficLight((__bridge any) window));
         Window_setResizeRenderFnRaw(w, nullptr);
         Window_setResizeRenderUserdata(w, nullptr);
         Window_setIdRaw(w, windowIdAcquire(window, w));
@@ -1500,10 +1690,17 @@ static Window *windowAlloc(const WindowDesc *desc) {
     }
 }
 
-// Merge a caller's Desc over the defaults. Unset (zero) fields fall back —
-// this is what makes partial designated initializers behave like overloads.
+/**
+ * Merge a caller's Desc over the defaults. Unset (zero) fields fall back,
+ * this is what makes partial designated initializers behave like overloads.
+ */
 static WindowDesc descResolve(const WindowDesc *desc) {
-    WindowDesc d = { .title = "vex", .width = 800, .height = 600, .x = 0, .y = 0, .centered = true };
+    WindowDesc d;
+    memset(&d, 0, sizeof(d));
+    d.title = "vex";
+    d.width = 800;
+    d.height = 600;
+    d.centered = true;
     if (desc == nullptr)
         return d;
     if (WindowDesc_title(desc))
@@ -1513,8 +1710,6 @@ static WindowDesc descResolve(const WindowDesc *desc) {
     if (WindowDesc_height(desc) > 0)
         d.height = WindowDesc_height(desc);
     if (WindowDesc_x(desc) != 0 || WindowDesc_y(desc) != 0) {
-        // Explicit placement defeats the centered default (a zeroed Desc
-        // cannot express "top-left", so centered wins ties — documented).
         d.x = WindowDesc_x(desc);
         d.y = WindowDesc_y(desc);
         d.centered = false;
@@ -1523,46 +1718,39 @@ static WindowDesc descResolve(const WindowDesc *desc) {
     return d;
 }
 
-// --- Constructors -----------------------------------------------------------
+/** --- Constructors ----------------------------------------------------------- */
 
-// Construct a default AppKit window through the common descriptor path.
+/** Construct a default AppKit window through the common descriptor path. */
 Window *Window_0() {
     return Window_new(nullptr);
 }
 
-// Construct a window descriptor with the requested title and default dimensions.
-Window *Window_1(const char *title) {
+/** Construct a window descriptor with the requested title and default dimensions. */
+Window *Window_1(string title) {
     return Window_new(&(WindowDesc){ .title = title });
 }
 
-// Construct a window descriptor with a title and explicit content dimensions.
-Window *Window_3(const char *title, i32 width, i32 height) {
+/** Construct a window descriptor with a title and explicit content dimensions. */
+Window *Window_3(string title, i32 width, i32 height) {
     return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
 }
 
-// Resolve descriptor defaults, allocate the AppKit window, and show on request.
+/** Resolve descriptor defaults, allocate the AppKit window, and show on request. */
 Window *Window_new(const WindowDesc *desc) {
     WindowDesc d = descResolve(desc);
     Window *w = windowAlloc(&d);
     if (w == nullptr)
         return nullptr;
-    // Placement already happened inside windowAlloc (centered default or the
-    // caller's x/y) — no post-creation move, so AppKit's move tracker stays
-    // quiet. Window_center/Window_setLocation remain for later re-placement
-    // of a live window.
     if (d.shown)
         Window_show(w);
     return w;
 }
 
-// Preserve the legacy constructor spelling by forwarding to Window_new.
-Window *Window_create(const char *title, i32 width, i32 height) {
-    return Window_new(&(WindowDesc){ .title = title, .width = width, .height = height });
-}
-
-// Tear down the window and free the handle. Safe to call whether the user
-// already closed the window or not: if it's still open we close it, and we
-// detach the delegate first so no callback can touch our freed memory.
+/**
+ * Tear down the window and free the handle. Safe to call whether the user
+ * already closed the window or not: if it's still open we close it, and we
+ * detach the delegate first so no callback can touch our freed memory.
+ */
 fn Window_destroy(Window *window) {
     if (window == nullptr)
         return;
@@ -1572,47 +1760,47 @@ fn Window_destroy(Window *window) {
         if (sPendingKeyWindow == nsw)
             sPendingKeyWindow = nil;
         [nsw setDelegate:nil];
-        [nsw close]; // flag-only close requests may still have a native window
+        [nsw close];
         Key_detachWindowAll(wid);
         Mouse_detachWindowAll(wid);
         Touch_detachWindowAll(wid);
         TrafficLight_destroy(Window_trafficLights(window));
         windowIdRelease(wid);
     }
-    free(window);
+    MemoryArena_free(Lifetime_arena(), window);
 }
 
-// Destroy each registered window while its delegate and handle are still valid.
+/** Destroy each registered window while its delegate and handle are still valid. */
 fn Window_destroyAll() {
     if (s_refs == nullptr || s_refCap == 0)
         return;
     for (u32 i = 1; i < s_refCap; i++) {
         Window *handle = s_refs[i].handle;
-        if (handle != nullptr) {
+        if (handle != nullptr)
             Window_destroy(handle);
-        }
     }
 }
 
-// Read the close latch, treating a missing window as already closed.
+/** Read the close latch, treating a missing window as already closed. */
 bool Window_shouldClose(Window *window) {
     return window ? atomic_load_explicit(Window_shouldClosePtr(window), memory_order_relaxed) : true;
 }
 
-// Set the close latch observed by the host lifecycle loop.
+/** Set the close latch observed by the host lifecycle loop. */
 fn Window_setShouldClose(Window *window, bool shouldClose) {
     if (window != nullptr)
         atomic_store_explicit(Window_shouldCloseMut(window), shouldClose, memory_order_relaxed);
 }
 
-// Ask AppKit to close the native window and set the C-side close latch.
+/** Ask AppKit to close the native window and set the C-side close latch. */
 fn Window_close(Window *window) {
-    if (!window) return;
+    if (!window)
+        return;
     @autoreleasepool { [Window_nsWindow(window) close]; }
     atomic_store_explicit(Window_shouldCloseMut(window), true, memory_order_relaxed);
 }
 
-// --- Present policy (pure state; a future render path consumes it) ----------
+/** --- Present policy (pure state; a future render path consumes it) ---------- */
 
 fn Window_setPresentMode(Window *window, i32 mode) {
     if (window == nullptr)
@@ -1622,14 +1810,14 @@ fn Window_setPresentMode(Window *window, i32 mode) {
         atomic_fetch_add_explicit(Window_renderGenerationMut(window), 1, memory_order_release);
 }
 
-// Read the stored present policy, defaulting to FIFO for a null handle.
+/** Read the stored present policy, defaulting to FIFO for a null handle. */
 i32 Window_getPresentMode(const Window *window) {
     if (window == nullptr)
         return WINDOW_PRESENT_FIFO;
     return atomic_load_explicit(Window_presentModePtr(window), memory_order_relaxed);
 }
 
-// Update the stored transparency policy and advance the render generation on change.
+/** Update the stored transparency policy and advance the render generation on change. */
 fn Window_setTransparent(Window *window, bool transparent) {
     if (window == nullptr)
         return;
@@ -1638,48 +1826,48 @@ fn Window_setTransparent(Window *window, bool transparent) {
         atomic_fetch_add_explicit(Window_renderGenerationMut(window), 1, memory_order_release);
 }
 
-// Read the stored transparency policy, returning false for a null handle.
+/** Read the stored transparency policy, returning false for a null handle. */
 bool Window_isTransparent(const Window *window) {
     return window ? atomic_load_explicit(Window_transparentPtr(window), memory_order_relaxed) : false;
 }
 
-// Read the policy generation used by downstream render-resource rebuilds.
+/** Read the policy generation used by downstream render-resource rebuilds. */
 u64 Window_renderGeneration(const Window *window) {
     return window ? atomic_load_explicit(Window_renderGenerationPtr(window), memory_order_acquire) : 0;
 }
 
-// --- Graphics board slots (stored + ordered; rendering lives elsewhere) -----
+/** --- Graphics board slots (stored + ordered; rendering lives elsewhere) ----- */
 
-// ;;INTENTION("Graphics board slots and layer ordering are GPU-era stubs retired per the Window Decoupling Law. A Window is a dumb presentation surface; graphics layers and surfaces are managed by graphvex.")
+/** ;;INTENTION("Graphics board slots and layer ordering are GPU-era stubs retired per the Window Decoupling Law. A Window is a dumb presentation surface; graphics layers and surfaces are managed by graphvex.") */
 fn Window_orderLayers(Window *window) {
     (discard) window;
 }
 
-// Retain the retired lower-layer setter as an inert compatibility seam.
+/** Retain the retired lower-layer setter as an inert compatibility seam. */
 fn Window_setBottomLayer(Window *window, any layer) {
     (discard) window;
     (discard) layer;
 }
 
-// Return no layer because the lean window no longer owns graphics layers.
+/** Return no layer because the lean window no longer owns graphics layers. */
 any Window_getBottomLayer(const Window *window) {
     (discard) window;
     return nullptr;
 }
 
-// Retain the retired upper-layer setter as an inert compatibility seam.
+/** Retain the retired upper-layer setter as an inert compatibility seam. */
 fn Window_setTopLayer(Window *window, any layer) {
     (discard) window;
     (discard) layer;
 }
 
-// Return no layer because the lean window no longer owns graphics layers.
+/** Return no layer because the lean window no longer owns graphics layers. */
 any Window_getTopLayer(const Window *window) {
     (discard) window;
     return nullptr;
 }
 
-// ;;INTENTION("Pane/board compositing was the GPU-era shim's job; on this window it is inert (still-unmigrated darling compositor retains the call). Pane work migrates to the render personal' own pass; retires together with the composite seam.")
+/** ;;INTENTION("Pane/board compositing was the GPU-era shim's job; on this window it is inert (still-unmigrated darling compositor retains the call). Pane work migrates to the render personal' own pass; retires together with the composite seam.") */
 bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
     (discard) window;
     (discard) panel;
@@ -1688,7 +1876,7 @@ bool Window_attachPanes(Window *window, Panel *panel, i32 width, i32 height) {
     return false;
 }
 
-// Retain the retired pane API as an inert failure on the lean window backend.
+/** Retain the retired pane API as an inert failure on the lean window backend. */
 bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
     (discard) window;
     (discard) panel;
@@ -1697,18 +1885,18 @@ bool Window_resizePanes(Window *window, Panel *panel, i32 width, i32 height) {
     return false;
 }
 
-// Keep the retired pane-compositor entry point linkable without rendering.
+/** Keep the retired pane-compositor entry point linkable without rendering. */
 fn Window_compositePanes(Window *window, Panel *contentPanel) {
     (discard) window;
     (discard) contentPanel;
 }
 
-// Keep the retired board-compositor entry point linkable without rendering.
+/** Keep the retired board-compositor entry point linkable without rendering. */
 fn Window_compositeBoards(Window *window) {
     (discard) window;
 }
 
-// --- Runtime state ----------------------------------------------------------
+/** --- Runtime state ---------------------------------------------------------- */
 
 fn Window_setEnabled(Window *window, bool enabled) {
     if (window == nullptr)
@@ -1716,15 +1904,13 @@ fn Window_setEnabled(Window *window, bool enabled) {
     atomic_store_explicit(Window_enabledMut(window), enabled, memory_order_relaxed);
 }
 
-// Read whether OS input forwarding is enabled for this window.
+/** Read whether OS input forwarding is enabled for this window. */
 bool Window_isEnabled(const Window *window) {
     return window ? atomic_load_explicit(Window_enabledPtr(window), memory_order_relaxed) : false;
 }
 
-// Read live-resize state, including the file-local diagnostic override seam.
+/** Read live-resize state, including the file-local diagnostic override seam. */
 bool Window_isLiveResizing(const Window *window) {
-    // LOCAL DIAGNOSTIC SEAM ONLY (never commit): /tmp/vex_live existing
-    // forces live mode so the modal-drag path reproduces without a mouse.
     FILE *probe = fopen("/tmp/vex_live", "r");
     if (probe) {
         fclose(probe);
@@ -1733,19 +1919,21 @@ bool Window_isLiveResizing(const Window *window) {
     return window ? atomic_load_explicit(Window_liveResizingPtr(window), memory_order_relaxed) : false;
 }
 
-// --- Chrome / state API -----------------------------------------------------
+/** --- Chrome / state API ----------------------------------------------------- */
 
 static NSWindowStyleMask styleMaskOf(Window *window) {
     return [Window_nsWindow(window) styleMask];
 }
 
-// Test whether the native window's current style mask contains the requested bit.
+/** Test whether the native window's current style mask contains the requested bit. */
 static bool hasStyleBit(Window *window, NSWindowStyleMask bit) {
     return (styleMaskOf(window) & bit) != 0;
 }
 
-// Single mask-rewrite path for all capability toggles. While native fullscreen
-// AppKit owns the mask, so style mutations are skipped then.
+/**
+ * Single mask-rewrite path for all capability toggles. While native fullscreen
+ * AppKit owns the mask, so style mutations are skipped then.
+ */
 static fn updateStyleMask(Window *window, NSWindowStyleMask add, NSWindowStyleMask clear) {
     NSWindowStyleMask mask = styleMaskOf(window);
     if ((mask & NSWindowStyleMaskFullScreen) != 0)
@@ -1753,30 +1941,28 @@ static fn updateStyleMask(Window *window, NSWindowStyleMask add, NSWindowStyleMa
     [Window_nsWindow(window) setStyleMask:(mask & ~clear) | add];
 }
 
-// Re-apply the traffic-light chrome through the segregated TrafficLight class
-// (window/traffic_light.h): per-button visibility, then re-seat the cluster
-// offset relative to the native layout (snapshotted on first touch; the
-// snapshot is invalidated whenever the style mask changes). Pure public AppKit
-// (standardWindowButton: + setHidden:/setFrameOrigin:) — no private API.
-// BORDERLESS windows own no lights to re-seat. Null-safe.
+/**
+ * Re-apply the traffic-light chrome through the segregated TrafficLight class
+ * (window/traffic_light.h): per-button visibility, then re-seat the cluster
+ * offset relative to the native layout (snapshotted on first touch; the
+ * snapshot is invalidated whenever the style mask changes). Pure public AppKit
+ * (standardWindowButton: + setHidden:/setFrameOrigin:), no private API.
+ * BORDERLESS windows own no lights to re-seat. Null-safe.
+ */
 static fn refreshChrome(Window *w) {
     if (w == nullptr)
         return;
     TrafficLight_refresh(Window_trafficLights(w));
 }
 
-// Set the AppKit title and reapply hidden-title chrome when required.
-fn Window_setTitle(Window *window, const char *title) {
+/** Set the AppKit title and reapply hidden-title chrome when required. */
+fn Window_setTitle(Window *window, string title) {
     if (window == nullptr || title == nullptr)
         return;
     @autoreleasepool {
         NSWindow *nsw = Window_nsWindow(window);
         [nsw setTitle:[NSString stringWithUTF8String:title]];
 
-        // macOS 15+ re-reveals the native title view whenever the title string
-        // changes, even when titleVisibility is hidden. Re-apply the hidden
-        // state for FullSizeContentView (NAKED) windows, then re-seat the
-        // traffic-light chrome so a title change can't resurrect hidden lights.
         if ((styleMaskOf(window) & NSWindowStyleMaskFullSizeContentView) != 0) {
             [nsw setTitlebarAppearsTransparent:YES];
             [nsw setTitleVisibility:NSWindowTitleHidden];
@@ -1785,21 +1971,21 @@ fn Window_setTitle(Window *window, const char *title) {
     }
 }
 
-// Read the cached content width in native physical pixels.
+/** Read the cached content width in native physical pixels. */
 i32 Window_width(Window *window) {
     if (window == nullptr)
         return 0;
     return atomic_load_explicit(Window_cachedWidthMut(window), memory_order_relaxed);
 }
 
-// Read the cached content height in native physical pixels.
+/** Read the cached content height in native physical pixels. */
 i32 Window_height(Window *window) {
     if (window == nullptr)
         return 0;
     return atomic_load_explicit(Window_cachedHeightMut(window), memory_order_relaxed);
 }
 
-// Convert requested physical dimensions to AppKit points and resize the content.
+/** Convert requested physical dimensions to AppKit points and resize the content. */
 fn Window_setSize(Window *window, i32 width, i32 height) {
     if (window == nullptr || width <= 0 || height <= 0)
         return;
@@ -1812,12 +1998,60 @@ fn Window_setSize(Window *window, i32 width, i32 height) {
     }
 }
 
-// Return the current AppKit backing scale factor for the window or main screen.
+/** Return the current AppKit backing scale factor for the window or main screen. */
 f32 Window_getScale(const Window *window) {
     return (f32) windowBackingScale(window);
 }
 
-// Reconcile scale, physical size, screen origin, and monitor after display changes.
+static CGDirectDisplayID windowDisplayId(const Window *window) {
+    NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
+    NSScreen *screen = nsw != nil ? [nsw screen] : nil;
+    if (screen == nil)
+        screen = [NSScreen mainScreen];
+    if (screen != nil) {
+        NSNumber *num = [[screen deviceDescription] objectForKey:@"NSScreenNumber"];
+        if (num != nil)
+            return (CGDirectDisplayID) [num unsignedIntValue];
+    }
+    return CGMainDisplayID();
+}
+
+/** Query the carrying display's true physical dimensions in millimeters. */
+fn Window_getPhysicalSizeMM(const Window *window, f32 *outWidthMM, f32 *outHeightMM) {
+    CGSize mm = CGDisplayScreenSize(windowDisplayId(window));
+    if (outWidthMM)
+        *outWidthMM = (f32) mm.width;
+    if (outHeightMM)
+        *outHeightMM = (f32) mm.height;
+}
+
+/**
+ * Compute backing pixels per Frame unit anchored to the actual physical screen
+ * (110 PPI desktop reference), independent of macOS More Space / Larger Text settings.
+ */
+f32 Window_getPhysicalScale(const Window *window) {
+    @autoreleasepool {
+        CGDirectDisplayID did = windowDisplayId(window);
+        CGSize mm = CGDisplayScreenSize(did);
+        CGDisplayModeRef mode = CGDisplayCopyDisplayMode(did);
+        bytes backingW = mode ? CGDisplayModeGetPixelWidth(mode) : 0u;
+        if (mode)
+            CGDisplayModeRelease(mode);
+
+        if (mm.width > 10.0 && backingW > 0u) {
+            d64 backingPPI = (d64) backingW / (mm.width / 25.4);
+            f32 scale = (f32) (backingPPI / 110.0);
+            if (scale < 0.5f)
+                scale = 0.5f;
+            if (scale > 6.0f)
+                scale = 6.0f;
+            return scale;
+        }
+        return Window_getScale(window);
+    }
+}
+
+/** Reconcile scale, physical size, screen origin, and monitor after display changes. */
 fn Window_revalidate(Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -1828,8 +2062,6 @@ fn Window_revalidate(Window *window) {
         if (prevScale <= 0.0)
             prevScale = curScale;
 
-        // If the scale factor changed (e.g. dragged from 2.0x Retina to 1.0x external monitor),
-        // adjust the points content size so the target physical pixel size is preserved.
         i32 targetPxW = atomic_load_explicit(Window_cachedWidthMut(window), memory_order_relaxed);
         i32 targetPxH = atomic_load_explicit(Window_cachedHeightMut(window), memory_order_relaxed);
         if (curScale != prevScale && targetPxW > 0 && targetPxH > 0) {
@@ -1845,7 +2077,7 @@ fn Window_revalidate(Window *window) {
     }
 }
 
-// Set content dimensions directly in AppKit points and refresh pixel geometry.
+/** Set content dimensions directly in AppKit points and refresh pixel geometry. */
 fn Window_setSizePoints(Window *window, f32 width, f32 height) {
     if (window == nullptr || width <= 0.0f || height <= 0.0f)
         return;
@@ -1855,12 +2087,14 @@ fn Window_setSizePoints(Window *window, f32 width, f32 height) {
     }
 }
 
-// Read content dimensions in points through optional output parameters.
+/** Read content dimensions in points through optional output parameters. */
 fn Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil) {
-        if (outWidth) *outWidth = 0.0f;
-        if (outHeight) *outHeight = 0.0f;
+        if (outWidth)
+            *outWidth = 0.0f;
+        if (outHeight)
+            *outHeight = 0.0f;
         return;
     }
     @autoreleasepool {
@@ -1873,41 +2107,41 @@ fn Window_getSizePoints(const Window *window, f32 *outWidth, f32 *outHeight) {
     }
 }
 
-// Return the content width in points through the shared size getter.
+/** Return the content width in points through the shared size getter. */
 f32 Window_widthPoints(const Window *window) {
     f32 w = 0.0f;
     Window_getSizePoints(window, &w, nullptr);
     return w;
 }
 
-// Return the content height in points through the shared size getter.
+/** Return the content height in points through the shared size getter. */
 f32 Window_heightPoints(const Window *window) {
     f32 h = 0.0f;
     Window_getSizePoints(window, nullptr, &h);
     return h;
 }
 
-// Alias the physical content width as the viewport width.
+/** Alias the physical content width as the viewport width. */
 i32 Window_viewportWidth(const Window *window) {
     return Window_width((Window*) window);
 }
 
-// Alias the physical content height as the viewport height.
+/** Alias the physical content height as the viewport height. */
 i32 Window_viewportHeight(const Window *window) {
     return Window_height((Window*) window);
 }
 
-// Alias the logical content width as the viewport width in points.
+/** Alias the logical content width as the viewport width in points. */
 f32 Window_viewportWidthPoints(const Window *window) {
     return Window_widthPoints(window);
 }
 
-// Alias the logical content height as the viewport height in points.
+/** Alias the logical content height as the viewport height in points. */
 f32 Window_viewportHeightPoints(const Window *window) {
     return Window_heightPoints(window);
 }
 
-// Return the outer NSWindow frame width in native pixels.
+/** Return the outer NSWindow frame width in native pixels. */
 i32 Window_windowWidth(const Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -1919,7 +2153,7 @@ i32 Window_windowWidth(const Window *window) {
     }
 }
 
-// Return the outer NSWindow frame height in native pixels.
+/** Return the outer NSWindow frame height in native pixels. */
 i32 Window_windowHeight(const Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -1931,7 +2165,7 @@ i32 Window_windowHeight(const Window *window) {
     }
 }
 
-// Return the outer NSWindow frame width in AppKit points.
+/** Return the outer NSWindow frame width in AppKit points. */
 f32 Window_windowWidthPoints(const Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -1941,7 +2175,7 @@ f32 Window_windowWidthPoints(const Window *window) {
     }
 }
 
-// Return the outer NSWindow frame height in AppKit points.
+/** Return the outer NSWindow frame height in AppKit points. */
 f32 Window_windowHeightPoints(const Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
     if (nsw == nil)
@@ -1951,7 +2185,7 @@ f32 Window_windowHeightPoints(const Window *window) {
     }
 }
 
-// Place the window by its top-left screen coordinate in the public pixel space.
+/** Place the window by its top-left screen coordinate in the public pixel space. */
 fn Window_setLocation(Window *window, i32 x, i32 y) {
     if (window == nullptr)
         return;
@@ -1961,7 +2195,7 @@ fn Window_setLocation(Window *window, i32 x, i32 y) {
     }
 }
 
-// Return the cached top-left screen origin through optional output pointers.
+/** Return the cached top-left screen origin through optional output pointers. */
 fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
         *outX = window ? (i32) Window_cachedX(window) : 0;
@@ -1969,7 +2203,7 @@ fn Window_getLocation(const Window *window, i32 *outX, i32 *outY) {
         *outY = window ? (i32) Window_cachedY(window) : 0;
 }
 
-// Return the cached content-view screen origin through optional outputs.
+/** Return the cached content-view screen origin through optional outputs. */
 fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
     if (outX)
         *outX = window ? (i32) Window_cachedContentX(window) : 0;
@@ -1977,14 +2211,11 @@ fn Window_getContentOrigin(const Window *window, i32 *outX, i32 *outY) {
         *outY = window ? (i32) Window_cachedContentY(window) : 0;
 }
 
-// Center the window in the main display's usable visible frame.
+/** Center the window in the main display's usable visible frame. */
 fn Window_center(Window *window) {
     if (window == nullptr)
         return;
     @autoreleasepool {
-        // Explicit _main-screen centering (not [nsWindow center]'s
-        // current-screen heuristic): the window lands in the usable area,
-        // clear of the menu bar and Dock.
         NSWindow *nsw = Window_nsWindow(window);
         NSRect avail = [[NSScreen mainScreen] visibleFrame];
         NSRect wf = [nsw frame];
@@ -1994,26 +2225,20 @@ fn Window_center(Window *window) {
     }
 }
 
-// Claim key synchronously: activation is async, so spin the runloop briefly
-// until [NSApp isActive] commits, then open animated + take key while the
-// grant is fresh. Falls back to the pump's sPendingKeyWindow re-assertion if
-// activation is denied outright.
+/**
+ * Claim key synchronously: activation is async, so spin the runloop briefly
+ * until [NSApp isActive] commits, then open animated + take key while the
+ * grant is fresh. Falls back to the pump's sPendingKeyWindow re-assertion if
+ * activation is denied outright.
+ */
 static fn claimKeyAfterActivation(NSWindow *nsw) {
     if (nsw == nil)
         return;
-    // Foreground claim: a fresh open (e.g. launched from an IDE/debugger)
-    // must take focus instead of landing behind the currently-active app.
-    // (The old IgnoringOtherApps flag is deprecated with no effect on
-    // macOS 14+; NSApp.activate is its sanctioned replacement.)
     if (@available(macOS 14.0, *))
         [NSApp activate];
     else
         [[NSRunningApplication currentApplication]
             activateWithOptions:NSApplicationActivateAllWindows];
-    // Show FIRST so the window appears instantly instead of waiting behind
-    // the activation spin below. makeKeyAndOrderFront (not a bare
-    // orderFront:) so the open still plays the system animation; the key
-    // half is re-asserted after the spin + by the pump fallback.
     [nsw makeKeyAndOrderFront:nil];
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
     while (![NSApp isActive] &&
@@ -2026,17 +2251,14 @@ static fn claimKeyAfterActivation(NSWindow *nsw) {
             [NSApp sendEvent:e];
         [NSApp updateWindows];
     }
-    // Animated open already issued above; now settle the key grant the
-    // open requested. Ordering front was guaranteed by that call either
-    // way; key follows when the grant allows.
     if (![NSApp isActive])
-        NSLog(@"window: activation denied — opening behind the active app; click the Dock icon to take focus");
+        NSLog(@"window: activation denied, opening behind the active app; click the Dock icon to take focus");
     if (![nsw isKeyWindow] && [nsw canBecomeKeyWindow])
         [nsw makeKeyWindow];
     sPendingKeyWindow = nsw;
 }
 
-// Activate and show the native window, then refresh its monitor mirror.
+/** Activate and show the native window, then refresh its monitor mirror. */
 fn Window_show(Window *window) {
     if (window == nullptr)
         return;
@@ -2046,7 +2268,7 @@ fn Window_show(Window *window) {
     }
 }
 
-// Remove the native window from display and cancel its pending key-window claim.
+/** Remove the native window from display and cancel its pending key-window claim. */
 fn Window_hide(Window *window) {
     if (window == nullptr)
         return;
@@ -2058,7 +2280,7 @@ fn Window_hide(Window *window) {
     }
 }
 
-// Select the native show or hide operation from the requested visibility.
+/** Select the native show or hide operation from the requested visibility. */
 fn Window_setVisible(Window *window, bool visible) {
     if (visible)
         Window_show(window);
@@ -2066,49 +2288,49 @@ fn Window_setVisible(Window *window, bool visible) {
         Window_hide(window);
 }
 
-// Query the AppKit style mask for the resizable capability.
+/** Query the AppKit style mask for the resizable capability. */
 bool Window_isResizable(Window *window) {
     if (window == nullptr)
         return false;
     return hasStyleBit(window, NSWindowStyleMaskResizable);
 }
 
-// Add or remove the resizable style bit unless AppKit owns fullscreen chrome.
+/** Add or remove the resizable style bit unless AppKit owns fullscreen chrome. */
 fn Window_setResizable(Window *window, bool resizable) {
     if (window == nullptr)
         return;
     updateStyleMask(window, resizable ? NSWindowStyleMaskResizable : 0, resizable ? 0 : NSWindowStyleMaskResizable);
 }
 
-// Query the AppKit style mask for the close-button capability.
+/** Query the AppKit style mask for the close-button capability. */
 bool Window_isClosable(Window *window) {
     if (window == nullptr)
         return false;
     return hasStyleBit(window, NSWindowStyleMaskClosable);
 }
 
-// Add or remove the native close-button style bit.
+/** Add or remove the native close-button style bit. */
 fn Window_setClosable(Window *window, bool closable) {
     if (window == nullptr)
         return;
     updateStyleMask(window, closable ? NSWindowStyleMaskClosable : 0, closable ? 0 : NSWindowStyleMaskClosable);
 }
 
-// Query the AppKit style mask for the minimize-button capability.
+/** Query the AppKit style mask for the minimize-button capability. */
 bool Window_isMiniaturizable(Window *window) {
     if (window == nullptr)
         return false;
     return hasStyleBit(window, NSWindowStyleMaskMiniaturizable);
 }
 
-// Add or remove the native minimize-button style bit.
+/** Add or remove the native minimize-button style bit. */
 fn Window_setMiniaturizable(Window *window, bool miniaturizable) {
     if (window == nullptr)
         return;
     updateStyleMask(window, miniaturizable ? NSWindowStyleMaskMiniaturizable : 0, miniaturizable ? 0 : NSWindowStyleMaskMiniaturizable);
 }
 
-// Enable or disable the native fullscreen collection behavior for the window.
+/** Enable or disable the native fullscreen collection behavior for the window. */
 fn Window_setFullscreenButton(Window *window, bool enabled) {
     if (window == nullptr)
         return;
@@ -2123,7 +2345,7 @@ fn Window_setFullscreenButton(Window *window, bool enabled) {
     }
 }
 
-// Apply the requested native chrome mode and refresh traffic-light geometry.
+/** Apply the requested native chrome mode and refresh traffic-light geometry. */
 fn Window_setUndecorated(Window *window, i32 mode) {
     if (window == nullptr)
         return;
@@ -2149,15 +2371,12 @@ fn Window_setUndecorated(Window *window, i32 mode) {
         NSWindow *nsw = Window_nsWindow(window);
         [nsw setStyleMask:next];
 
-        // setStyleMask: resets the collectionBehavior, dropping FullScreenPrimary.
         [nsw setCollectionBehavior:([nsw collectionBehavior] | NSWindowCollectionBehaviorFullScreenPrimary)];
 
         bool transparent = (mode == WINDOW_UNDECORATED_NAKED);
         [nsw setTitlebarAppearsTransparent:transparent];
         [nsw setTitleVisibility:(transparent ? NSWindowTitleHidden : NSWindowTitleVisible)];
 
-        // Mask (and therefore the native light layout) changed: re-snapshot and
-        // re-apply per-button visibility + offset against the new layout.
         TrafficLight_resetBase(Window_trafficLights(window));
         refreshChrome(window);
         windowRefreshSize(window);
@@ -2165,48 +2384,46 @@ fn Window_setUndecorated(Window *window, i32 mode) {
     }
 }
 
-// Translate the boolean decoration preference into the native chrome mode setter.
+/** Translate the boolean decoration preference into the native chrome mode setter. */
 fn Window_setDecorated(Window *window, bool decorated) {
     Window_setUndecorated(window, decorated ? WINDOW_DECORATED : WINDOW_UNDECORATED_BORDERLESS);
 }
 
-// Report whether the stored mode selects standard decorated chrome.
+/** Report whether the stored mode selects standard decorated chrome. */
 bool Window_isDecorated(const Window *window) {
     if (window == nullptr)
         return false;
     return Window_undecoratedMode(window) == WINDOW_DECORATED;
 }
 
-// Translate the naked-titlebar preference into the native chrome mode setter.
+/** Translate the naked-titlebar preference into the native chrome mode setter. */
 fn Window_setNaked(Window *window, bool naked) {
     Window_setUndecorated(window, naked ? WINDOW_UNDECORATED_NAKED : WINDOW_DECORATED);
 }
 
-// Report whether the stored mode selects full-size-content naked chrome.
+/** Report whether the stored mode selects full-size-content naked chrome. */
 bool Window_isNaked(const Window *window) {
     if (window == nullptr)
         return false;
     return Window_undecoratedMode(window) == WINDOW_UNDECORATED_NAKED;
 }
 
-// Translate the borderless preference into the native chrome mode setter.
+/** Translate the borderless preference into the native chrome mode setter. */
 fn Window_setBorderless(Window *window, bool borderless) {
     Window_setUndecorated(window, borderless ? WINDOW_UNDECORATED_BORDERLESS : WINDOW_DECORATED);
 }
 
-// Report whether the stored mode selects borderless chrome.
+/** Report whether the stored mode selects borderless chrome. */
 bool Window_isBorderless(const Window *window) {
     if (window == nullptr)
         return false;
     return Window_undecoratedMode(window) == WINDOW_UNDECORATED_BORDERLESS;
 }
 
-// Extend or restore decorated content into the titlebar and refresh geometry.
+/** Extend or restore decorated content into the titlebar and refresh geometry. */
 fn Window_setViewportFlushToTop(Window *window, bool flush) {
     if (window == nullptr)
         return;
-    // Viewport flush-to-top ONLY applies when the window is decorated (not naked, not borderless).
-    // If the window is currently naked or undecorated, this function is disabled (no-op).
     if (Window_undecoratedMode(window) != WINDOW_DECORATED)
         return;
     if (Window_viewportFlushToTop(window) == flush)
@@ -2217,7 +2434,6 @@ fn Window_setViewportFlushToTop(Window *window, bool flush) {
             return;
 
         Window_setViewportFlushToTopRaw(window, flush);
-    }
 
         NSWindow *nsw = Window_nsWindow(window);
         if (flush) {
@@ -2229,7 +2445,6 @@ fn Window_setViewportFlushToTop(Window *window, bool flush) {
             [nsw setTitlebarAppearsTransparent:NO];
             [nsw setTitleVisibility:NSWindowTitleVisible];
         }
-        // Native light layout changed with the mask: re-snapshot, re-seat.
         TrafficLight_resetBase(Window_trafficLights(window));
         refreshChrome(window);
         windowRefreshSize(window);
@@ -2237,7 +2452,7 @@ fn Window_setViewportFlushToTop(Window *window, bool flush) {
     }
 }
 
-// Read whether decorated chrome currently extends content into the titlebar.
+/** Read whether decorated chrome currently extends content into the titlebar. */
 bool Window_isViewportFlushToTop(const Window *window) {
     if (window == nullptr)
         return false;
@@ -2246,13 +2461,15 @@ bool Window_isViewportFlushToTop(const Window *window) {
     return Window_viewportFlushToTop(window);
 }
 
-// Route f32ing traffic-light behavior through the titlebar-flush setting.
+/** Route f32ing traffic-light behavior through the titlebar-flush setting. */
 fn Window_setFloatingTrafficLights(Window *window, bool f32ing) {
     Window_setViewportFlushToTop(window, f32ing);
 }
 
-// Map the public WindowTrafficLight enum onto the TrafficLight class's button
-// index (the values coincide: close=0, miniaturize=1, zoom=2). -1 = unknown.
+/**
+ * Map the public WindowTrafficLight enum onto the TrafficLight class's button
+ * index (the values coincide: close=0, miniaturize=1, zoom=2). -1 = unknown.
+ */
 static i32 lightIndex(WindowTrafficLight light) {
     if (light == WINDOW_TRAFFIC_LIGHT_CLOSE)
         return TRAFFIC_LIGHT_CLOSE;
@@ -2263,7 +2480,7 @@ static i32 lightIndex(WindowTrafficLight light) {
     return -1;
 }
 
-// Set visibility for a validated native traffic-light button enum.
+/** Set visibility for a validated native traffic-light button enum. */
 fn Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLight light, bool visible) {
     if (window == nullptr)
         return;
@@ -2275,7 +2492,7 @@ fn Window_macOS_setTrafficLightButtonVisible(Window *window, WindowTrafficLight 
     }
 }
 
-// Query configured visibility for a valid native traffic-light button.
+/** Query configured visibility for a valid native traffic-light button. */
 bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTrafficLight light) {
     i32 i = lightIndex(light);
     if (window == nullptr || i < 0)
@@ -2283,7 +2500,7 @@ bool Window_macOS_isTrafficLightButtonVisible(const Window *window, WindowTraffi
     return TrafficLight_isButtonVisible(Window_trafficLights(window), (TrafficLightButton) i);
 }
 
-// Set the traffic-light cluster's header-relative position in AppKit points.
+/** Set the traffic-light cluster's header-relative position in AppKit points. */
 fn Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
     if (window == nullptr)
         return;
@@ -2292,7 +2509,7 @@ fn Window_macOS_setTrafficLightHeaderPosition(Window *window, f32 x, f32 y) {
     }
 }
 
-// Return the configured header-relative button-cluster position through outputs.
+/** Return the configured header-relative button-cluster position through outputs. */
 fn Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f32 *outY) {
     f32 x = 0.0f;
     f32 y = 0.0f;
@@ -2304,7 +2521,7 @@ fn Window_macOS_getTrafficLightHeaderPosition(const Window *window, f32 *outX, f
         *outY = y;
 }
 
-// Set the native NSWindow alpha value.
+/** Set the native NSWindow alpha value. */
 fn Window_setOpacity(Window *window, f32 opacity) {
     if (window == nullptr)
         return;
@@ -2313,7 +2530,7 @@ fn Window_setOpacity(Window *window, f32 opacity) {
     }
 }
 
-// Set the native opaque/background policy and publish the transparency state.
+/** Set the native opaque/background policy and publish the transparency state. */
 fn Window_setTransparentBackground(Window *window, bool transparent) {
     if (window == nullptr)
         return;
@@ -2327,9 +2544,11 @@ fn Window_setTransparentBackground(Window *window, bool transparent) {
     }
 }
 
-// Frosted backdrop: a behindWindow NSVisualEffectView under the draw view, so
-// the transparent parts of a present show the blurred desktop through. radius
-// is a hint (AppKit materials are fixed); 0 removes it.
+/**
+ * Frosted backdrop: a behindWindow NSVisualEffectView under the draw view, so
+ * the transparent parts of a present show the blurred desktop through. radius
+ * is a hint (AppKit materials are fixed); 0 removes it.
+ */
 fn Window_setBackdropBlur(Window *window, f32 radius) {
     if (window == nullptr)
         return;
@@ -2359,17 +2578,19 @@ fn Window_setBackdropBlur(Window *window, f32 radius) {
     }
 }
 
-// Liquid Glass (macOS 26+): a real NSGlassEffectView behind the draw view. The
-// class is resolved by name at runtime so this compiles against any SDK, and
-// @available gates the OS; where it is unavailable the NSVisualEffectView
-// backdrop (Window_setBackdropBlur) is the effective fallback.
+/**
+ * Liquid Glass (macOS 26+): a real NSGlassEffectView behind the draw view. The
+ * class is resolved by name at runtime so this compiles against any SDK, and
+ * @available gates the OS; where it is unavailable the NSVisualEffectView
+ * backdrop (Window_setBackdropBlur) is the effective fallback.
+ */
 bool Window_macOS_hasLiquidGlass() {
     if (@available(macOS 26.0, *))
         return NSClassFromString(@"NSGlassEffectView") != Nil;
     return false;
 }
 
-// Apply or remove the runtime-available Liquid Glass view from its descriptor.
+/** Apply or remove the runtime-available Liquid Glass view from its descriptor. */
 fn Window_macOS_setLiquidGlass(Window *window, const WindowLiquidGlassDesc *desc) {
     if (window == nullptr)
         return;
@@ -2413,7 +2634,7 @@ fn Window_macOS_setLiquidGlass(Window *window, const WindowLiquidGlassDesc *desc
     }
 }
 
-// Copy the currently stored Liquid Glass descriptor to the caller's output.
+/** Copy the currently stored Liquid Glass descriptor to the caller's output. */
 bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *out) {
     if (window == nullptr || out == nullptr)
         return false;
@@ -2421,7 +2642,7 @@ bool Window_macOS_getLiquidGlass(const Window *window, WindowLiquidGlassDesc *ou
     return true;
 }
 
-// Select the AppKit f32ing or normal window level.
+/** Select the AppKit f32ing or normal window level. */
 fn Window_setAlwaysOnTop(Window *window, bool onTop) {
     if (window == nullptr)
         return;
@@ -2430,7 +2651,7 @@ fn Window_setAlwaysOnTop(Window *window, bool onTop) {
     }
 }
 
-// Publish caller-owned RGBA pixels as layer contents without copying the buffer.
+/** Publish caller-owned RGBA pixels as layer contents without copying the buffer. */
 fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width, i32 height) {
     if (window == nullptr || pixels == nullptr || width <= 0 || height <= 0)
         return;
@@ -2439,10 +2660,6 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width,
         NSView *view = glView ? glView : [Window_nsWindow(window) contentView];
         if (view == nil)
             return;
-        // ZERO-COPY: the CGImage borrows the caller's buffer directly — no
-        // bitmap-context allocation, no pixel copy. The buffer must stay valid
-        // until the layer is done; live resize flushes the committed CA updates
-        // but that submission is not a buffer-lifetime completion fence.
         CGDataProviderRef provider =
             CGDataProviderCreateWithData(nullptr, pixels, stride * (bytes) height, nullptr);
         if (provider == nullptr)
@@ -2459,26 +2676,24 @@ fn Window_presentRGBA(Window *window, const_any pixels, bytes stride, i32 width,
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         view.layer.contents = (__bridge id) img;
-        view.layer.contentsGravity = kCAGravityResize;  // stale-step fallback only
+        view.layer.contentsGravity = kCAGravityResize;
         [CATransaction commit];
-        // Flush submitted changes, not an explicit transaction still open.
-        // This submits CA work; it is not a GPU/WindowServer completion fence.
         if (Window_isLiveResizing(window))
             [CATransaction flush];
         CGImageRelease(img);
     }
 }
 
-// ── Zero-copy present surface (IOSurface + CALayer) ─────────────────────────
-// The window's draw view already wantsLayer; we hand the layer an IOSurface as
-// its contents. The render repo draws straight into the IOSurface on the GPU,
-// so publishing is a pointer swap, not a pixel copy.
+/**
+ * ── Zero-copy present surface (IOSurface + CALayer) ─────────────────────────
+ * The window's draw view already wantsLayer; we hand the layer an IOSurface as
+ * its contents. The render repo draws straight into the IOSurface on the GPU,
+ * so publishing is a pointer swap, not a pixel copy.
+ */
 any Window_createPresentSurface(Window *window, i32 widthPx, i32 heightPx) {
     if (window == nullptr || widthPx <= 0 || heightPx <= 0)
         return nullptr;
     @autoreleasepool {
-        // Row Bytes must be aligned for Metal to build a texture from the
-        // IOSurface (an unaligned width*4 aborts in _mtlValidateStrideTextureParameters).
         i32 rowBytes = ((widthPx * 4) + 63) & ~63;
         NSDictionary *props = @{
             (__bridge id) kIOSurfaceWidth: @(widthPx),
@@ -2492,14 +2707,14 @@ any Window_createPresentSurface(Window *window, i32 widthPx, i32 heightPx) {
     }
 }
 
-// Release the retained IOSurface reference supplied by the caller.
+/** Release the retained IOSurface reference supplied by the caller. */
 fn Window_destroyPresentSurface(Window *window, any surface) {
     (discard) window;
     if (surface != nullptr)
         CFRelease((CFTypeRef) surface);
 }
 
-// Publish the IOSurface as the view layer's contents at the current backing scale.
+/** Publish the IOSurface as the view layer's contents at the current backing scale. */
 fn Window_presentSurface(Window *window, any surface) {
     if (window == nullptr || surface == nullptr)
         return;
@@ -2520,16 +2735,12 @@ fn Window_presentSurface(Window *window, any surface) {
         d64 scale = cachedScale > 0.0 ? cachedScale : 1.0;
         layer.contentsScale = scale;
         [CATransaction commit];
-        // This is a CALayer/IOSurface publication, not a CAMetalLayer drawable:
-        // presentsWithTransaction is not available here. Submit the closed
-        // transaction during tracking instead of waiting for the outer pump.
-        // flush does not prove display completion or synchronize a GPU worker.
         if (Window_isLiveResizing(window))
             [CATransaction flush];
     }
 }
 
-// Return the current layer contents handle for the active draw view.
+/** Return the current layer contents handle for the active draw view. */
 any Window_presentSurfaceContents(const Window *window) {
     if (window == nullptr)
         return nullptr;
@@ -2540,7 +2751,7 @@ any Window_presentSurfaceContents(const Window *window) {
     return (__bridge any ) view.layer.contents;
 }
 
-// Copy IOSurface pixels into the caller's RGBA destination when dimensions permit.
+/** Copy IOSurface pixels into the caller's RGBA destination when dimensions permit. */
 bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes destStride) {
     (discard) window;
     if (surface == nullptr || destRGBA == nullptr || destStride == 0)
@@ -2559,9 +2770,11 @@ bool Window_readPresentSurface(Window *window, any surface, any destRGBA, bytes 
     return true;
 }
 
-// Write a tightly packed RGBA8 buffer to a PNG file. The screenshot/CAPTURE
-// path for tests and agents; ImageIO does the encoding.
-bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, const char *path) {
+/**
+ * Write a tightly packed RGBA8 buffer to a PNG file. The screenshot/CAPTURE
+ * path for tests and agents; ImageIO does the encoding.
+ */
+bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, string path) {
     if (pixels == nullptr || width <= 0 || height <= 0 || path == nullptr)
         return false;
     bool ok = false;
@@ -2595,7 +2808,7 @@ bool Window_writePNG(const_any pixels, bytes stride, i32 width, i32 height, cons
     return ok;
 }
 
-// Enable or clear the native window's pointer-ignoring behavior.
+/** Enable or clear the native window's pointer-ignoring behavior. */
 fn Window_setClickThrough(Window *window, bool clickThrough) {
     if (window == nullptr)
         return;
@@ -2604,7 +2817,7 @@ fn Window_setClickThrough(Window *window, bool clickThrough) {
     }
 }
 
-// Request the native non-client shadow policy for decorated chrome.
+/** Request the native non-client shadow policy for decorated chrome. */
 fn Window_setShadow(Window *window, bool shadow) {
     if (window == nullptr)
         return;
@@ -2613,7 +2826,7 @@ fn Window_setShadow(Window *window, bool shadow) {
     }
 }
 
-// Configure whether background dragging is delegated to the native window.
+/** Configure whether background dragging is delegated to the native window. */
 fn Window_setMovableByBackground(Window *window, bool movable) {
     if (window == nullptr)
         return;
@@ -2622,7 +2835,7 @@ fn Window_setMovableByBackground(Window *window, bool movable) {
     }
 }
 
-// Order the native window to the front of the AppKit window stack.
+/** Order the native window to the front of the AppKit window stack. */
 fn Window_bringToFront(Window *window) {
     if (window == nullptr)
         return;
@@ -2631,19 +2844,19 @@ fn Window_bringToFront(Window *window) {
     }
 }
 
-// Attach a child window using AppKit's parent-child ordering relationship.
+/** Attach a child window using AppKit's parent-child ordering relationship. */
 fn Window_attachChild(Window *parent, Window *child) {
     (discard) parent;
     (discard) child;
 }
 
-// Remove an existing child-window relationship from its parent.
+/** Remove an existing child-window relationship from its parent. */
 fn Window_detachChild(Window *parent, Window *child) {
     (discard) parent;
     (discard) child;
 }
 
-// --- Minimize ---
+/** --- Minimize --- */
 
 fn Window_minimize(Window *window) {
     if (window == nullptr)
@@ -2653,7 +2866,7 @@ fn Window_minimize(Window *window) {
     }
 }
 
-// Restore a miniaturized window and let AppKit publish its new geometry.
+/** Restore a miniaturized window and let AppKit publish its new geometry. */
 fn Window_restore(Window *window) {
     if (window == nullptr)
         return;
@@ -2662,7 +2875,7 @@ fn Window_restore(Window *window) {
     }
 }
 
-// Read the native miniaturization state for a valid window.
+/** Read the native miniaturization state for a valid window. */
 bool Window_isMinimized(Window *window) {
     if (window == nullptr)
         return false;
@@ -2673,7 +2886,7 @@ bool Window_isMinimized(Window *window) {
     }
 }
 
-// --- Fullscreen ---
+/** --- Fullscreen --- */
 
 bool Window_isFullscreen(Window *window) {
     if (window == nullptr)
@@ -2683,7 +2896,7 @@ bool Window_isFullscreen(Window *window) {
     }
 }
 
-// Ask AppKit to enter or exit its native fullscreen space.
+/** Ask AppKit to enter or exit its native fullscreen space. */
 fn Window_setFullscreen(Window *window, bool fullscreen) {
     if (window == nullptr)
         return;
@@ -2693,7 +2906,7 @@ fn Window_setFullscreen(Window *window, bool fullscreen) {
     }
 }
 
-// Toggle native fullscreen based on the window's current AppKit state.
+/** Toggle native fullscreen based on the window's current AppKit state. */
 fn Window_toggleFullscreen(Window *window) {
     if (window == nullptr)
         return;
@@ -2702,7 +2915,7 @@ fn Window_toggleFullscreen(Window *window) {
     }
 }
 
-// --- DRM / sharing ---
+/** --- DRM / sharing --- */
 
 fn Window_setDRM(Window *window, bool enabled) {
     if (window == nullptr)
@@ -2712,7 +2925,7 @@ fn Window_setDRM(Window *window, bool enabled) {
     }
 }
 
-// --- Size constraints ---
+/** --- Size constraints --- */
 
 fn Window_setMinSize(Window *window, i32 width, i32 height) {
     if (window == nullptr)
@@ -2725,7 +2938,7 @@ fn Window_setMinSize(Window *window, i32 width, i32 height) {
     }
 }
 
-// Convert maximum content dimensions from physical pixels and set AppKit limits.
+/** Convert maximum content dimensions from physical pixels and set AppKit limits. */
 fn Window_setMaxSize(Window *window, i32 width, i32 height) {
     if (window == nullptr)
         return;
@@ -2737,11 +2950,13 @@ fn Window_setMaxSize(Window *window, i32 width, i32 height) {
     }
 }
 
-// --- Cursor control ---
+/** --- Cursor control --- */
 
-// FPS-style relative cursor: hides the pointer, decouples it from movement,
-// and re-warps to the window centre each pump pass while deltas flow into the
-// mouse stream as move-delta events.
+/**
+ * FPS-style relative cursor: hides the pointer, decouples it from movement,
+ * and re-warps to the window centre each pump pass while deltas flow into the
+ * mouse stream as move-delta events.
+ */
 fn Window_setCursorLocked(Window *window, bool locked) {
     if (locked == s_cursorLocked)
         return;
@@ -2761,7 +2976,7 @@ fn Window_setCursorLocked(Window *window, bool locked) {
     }
 }
 
-// Store the cursor shape that the event path applies to the active window.
+/** Store the cursor shape that the event path applies to the active window. */
 fn Window_setCursorType(Window *window, WindowCursorType type) {
     if (window == nullptr)
         return;
@@ -2800,23 +3015,23 @@ fn Window_setCursorType(Window *window, WindowCursorType type) {
     }
 }
 
-// Return the requested cursor shape, defaulting for a missing window.
+/** Return the requested cursor shape, defaulting for a missing window. */
 WindowCursorType Window_getCursorType(const Window *window) {
     if (window == nullptr)
         return WINDOW_CURSOR_DEFAULT;
     return Window_cursorType(window);
 }
 
-// --- Software frame presentation (inert without a render target) ------------
+/** --- Software frame presentation (inert without a render target) ------------ */
 
-// ;;INTENTION("Window_present on the fresh window is inert (`return false`): a pure AppKit window has no raster target of its own. Software present was GPU-era shim logic; the render personal own pixel paths. Retires with the composite seam.")
+/** ;;INTENTION("Window_present on the fresh window is inert (`return false`): a pure AppKit window has no raster target of its own. Software present was GPU-era shim logic; the render personal own pixel paths. Retires with the composite seam.") */
 bool Window_present(Window *window, const Buffer *frame) {
     (discard) window;
     (discard) frame;
     return false;
 }
 
-// --- Surface anchors (thread 0) ----------------------------------------------
+/** --- Surface anchors (thread 0) ---------------------------------------------- */
 
 any Window_contentView(Window *window) {
     NSWindow *nsw = window != nullptr ? Window_nsWindow(window) : nil;
@@ -2832,26 +3047,26 @@ any Window_nativeHandle(const Window *window) {
     return (__bridge any) nsw;
 }
 
-// ;;INTENTION("Window_metalLayer is gone from this file by design (no Metal here). Returns nullptr so the VK_EXT_metal_surface path degrades cleanly until the render personal create their own CAMetalLayer on the content view. Retires with the composite seam.")
+/** ;;INTENTION("Window_metalLayer is gone from this file by design (no Metal here). Returns nullptr so the VK_EXT_metal_surface path degrades cleanly until the render personal create their own CAMetalLayer on the content view. Retires with the composite seam.") */
 any Window_metalLayer(Window *window) {
     (discard) window;
     return nullptr;
 }
 
-// ;;INTENTION("Gravity ownership moved out of the window (no layer here). No-op; retires with the composite seam.")
+/** ;;INTENTION("Gravity ownership moved out of the window (no layer here). No-op; retires with the composite seam.") */
 fn Window_setGravityTopLeft(Window *window) {
     (discard) window;
 }
 
-// ;;INTENTION("Worker present transaction was GPU-era (presentsWithTransaction drawables). No layer means nothing to commit; no-op. Retires with the composite seam.")
+/** ;;INTENTION("Worker present transaction was GPU-era (presentsWithTransaction drawables). No layer means nothing to commit; no-op. Retires with the composite seam.") */
 fn Window_workerPresentBegin() {
 }
 
-// Close the retired worker-present transaction hook; this backend owns none.
+/** Close the retired worker-present transaction hook; this backend owns none. */
 fn Window_workerPresentEnd() {
 }
 
-// --- Event wiring (rings are engine-global; adapters attach by window id) ----
+/** --- Event wiring (rings are engine-global; adapters attach by window id) ---- */
 
 fn Window_addKeyAdapter(Window *window, const KeyHandler *adapter) {
     if (window == nullptr)
@@ -2859,42 +3074,42 @@ fn Window_addKeyAdapter(Window *window, const KeyHandler *adapter) {
     Key_attachWindow(Window_idRaw(window), adapter);
 }
 
-// Detach a key callback from the window's engine input slot.
+/** Detach a key callback from the window's engine input slot. */
 bool Window_removeKeyAdapter(Window *window, const KeyHandler *adapter) {
     if (window == nullptr)
         return false;
     return Key_detachWindow(Window_idRaw(window), adapter);
 }
 
-// Attach a mouse callback to the window's engine input slot.
+/** Attach a mouse callback to the window's engine input slot. */
 fn Window_addMouseAdapter(Window *window, const MouseHandler *adapter) {
     if (window == nullptr)
         return;
     Mouse_attachWindow(Window_idRaw(window), adapter);
 }
 
-// Detach a mouse callback from the window's engine input slot.
+/** Detach a mouse callback from the window's engine input slot. */
 bool Window_removeMouseAdapter(Window *window, const MouseHandler *adapter) {
     if (window == nullptr)
         return false;
     return Mouse_detachWindow(Window_idRaw(window), adapter);
 }
 
-// Attach a touch callback to the window's engine input slot.
+/** Attach a touch callback to the window's engine input slot. */
 fn Window_addTouchAdapter(Window *window, const TouchHandler *adapter) {
     if (window == nullptr)
         return;
     Touch_attachWindow(Window_idRaw(window), adapter);
 }
 
-// Detach a touch callback from the window's engine input slot.
+/** Detach a touch callback from the window's engine input slot. */
 bool Window_removeTouchAdapter(Window *window, const TouchHandler *adapter) {
     if (window == nullptr)
         return false;
     return Touch_detachWindow(Window_idRaw(window), adapter);
 }
 
-// Drain key, mouse, and touch callback queues for the engine input modules.
+/** Drain key, mouse, and touch callback queues for the engine input modules. */
 fn Window_dispatchEvents(Window *window) {
     (discard) window;
     Key_dispatchEvents();
@@ -2902,13 +3117,13 @@ fn Window_dispatchEvents(Window *window) {
     Touch_dispatchEvents();
 }
 
-// --- Focus (the spotlight: one focused window per machine) -------------------
+/** --- Focus (the spotlight: one focused window per machine) ------------------- */
 
 u32 Window_id(Window *window) {
     return window ? Window_idRaw(window) : FOCUS_BROADCAST;
 }
 
-// Request AppKit activation and schedule the window for key-window promotion.
+/** Request AppKit activation and schedule the window for key-window promotion. */
 fn Window_focus(Window *window) {
     if (window == nullptr)
         return;
@@ -2918,28 +3133,30 @@ fn Window_focus(Window *window) {
     }
 }
 
-// Compare this window's id with the current process-wide focus identity.
+/** Compare this window's id with the current process-wide focus identity. */
 bool Window_isFocused(Window *window) {
     return window && Focus_isFocused(Window_idRaw(window));
 }
 
-// Enable or suppress AppKit key-window eligibility for this window.
+/** Enable or suppress AppKit key-window eligibility for this window. */
 fn Window_setKeyEnabled(Window *window, bool enabled) {
     if (window == nullptr)
         return;
     atomic_store_explicit(Window_keyEnabledMut(window), enabled, memory_order_relaxed);
 }
 
-// Read whether this window currently accepts key focus.
+/** Read whether this window currently accepts key focus. */
 bool Window_isKeyEnabled(const Window *window) {
     if (window == nullptr)
         return false;
     return atomic_load_explicit(Window_keyEnabledPtr(window), memory_order_relaxed);
 }
 
-// --- Lifecycle registry ------------------------------------------------------
-// The ONLY outside path to the embedded WindowEvent: fill slots with
-// WindowEvent_setOn*(Window_getLifecycle(w), fn). Null-safe.
+/**
+ * --- Lifecycle registry ------------------------------------------------------
+ * The ONLY outside path to the embedded WindowEvent: fill slots with
+ * WindowEvent_setOn*(Window_getLifecycle(w), fn). Null-safe.
+ */
 
 WindowEvent *Window_getLifecycle(Window *window) {
     if (window == nullptr)
@@ -2947,13 +3164,13 @@ WindowEvent *Window_getLifecycle(Window *window) {
     return Window_lifecycleMut(window);
 }
 
-// --- Monitor identity ---------------------------------------------------------
+/** --- Monitor identity --------------------------------------------------------- */
 
 u32 Window_getMonitorId(const Window *window) {
     return window ? atomic_load_explicit(Window_monitorIdPtr(window), memory_order_acquire) : 0;
 }
 
-// --- Resize reflection ---------------------------------------------------------
+/** --- Resize reflection --------------------------------------------------------- */
 
 u64 Window_sizeGeneration(Window *window) {
     if (window == nullptr)
@@ -2961,7 +3178,7 @@ u64 Window_sizeGeneration(Window *window) {
     return atomic_load_explicit(Window_sizeGenerationPtr(window), memory_order_acquire);
 }
 
-// Register the callback invoked synchronously as native resize geometry changes.
+/** Register the callback invoked synchronously as native resize geometry changes. */
 fn Window_setResizeRenderHook(Window *window, WindowResizeRenderFn fn, any userdata) {
     if (window == nullptr)
         return;
@@ -2969,7 +3186,7 @@ fn Window_setResizeRenderHook(Window *window, WindowResizeRenderFn fn, any userd
     Window_setResizeRenderUserdata(window, userdata);
 }
 
-// Return the callback registered for synchronous resize rendering.
+/** Return the callback registered for synchronous resize rendering. */
 WindowResizeRenderFn Window_getResizeRenderHook(const Window *window) {
     return window ? Window_resizeRenderFn(window) : nullptr;
 }

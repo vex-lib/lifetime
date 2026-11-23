@@ -1,13 +1,16 @@
-// window/traffic_light_cocoa.m — macOS traffic-light button management.
-//
-// Segregated component managing macOS traffic-light buttons (close, minimize,
-// zoom) layout, visibility, and header positioning. Decoupled from the core
-// Window state per the Single Class Per File Law and the Window Decoupling Law.
+/**
+ * window/traffic_light_cocoa.m, macOS traffic-light button management.
+ *
+ * Segregated component managing macOS traffic-light buttons (close, minimize,
+ * zoom) layout, visibility, and header positioning. Decoupled from the core
+ * Window state per the Single Class Per File Law and the Window Decoupling Law.
+ */
 
 #import <AppKit/AppKit.h>
 
 #include "vex.h"
-#include <stdlib.h>
+#include "nio/lifetime_memory.h"
+#include "re/type/re_type.h"
 
 #include "window/traffic_light.h"
 
@@ -74,35 +77,73 @@ struct TrafficLight {
 };
 
 ;;GETTER
-static NSWindow *TrafficLight_window(const TrafficLight *self) { return (*self).window; }
+static NSWindow *TrafficLight_window(const TrafficLight *self)
+{
+    return (*self).window;
+}
 ;;SETTER
-static fn TrafficLight_setWindow(TrafficLight *self, NSWindow *w) { (*self).window = w; }
+static fn TrafficLight_setWindow(TrafficLight *self, NSWindow *w)
+{
+    (*self).window = w;
+}
 ;;GETTER
-static bool TrafficLight_lightVisibleAt(const TrafficLight *self, i32 i) { return (*self).lightVisible[i]; }
+static bool TrafficLight_lightVisibleAt(const TrafficLight *self, i32 i)
+{
+    return (*self).lightVisible[i];
+}
 ;;SETTER
-static fn TrafficLight_setLightVisibleAt(TrafficLight *self, i32 i, bool v) { (*self).lightVisible[i] = v; }
+static fn TrafficLight_setLightVisibleAt(TrafficLight *self, i32 i, bool v)
+{
+    (*self).lightVisible[i] = v;
+}
 ;;GETTER
-static NSRect TrafficLight_lightBaseAt(const TrafficLight *self, i32 i) { return (*self).lightBase[i]; }
+static NSRect TrafficLight_lightBaseAt(const TrafficLight *self, i32 i)
+{
+    return (*self).lightBase[i];
+}
 ;;SETTER
-static fn TrafficLight_setLightBaseAt(TrafficLight *self, i32 i, NSRect r) { (*self).lightBase[i] = r; }
+static fn TrafficLight_setLightBaseAt(TrafficLight *self, i32 i, NSRect r)
+{
+    (*self).lightBase[i] = r;
+}
 ;;GETTER
-static f32 TrafficLight_lightOX(const TrafficLight *self) { return (*self).lightOX; }
+static f32 TrafficLight_lightOX(const TrafficLight *self)
+{
+    return (*self).lightOX;
+}
 ;;SETTER
-static fn TrafficLight_setLightOX(TrafficLight *self, f32 v) { (*self).lightOX = v; }
+static fn TrafficLight_setLightOX(TrafficLight *self, f32 v)
+{
+    (*self).lightOX = v;
+}
 ;;GETTER
-static f32 TrafficLight_lightOY(const TrafficLight *self) { return (*self).lightOY; }
+static f32 TrafficLight_lightOY(const TrafficLight *self)
+{
+    return (*self).lightOY;
+}
 ;;SETTER
-static fn TrafficLight_setLightOY(TrafficLight *self, f32 v) { (*self).lightOY = v; }
+static fn TrafficLight_setLightOY(TrafficLight *self, f32 v)
+{
+    (*self).lightOY = v;
+}
 ;;GETTER
-static bool TrafficLight_lightBaseSet(const TrafficLight *self) { return (*self).lightBaseSet; }
+static bool TrafficLight_lightBaseSet(const TrafficLight *self)
+{
+    return (*self).lightBaseSet;
+}
 ;;SETTER
-static fn TrafficLight_setLightBaseSet(TrafficLight *self, bool v) { (*self).lightBaseSet = v; }
+static fn TrafficLight_setLightBaseSet(TrafficLight *self, bool v)
+{
+    (*self).lightBaseSet = v;
+}
 
 /** Creates a traffic-light adapter for the supplied native window handle. */
-TrafficLight *TrafficLight_create(any nsWindowHandle) {
-    TrafficLight *self = (TrafficLight*) calloc(1, sizeof(TrafficLight));
+;;CONSTRUCTOR
+TrafficLight *TrafficLight_1(any nsWindowHandle) {
+    TrafficLight *self = (TrafficLight*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, sizeof(TrafficLight));
     if (self == nullptr)
         return nullptr;
+    memset(self, 0, sizeof(TrafficLight));
 
     TrafficLight_setWindow(self, (__bridge NSWindow*) nsWindowHandle);
     TrafficLight_setLightVisibleAt(self, TRAFFIC_LIGHT_CLOSE, true);
@@ -117,7 +158,7 @@ TrafficLight *TrafficLight_create(any nsWindowHandle) {
 /** Releases adapter-owned bookkeeping without destroying the native window. */
 fn TrafficLight_destroy(TrafficLight *self) {
     if (self != nullptr)
-        free(self);
+        MemoryArena_free(Lifetime_arena(), self);
 }
 
 /** Recomputes the traffic-light buttons' base positions from the native window. */

@@ -30,7 +30,7 @@
  *   The fn-pointer lifecycle contract for ONE window. Embedded in the window's
  *   platform state (one instance per Window), filled once by the app, fired by
  *   the pump pass on Thread 0. Every slot is nullable and every fire is a
- *   no-op on a null slot — a window that ignores an event costs nothing and
+ *   no-op on a null slot, a window that ignores an event costs nothing and
  *   never crashes (the Cold-Strict, Hot-Minimal Validation Law).
  *
  *   Focus is Application-level, pressed is Window-level, quit is vetoable:
@@ -39,7 +39,7 @@
  *     - onQuitRequested (close btn / Cmd+Q / Cmd+W / Alt+F4) returns bool:
  *       true = may quit. A null slot allows the quit (default-proceed).
  *
- *   The fire dispatchers are the ONLY code that reads the slot pointers — the
+ *   The fire dispatchers are the ONLY code that reads the slot pointers, the
  *   null-checks live here, nowhere else.
  *
  * STRUCT FIELDS:
@@ -129,7 +129,7 @@
  * ============================================================================
  */
 
-// CONSTRUCTORS (PUBLIC & PRIVATE)
+/** CONSTRUCTORS (PUBLIC & PRIVATE) */
 /** Clears all callback slots and owner data, returning false for null self. */
 bool WindowEvent_init(WindowEvent *self) {
     if(self == nullptr)
@@ -151,7 +151,7 @@ bool WindowEvent_init(WindowEvent *self) {
     return true;
 }
 
-// CORE FUNCTIONS (PUBLIC & PRIVATE)
+/** CORE FUNCTIONS (PUBLIC & PRIVATE) */
 /** Calls the quit-request callback; permits closing when no handler is installed. */
 bool WindowEvent_fireQuitRequested(WindowEvent *self, Window *window) {
     if(self == nullptr)
@@ -282,7 +282,7 @@ fn WindowEvent_fireOcclusionChanged(WindowEvent *self, Window *window, bool visi
     fn(WindowEvent_getSelf(self), window, visible);
 }
 
-// SETTERS (PUBLIC & PRIVATE)
+/** SETTERS (PUBLIC & PRIVATE) */
 
 ;;SETTER
 /** Sets the opaque owner value passed to every registered callback. */
@@ -396,7 +396,7 @@ fn WindowEvent_setOnOcclusionChanged(WindowEvent *self, WindowOcclusionFn fn) {
     (*self).onOcclusionChanged = fn;
 }
 
-// GETTERS (PUBLIC & PRIVATE)
+/** GETTERS (PUBLIC & PRIVATE) */
 
 ;;GETTER
 /** Returns the opaque owner supplied to callback handlers. */
