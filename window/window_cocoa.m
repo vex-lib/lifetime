@@ -686,10 +686,7 @@ static bool windowRefsGrow() {
         : (WindowSlot*) MemoryArena_alloc(Lifetime_arena(), TYPE_BYTE_ARRAY, (bytes) nextCap * sizeof(WindowSlot));
     if (grown == nullptr)
         return false;
-    for (u32 i = s_refCap; i < nextCap; i++) {
-        grown[i].window = nil;
-        grown[i].handle = nullptr;
-    }
+    memset((any) &grown[s_refCap], 0, (bytes) (nextCap - s_refCap) * sizeof(WindowSlot));
     s_refs = grown;
     s_refCap = nextCap;
     return true;
@@ -833,7 +830,58 @@ static CGFloat windowBackingScale(const Window *window);
 }
 @end
 
-/** App-level delegate: lets the process end when the last window closes. */
+/** Posts a synthetic wake-up event so Window_waitEvents returns immediately on close/quit. */
+static fn windowPostWakeEvent() {
+    if (NSApp == nil)
+        return;
+    NSEvent *wake = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+                                       location:NSMakePoint(0.0, 0.0)
+                                  modifierFlags:0
+                                      timestamp:0.0
+                                   windowNumber:0
+                                        context:nil
+                                        subtype:0
+                                          data1:0
+                                          data2:0];
+    if (wake != nil)
+        [NSApp postEvent:wake atStart:YES];
+}
+
+/** Installs standard macOS main menu shortcuts (Cmd+Q, Cmd+W, Cmd+M, Cmd+H, Ctrl+Cmd+F). */
+static fn windowInstallMainMenu() {
+    if (NSApp == nil || [NSApp mainMenu] != nil)
+        return;
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSMenuItem *appItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSString *appName = [[NSProcessInfo processInfo] processName];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Hide %@", appName]
+                       action:@selector(hide:)
+                keyEquivalent:@"h"];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Quit %@", appName]
+                       action:@selector(terminate:)
+                keyEquivalent:@"q"];
+    [appItem setSubmenu:appMenu];
+    [mainMenu addItem:appItem];
+
+    NSMenuItem *winItem = [[NSMenuItem alloc] initWithTitle:@"Window" action:nil keyEquivalent:@""];
+    NSMenu *winMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+    [winMenu addItemWithTitle:@"Close Window" action:@selector(performClose:) keyEquivalent:@"w"];
+    [winMenu addItemWithTitle:@"Minimize" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    NSMenuItem *fsItem = [[NSMenuItem alloc] initWithTitle:@"Toggle Full Screen"
+                                                    action:@selector(toggleFullScreen:)
+                                             keyEquivalent:@"f"];
+    [fsItem setKeyEquivalentModifierMask:(NSEventModifierFlagControl | NSEventModifierFlagCommand)];
+    [winMenu addItem:fsItem];
+    [winItem setSubmenu:winMenu];
+    [mainMenu addItem:winItem];
+
+    [NSApp setMainMenu:mainMenu];
+    [NSApp setWindowsMenu:winMenu];
+}
+
+/** App-level delegate: routes Cmd+Q and last-window-close into the C run loop immediately. */
 @interface WindowAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
@@ -842,6 +890,24 @@ static CGFloat windowBackingScale(const Window *window);
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*) sender {
     (discard) sender;
     return YES;
+}
+
+/** Convert Cmd+Q / Dock Quit into an immediate clean close of every open Window handle. */
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*) sender {
+    (discard) sender;
+    for (u32 i = 1; i < s_refCap; i++) {
+        Window *handle = s_refs[i].handle;
+        NSWindow *nsw = s_refs[i].window;
+        if (handle != nullptr) {
+            if (!WindowEvent_fireQuitRequested(Window_lifecycleMut(handle), handle))
+                return NSTerminateCancel;
+            atomic_store_explicit(Window_shouldCloseMut(handle), true, memory_order_relaxed);
+        }
+        if (nsw != nil)
+            [nsw orderOut:nil];
+    }
+    windowPostWakeEvent();
+    return NSTerminateCancel;
 }
 @end
 
@@ -856,12 +922,15 @@ static CGFloat windowBackingScale(const Window *window);
 @end
 
 @implementation WindowDelegate
-/** Ask lifecycle listeners whether AppKit should accept the close request. */
+/** Ask lifecycle listeners whether AppKit should accept the close request and close immediately. */
 - (BOOL)windowShouldClose:(NSWindow*) sender {
-    (discard) sender;
     Window *w = self.handlePtr;
-    if (w)
-        return WindowEvent_fireQuitRequested(Window_lifecycleMut(w), w);
+    if (w && !WindowEvent_fireQuitRequested(Window_lifecycleMut(w), w))
+        return NO;
+    if (self.shouldClosePtr)
+        atomic_store_explicit(self.shouldClosePtr, true, memory_order_relaxed);
+    [sender orderOut:nil];
+    windowPostWakeEvent();
     return YES;
 }
 
@@ -870,6 +939,7 @@ static CGFloat windowBackingScale(const Window *window);
     (discard) notification;
     if (self.shouldClosePtr)
         atomic_store_explicit(self.shouldClosePtr, true, memory_order_relaxed);
+    windowPostWakeEvent();
 }
 
 /** Revalidate physical size and monitor state after the window changes screens. */
@@ -1321,7 +1391,11 @@ static fn routeEvent(NSEvent *event) {
             d64 x, y;
             mouseLocation(event, &x, &y);
             Mouse_pushMoveEvent(wid, x, y);
-            Mouse_pushScrollEvent(wid, [event scrollingDeltaX], [event scrollingDeltaY]);
+            CGFloat scale = [event window] ? [[event window] backingScaleFactor] : 1.0;
+            if (scale <= 0.0)
+                scale = 1.0;
+            d64 mult = [event hasPreciseScrollingDeltas] ? (d64) scale : (12.0 * (d64) scale);
+            Mouse_pushScrollEvent(wid, [event scrollingDeltaX] * mult, [event scrollingDeltaY] * mult);
             break;
         }
 
@@ -1478,7 +1552,8 @@ bool Window_pollEventStep() {
 
 /** Wait for one process-wide AppKit event for the requested bounded interval. */
 fn Window_waitEvents(Window *window, i32 timeoutMs) {
-    (discard) window;
+    if (window != nullptr && Window_shouldClose(window))
+        return;
     @autoreleasepool {
         NSDate *until = timeoutMs > 0
             ? [NSDate dateWithTimeIntervalSinceNow:(d64) timeoutMs / 1000.0]
@@ -1582,6 +1657,8 @@ static Window *windowAlloc(const WindowDesc *desc) {
             sAppDelegate = [[WindowAppDelegate alloc] init];
             [NSApp setDelegate:sAppDelegate];
             [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+            windowInstallMainMenu();
+            [NSApp finishLaunching];
         }
 
         NSWindowStyleMask style = NSWindowStyleMaskTitled
@@ -1766,6 +1843,9 @@ fn Window_destroy(Window *window) {
         Touch_detachWindowAll(wid);
         TrafficLight_destroy(Window_trafficLights(window));
         windowIdRelease(wid);
+        Window_setGlView(window, nil);
+        Window_setDelegate(window, nil);
+        Window_setNsWindow(window, nil);
     }
     MemoryArena_free(Lifetime_arena(), window);
 }
@@ -2026,28 +2106,99 @@ fn Window_getPhysicalSizeMM(const Window *window, f32 *outWidthMM, f32 *outHeigh
 }
 
 /**
- * Compute backing pixels per Frame unit anchored to the actual physical screen
- * (110 PPI desktop reference), independent of macOS More Space / Larger Text settings.
+ * Resolves the carrying display's true hardware panel resolution in physical
+ * pixels by scanning CGDisplayCopyAllDisplayModes for kDisplayModeNativeFlag
+ * (0x02000000), falling back to the current display mode's pixel dimensions.
+ * @param did       CoreGraphics display ID
+ * @param outWidth  receives native panel pixel width
+ * @param outHeight receives native panel pixel height
+ */
+static fn windowQueryNativePanelPixels(CGDirectDisplayID did, bytes *outWidth, bytes *outHeight) {
+    bytes nativeW = 0u;
+    bytes nativeH = 0u;
+    CFArrayRef modes = CGDisplayCopyAllDisplayModes(did, nullptr);
+    if (modes != nullptr) {
+        CFIndex count = CFArrayGetCount(modes);
+        for (CFIndex i = 0; i < count; i++) {
+            CGDisplayModeRef m = (CGDisplayModeRef) CFArrayGetValueAtIndex(modes, i);
+            if (m == nullptr)
+                continue;
+            u32 ioFlags = (u32) CGDisplayModeGetIOFlags(m);
+            if ((ioFlags & 0x02000000u) != 0u) {
+                bytes pw = CGDisplayModeGetPixelWidth(m);
+                bytes ph = CGDisplayModeGetPixelHeight(m);
+                if (pw > nativeW) {
+                    nativeW = pw;
+                    nativeH = ph;
+                }
+            }
+        }
+        CFRelease(modes);
+    }
+    if (nativeW == 0u || nativeH == 0u) {
+        CGDisplayModeRef cur = CGDisplayCopyDisplayMode(did);
+        if (cur != nullptr) {
+            nativeW = CGDisplayModeGetPixelWidth(cur);
+            nativeH = CGDisplayModeGetPixelHeight(cur);
+            CGDisplayModeRelease(cur);
+        }
+    }
+    if (outWidth)
+        *outWidth = nativeW;
+    if (outHeight)
+        *outHeight = nativeH;
+}
+
+/**
+ * Returns the carrying display's true hardware panel resolution in physical
+ * pixels (independent of macOS More Space / Larger Text virtual scaling).
+ * @param window    target window (nullptr queries the main display)
+ * @param outWidth  receives native panel width in physical pixels (optional)
+ * @param outHeight receives native panel height in physical pixels (optional)
+ */
+fn Window_getNativePixels(const Window *window, i32 *outWidth, i32 *outHeight) {
+    @autoreleasepool {
+        bytes w = 0u;
+        bytes h = 0u;
+        windowQueryNativePanelPixels(windowDisplayId(window), &w, &h);
+        if (outWidth)
+            *outWidth = (i32) w;
+        if (outHeight)
+            *outHeight = (i32) h;
+    }
+}
+
+/**
+ * Computes backing pixels per true physical monitor pixel:
+ *   currentModeBackingWidth / nativePanelPixelWidth.
+ * When multiplied by a physical pixel dimension (such as 1280x720) and passed
+ * to Window_setSize, AppKit points become desiredPhysPx * (modeLogicalW / nativeW),
+ * keeping the window and all widgets at the exact same physical monitor size
+ * across macOS Larger Text, Default, and More Space presets.
+ * @param window target window (nullptr queries the main display)
+ * @return backing-to-physical pixel ratio (1.0 when native equals backing)
  */
 f32 Window_getPhysicalScale(const Window *window) {
     @autoreleasepool {
         CGDirectDisplayID did = windowDisplayId(window);
-        CGSize mm = CGDisplayScreenSize(did);
-        CGDisplayModeRef mode = CGDisplayCopyDisplayMode(did);
-        bytes backingW = mode ? CGDisplayModeGetPixelWidth(mode) : 0u;
-        if (mode)
-            CGDisplayModeRelease(mode);
+        bytes nativeW = 0u;
+        bytes nativeH = 0u;
+        windowQueryNativePanelPixels(did, &nativeW, &nativeH);
 
-        if (mm.width > 10.0 && backingW > 0u) {
-            d64 backingPPI = (d64) backingW / (mm.width / 25.4);
-            f32 scale = (f32) (backingPPI / 110.0);
-            if (scale < 0.5f)
-                scale = 0.5f;
-            if (scale > 6.0f)
-                scale = 6.0f;
-            return scale;
+        CGDisplayModeRef cur = CGDisplayCopyDisplayMode(did);
+        bytes backingW = cur ? CGDisplayModeGetPixelWidth(cur) : 0u;
+        if (cur)
+            CGDisplayModeRelease(cur);
+
+        if (nativeW > 0u && backingW > 0u) {
+            f32 ratio = (f32) ((d64) backingW / (d64) nativeW);
+            if (ratio < 0.25f)
+                ratio = 0.25f;
+            if (ratio > 4.0f)
+                ratio = 4.0f;
+            return ratio;
         }
-        return Window_getScale(window);
+        return 1.0f;
     }
 }
 

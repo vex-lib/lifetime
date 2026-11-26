@@ -169,7 +169,8 @@ fn Window_setVisible(Window *window, bool visible);
 
 /** --- Native pixel & DPI scale helpers (Native Pixel Law) --- */
 f32 Window_getScale(const Window *window); /** active OS backing scale factor (e.g. 2.0 on Retina) */
-f32 Window_getPhysicalScale(const Window *window); /** true physical-screen backing pixels per logical unit (ignores macOS More Space / Larger Text scaling) */
+f32 Window_getPhysicalScale(const Window *window); /** backing pixels per true physical monitor pixel (currentBackingWidth / nativePanelPixelWidth; ignores macOS More Space / Larger Text scaling) */
+fn  Window_getNativePixels(const Window *window, i32 *outWidth, i32 *outHeight); /** true hardware panel resolution in physical pixels (e.g. 2408x1506) */
 fn  Window_getPhysicalSizeMM(const Window *window, f32 *outWidthMM, f32 *outHeightMM);
 fn  Window_revalidate(Window *window); /** recompute points geometry across screen DPI transitions */
 fn  Window_setSizePoints(Window *window, f32 width, f32 height);

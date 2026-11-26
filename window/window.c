@@ -1273,7 +1273,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_MOUSEWHEEL: {
          if (window) {
-            d64 delta = (d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA;
+            d64 delta = ((d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA) * 40.0;
             Mouse_pushScrollEvent(Window_idRaw(window), 0.0, delta);
          }
          return 0;
@@ -1281,7 +1281,7 @@ static LRESULT CALLBACK windowWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
       case WM_MOUSEHWHEEL: {
          if (window) {
-            d64 delta = (d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA;
+            d64 delta = ((d64) GET_WHEEL_DELTA_WPARAM(wp) / (d64) WHEEL_DELTA) * 40.0;
             Mouse_pushScrollEvent(Window_idRaw(window), delta, 0.0);
          }
          return 0;
