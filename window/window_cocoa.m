@@ -760,13 +760,33 @@ static Window *windowHandleOf(NSWindow *window) {
 static fn windowRefreshSize(Window *window);
 static fn windowRefreshOrigin(Window *window);
 static CGFloat windowBackingScale(const Window *window);
-@interface WindowContentView : NSView
+@interface WindowContentView : NSView {
+    NSTimer *_liveResizeTimer;
+}
 @end
 
 @implementation WindowContentView
 /** Keep AppKit view coordinates in the engine's top-left origin convention. */
 - (BOOL)isFlipped {
     return YES;
+}
+
+- (discard)dealloc {
+    if (_liveResizeTimer != nil) {
+        [_liveResizeTimer invalidate];
+        _liveResizeTimer = nil;
+    }
+#if !__has_feature(objc_arc)
+    [super dealloc];
+#endif
+}
+
+- (discard)onLiveResizeTick:(NSTimer*) timer {
+    (discard) timer;
+    Window *w = windowHandleOf([self window]);
+    if (w && !atomic_load_explicit(Window_miniaturizingMut(w), memory_order_relaxed) &&
+        ![[self window] isMiniaturized] && Window_resizeRenderFn(w))
+        Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
 }
 
 /** Publish each content-size step and invoke the resize render hook in the tracking turn. */
@@ -809,24 +829,31 @@ static CGFloat windowBackingScale(const Window *window);
     Window *w = windowHandleOf([self window]);
     if (w)
         atomic_store_explicit(Window_liveResizingMut(w), true, memory_order_relaxed);
+    if (_liveResizeTimer == nil) {
+        _liveResizeTimer = [NSTimer timerWithTimeInterval:(1.0 / 60.0)
+                                                   target:self
+                                                 selector:@selector(onLiveResizeTick:)
+                                                 userInfo:nil
+                                                  repeats:YES];
+        [[NSRunLoop mainRunLoop] addTimer:_liveResizeTimer forMode:NSRunLoopCommonModes];
+    }
     [super viewWillStartLiveResize];
 }
 
 /** Clear live-resize state and reconcile the final size and render hook. */
 - (discard)viewDidEndLiveResize {
+    if (_liveResizeTimer != nil) {
+        [_liveResizeTimer invalidate];
+        _liveResizeTimer = nil;
+    }
+    [super viewDidEndLiveResize];
     Window *w = windowHandleOf([self window]);
     if (w) {
         atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
-        /**
-         * Final geometry reconciliation only: each live step already publishes
-         * its current extent. The Frame hook no-ops when this size is unchanged;
-         * no frozen drawable, delayed rebuild or mandatory settle frame exists.
-         */
         if (Window_resizeRenderFn(w))
             Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
     }
-    [super viewDidEndLiveResize];
 }
 @end
 
@@ -996,6 +1023,8 @@ static fn windowInstallMainMenu() {
         atomic_store_explicit(Window_liveResizingMut(w), false, memory_order_relaxed);
         windowRefreshSize(w);
         windowRefreshOrigin(w);
+        if (Window_resizeRenderFn(w))
+            Window_resizeRenderFn(w)(Window_resizeRenderUserdata(w));
         WindowEvent_fireFullscreen(Window_lifecycleMut(w), w);
     }
 }
@@ -1989,14 +2018,12 @@ bool Window_isEnabled(const Window *window) {
     return window ? atomic_load_explicit(Window_enabledPtr(window), memory_order_relaxed) : false;
 }
 
-/** Read live-resize state, including the file-local diagnostic override seam. */
+/** Read live-resize state published by AppKit tracking callbacks. */
 bool Window_isLiveResizing(const Window *window) {
-    FILE *probe = fopen("/tmp/vex_live", "r");
-    if (probe) {
-        fclose(probe);
-        return window != nullptr;
-    }
-    return window ? atomic_load_explicit(Window_liveResizingPtr(window), memory_order_relaxed) : false;
+    if (!window)
+        return false;
+
+    return atomic_load_explicit(Window_liveResizingPtr(window), memory_order_relaxed);
 }
 
 /** --- Chrome / state API ----------------------------------------------------- */
